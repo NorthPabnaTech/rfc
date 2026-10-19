@@ -1,0 +1,247 @@
+/*
+ * RFC Gadget design tokens.
+ * Brand: electric BLUE (cyan → blue orbit) on deep navy, taken from the RFC
+ * logo. Light body for the storefront and admin, deep-navy "noir" surfaces
+ * for the header, footer, hero and admin sidebar.
+ *
+ * Imported by styles/globals.css *after* the tailwindcss import.
+ * The @theme block exposes tokens to Tailwind v4 utilities
+ * (e.g. bg-panel, text-ink, border-line, bg-brand, bg-noir, font-display).
+ *
+ * 1. PALETTE SCALES (base, brand/blue, info, success, warning, danger) are the
+ *    single source of truth — 11 shades each (25 … 900).
+ * 2. SEMANTIC tokens (surface, ink, line, brand, accent, noir, status-*) point
+ *    at a shade. Components use only semantic tokens, so the whole app
+ *    re-skins from this file.
+ */
+
+@theme {
+  /* ═══ Brand palette scales — source of truth ═══════════════════════════ */
+
+  /* Base — neutral slate */
+  --color-base-25: #f9fafb;
+  --color-base-50: #f0f3f9;
+  --color-base-100: #e9eff6;
+  --color-base-200: #d7dfe9;
+  --color-base-300: #afbaca;
+  --color-base-400: #8897ae;
+  --color-base-500: #5e718d;
+  --color-base-600: #455468;
+  --color-base-700: #3d4a5c;
+  --color-base-800: #2d3643;
+  --color-base-900: #1c222b;
+
+  /* Brand — electric blue from the logo's "C" (primary brand / action colour) */
+  --color-brand-25: #f3f8ff;
+  --color-brand-50: #e6f1ff;
+  --color-brand-100: #c7e0ff;
+  --color-brand-200: #9cc9ff;
+  --color-brand-300: #63aaff;
+  --color-brand-400: #2b8cff;
+  --color-brand-500: #1170f5;
+  --color-brand-600: #0a5ad6;
+  --color-brand-700: #0b48ab;
+  --color-brand-800: #0e3d87;
+  --color-brand-900: #0c2857;
+  /* The cyan highlight at the top of the logo's orbit (gradients only) */
+  --color-brand-cyan: #19c6ff;
+
+  /* Info — blue */
+  --color-info-25: #f2f5ff;
+  --color-info-50: #e8edff;
+  --color-info-100: #b4c4ff;
+  --color-info-200: #94abff;
+  --color-info-300: #6e8eff;
+  --color-info-400: #4a72ff;
+  --color-info-500: #1b4dff;
+  --color-info-600: #0f3cd9;
+  --color-info-700: #042bb2;
+  --color-info-800: #042185;
+  --color-info-900: #00114a;
+
+  /* Success — green */
+  --color-success-25: #f2fff9;
+  --color-success-50: #d7ffeb;
+  --color-success-100: #7dfeb9;
+  --color-success-200: #44e790;
+  --color-success-300: #2fd181;
+  --color-success-400: #1db469;
+  --color-success-500: #11a75c;
+  --color-success-600: #0a9952;
+  --color-success-700: #048746;
+  --color-success-800: #046a37;
+  --color-success-900: #02542b;
+
+  /* Warning — yellow */
+  --color-warning-25: #fff9df;
+  --color-warning-50: #fff2c4;
+  --color-warning-100: #ffe99d;
+  --color-warning-200: #ffe176;
+  --color-warning-300: #ffd84e;
+  --color-warning-400: #ffd027;
+  --color-warning-500: #ffc700;
+  --color-warning-600: #d8a800;
+  --color-warning-700: #b18a00;
+  --color-warning-800: #896b00;
+  --color-warning-900: #624d00;
+
+  /* Danger — red / error (distinct from brand) */
+  --color-danger-25: #fff5f4;
+  --color-danger-50: #ffdcda;
+  --color-danger-100: #ffc5c1;
+  --color-danger-200: #ffa19b;
+  --color-danger-300: #ff7a72;
+  --color-danger-400: #ff574d;
+  --color-danger-500: #ff3838;
+  --color-danger-600: #e92215;
+  --color-danger-700: #d21a0e;
+  --color-danger-800: #be170c;
+  --color-danger-900: #ab0a00;
+
+  /* ═══ Semantic tokens — mapped to the scales above ═════════════════════ */
+
+  /* Surfaces */
+  --color-surface: var(--color-base-25);
+  --color-panel: #ffffff;
+  --color-well: var(--color-base-50);
+
+  /* Text */
+  --color-ink: var(--color-base-900);
+  --color-muted: var(--color-base-500);
+  --color-subtle: var(--color-base-400);
+
+  /* Lines — soft hairline (base-200 @ ~72%) + a stronger divider */
+  --color-line: color-mix(in srgb, var(--color-base-200) 72%, transparent);
+  --color-line-2: var(--color-base-300);
+
+  /* Brand — blue fill with white text (brand-500 keeps ≥ 4.5:1 on white). */
+  --color-brand: var(--color-brand-500);
+  --color-brand-hover: var(--color-brand-600);
+  --color-brand-soft: var(--color-brand-50);
+  --color-brand-ink: var(--color-brand-700);
+  --color-brand-contrast: #ffffff;
+
+  /* Accent — deep blue, legible as text/links on white */
+  --color-accent: var(--color-brand-600);
+  --color-accent-hover: var(--color-brand-700);
+  --color-accent-soft: var(--color-brand-50);
+
+  /* Noir — the logo's deep-navy background; header, footer, hero, admin sidebar */
+  --color-noir: #050b2b;
+  --color-noir-2: #0a1338;
+  --color-noir-3: #121d4a;
+  --color-noir-line: #1f2b5e;
+  --color-noir-fg: #9ba7cc;
+  --color-cream: #eef4ff;
+
+  /* Status Colors for utilities */
+  --color-ok: var(--color-success-600);
+  --color-ok-hover: var(--color-success-700);
+
+  /* ═══ Sidebar — dark chrome ════════════════════════════════════════════
+   * The sidebar is a dark surface, independent of the light app body. Only
+   * the sidebar component consumes these tokens. Idle content is a soft grey
+   * on near-black; hover raises one step; the active item fills with brand. */
+  --color-sidebar: var(--color-noir); /* panel background */
+  --color-sidebar-raised: var(--color-noir-3); /* hover / nested panels (flyout) */
+  --color-sidebar-active: var(--color-brand-500); /* active item fill */
+  --color-sidebar-border: var(--color-noir-line); /* dividers / hairlines */
+  --color-sidebar-fg: #9ba7cc; /* idle label + icon */
+  --color-sidebar-fg-strong: white; /* hover / active / titles */
+  --color-sidebar-muted: #6b77a0; /* secondary text (email, hints) */
+
+  /* Typography — loaded with next/font in app/layout.tsx, which sets the
+   * --font-body / --font-heading variables on <html>. Nunito Sans for UI and
+   * body copy; Jost (geometric, like the logo wordmark) for display type.
+   * Neither has Bengali glyphs, so Bangla text falls through to Hind Siliguri
+   * (--font-bangla). */
+  --font-sans:
+    var(--font-body), 'Nunito Sans', var(--font-bangla), 'Hind Siliguri', ui-sans-serif, system-ui,
+    sans-serif;
+  --font-display:
+    var(--font-heading), 'Jost', var(--font-bangla), 'Hind Siliguri', ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: var(--font-sans);
+  --font-serif: var(--font-display);
+
+  /* Radii */
+  --radius-xl2: 10px;
+
+  /* Elevation — softer, more diffuse shadows */
+  --shadow-pop:
+    0 8px 24px -10px oklch(0.2 0.02 265 / 0.13), 0 2px 6px -2px oklch(0.2 0.02 265 / 0.08);
+  --shadow-modal: 0 24px 60px -14px oklch(0.2 0.02 265 / 0.22);
+
+  /* shadcn color utility mapping */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* shadcn border radius utility mapping */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xs: calc(var(--radius) - 5px);
+}
+
+:root {
+  /* Focus ring — brand glow (used by box-shadow, not a Tailwind color) */
+  --brand-ring: color-mix(in srgb, var(--color-brand-500) 28%, transparent);
+
+  /* ── shadcn CSS variable aliases ───────────────────────────────────────────
+   * New shadcn components use these names. We map them to our design tokens
+   * so updated components render correctly without class-name changes. */
+  --background: var(--color-surface);
+  --foreground: var(--color-ink);
+  --card: var(--color-panel);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-panel);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-brand);
+  --primary-foreground: var(--color-brand-contrast);
+  --secondary: var(--color-well);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-well);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-well);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--status-danger-fg);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-line);
+  --input: var(--color-line);
+  --ring: var(--color-accent);
+  --radius: 9px; /* cards step up to 10px via --radius-xl2 */
+
+  /* Status tokens — paired bg / fg / dot, mapped to the palette scales.
+   * ok → success (green), warn → warning (yellow), danger → danger (red),
+   * info → info (blue). */
+  --status-ok-bg: var(--color-success-50);
+  --status-ok-fg: var(--color-success-700);
+  --status-ok-dot: var(--color-success-500);
+
+  --status-warn-bg: var(--color-warning-50);
+  --status-warn-fg: var(--color-warning-800);
+  --status-warn-dot: var(--color-warning-600);
+
+  --status-danger-bg: var(--color-danger-50);
+  --status-danger-fg: var(--color-danger-700);
+  --status-danger-dot: var(--color-danger-600);
+
+  --status-info-bg: var(--color-info-50);
+  --status-info-fg: var(--color-info-600);
+  --status-info-dot: var(--color-info-500);
+}

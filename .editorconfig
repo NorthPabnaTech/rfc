@@ -1,0 +1,16 @@
+# Baseline editor settings for any editor. Values mirror prettier.config.mjs
+# so the two never disagree. Prettier remains the single source of truth for
+# formatting (the VS Code extension is told to ignore EditorConfig).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+[*.md]
+trim_trailing_whitespace = false

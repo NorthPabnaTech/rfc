@@ -1,0 +1,32 @@
+import 'server-only';
+
+import { z } from 'zod';
+
+/**
+ * Server-only environment, validated once on first import so a missing or
+ * malformed variable fails fast with a readable message instead of surfacing
+ * as an obscure driver/SDK error deep inside a request.
+ */
+const schema = z.object({
+  MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+  MONGODB_DB: z.string().min(1).default('rfc_gadget'),
+  AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
+  CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
+  CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
+  CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+});
+
+const parsed = schema.safeParse(process.env);
+
+if (!parsed.success) {
+  const issues = parsed.error.issues
+    .map((i) => `  • ${i.path.join('.') || '(root)'}: ${i.message}`)
+    .join('\n');
+  throw new Error(`Invalid server environment variables:\n${issues}`);
+}
+
+export const serverEnv = {
+  ...parsed.data,
+  IS_PROD: parsed.data.NODE_ENV === 'production',
+} as const;

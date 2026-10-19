@@ -1,0 +1,240 @@
+import {
+  Alert02Icon,
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowLeftDoubleIcon,
+  ArrowLeftRightIcon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  ArrowUpRight01Icon,
+  BookOpen01Icon,
+  Building01Icon,
+  Calendar03Icon,
+  Call02Icon,
+  Camera01Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  ChartColumnIcon,
+  ChartIncreaseIcon,
+  CheckmarkBadge01Icon,
+  CheckmarkCircle01Icon,
+  Clock01Icon,
+  Coins01Icon,
+  ComputerIcon,
+  Copy01Icon,
+  CreditCardIcon,
+  CustomerSupportIcon,
+  DashboardSquare01Icon,
+  Delete02Icon,
+  DeliveryTruck01Icon,
+  Discount01Icon,
+  DiscountTag01Icon,
+  Download04Icon,
+  Facebook01Icon,
+  FavouriteIcon,
+  File01Icon,
+  FileSyncIcon,
+  FilterHorizontalIcon,
+  FireIcon,
+  FolderLibraryIcon,
+  GridViewIcon,
+  HelpCircleIcon,
+  Home01Icon,
+  Image01Icon,
+  InboxIcon,
+  InformationCircleIcon,
+  InstagramIcon,
+  Invoice01Icon,
+  Layers01Icon,
+  Leaf01Icon,
+  Link01Icon,
+  ListViewIcon,
+  Loading03Icon,
+  Location01Icon,
+  Login03Icon,
+  Logout03Icon,
+  Mail01Icon,
+  Megaphone01Icon,
+  Menu01Icon,
+  MessageQuestionIcon,
+  MinusSignIcon,
+  MoneyReceive01Icon,
+  MoreHorizontalIcon,
+  Notification01Icon,
+  Package01Icon,
+  PackageDeliveredIcon,
+  PackageProcessIcon,
+  PanelLeftOpenIcon,
+  PencilEdit02Icon,
+  PinLocation01Icon,
+  PlusSignIcon,
+  RefreshIcon,
+  Restaurant01Icon,
+  Search01Icon,
+  SecurityCheckIcon,
+  Settings01Icon,
+  Settings02Icon,
+  Shield01Icon,
+  ShoppingBag02Icon,
+  ShoppingCart01Icon,
+  SparklesIcon,
+  SquareLock01Icon,
+  StarIcon,
+  Store01Icon,
+  Table01Icon,
+  Tag01Icon,
+  Tick02Icon,
+  TiktokIcon,
+  TruckDeliveryIcon,
+  UnfoldMoreIcon,
+  Upload04Icon,
+  UserCircleIcon,
+  UserIcon,
+  UserMultipleIcon,
+  ViewIcon,
+  ViewOffIcon,
+  WhatsappIcon,
+  YoutubeIcon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+
+import { cn } from '@lib/utils';
+
+/*
+ * Icon registry — backed entirely by `@hugeicons` (free set), no custom SVGs.
+ * The name-based API is kept stable so call sites stay `<Icon name="…" />`.
+ * Add a new icon by importing its data object above and mapping a key in
+ * REGISTRY. Icons render through `<HugeiconsIcon>`, which draws each glyph in
+ * `currentColor`, so text-color classes (`text-muted`, …) style them.
+ */
+
+const REGISTRY = {
+  // ---- nav icons ----
+  grid: DashboardSquare01Icon,
+  cart: ShoppingCart01Icon,
+  table: Table01Icon,
+  tag: Tag01Icon,
+  food: Restaurant01Icon,
+  truck: DeliveryTruck01Icon,
+  leaf: Leaf01Icon,
+  receipt: Invoice01Icon,
+  box: Package01Icon,
+  book: BookOpen01Icon,
+  flame: FireIcon,
+  monitor: ComputerIcon,
+  card: CreditCardIcon,
+  users: UserMultipleIcon,
+  bar: ChartColumnIcon,
+  shield: Shield01Icon,
+  user: UserIcon,
+  building: Building01Icon,
+  settings: Settings01Icon,
+  lock: SquareLock01Icon,
+  doc: File01Icon,
+  star: StarIcon,
+  coin: Coins01Icon,
+  mapPin: PinLocation01Icon,
+  image: Image01Icon,
+  megaphone: Megaphone01Icon,
+  discount: Discount01Icon,
+  coupon: DiscountTag01Icon,
+
+  // ---- utility icons (topbar, dialogs, tables) ----
+  search: Search01Icon,
+  mail: Mail01Icon,
+  bell: Notification01Icon,
+  chevDown: ArrowDown01Icon,
+  chevRight: ArrowRight01Icon,
+  chevLeft: ArrowLeft01Icon,
+  arrowLeft: ArrowLeft01Icon,
+  chevUpDown: UnfoldMoreIcon,
+  chevDouble: ArrowLeftDoubleIcon,
+  arrowsLeftRight: ArrowLeftRightIcon,
+  panelLeft: PanelLeftOpenIcon,
+  plus: PlusSignIcon,
+  minus: MinusSignIcon,
+  check: Tick02Icon,
+  x: Cancel01Icon,
+  more: MoreHorizontalIcon,
+  download: Download04Icon,
+  upload: Upload04Icon,
+  pencil: PencilEdit02Icon,
+  revision: FileSyncIcon,
+  trash: Delete02Icon,
+  eye: ViewIcon,
+  eyeOff: ViewOffIcon,
+  calendar: Calendar03Icon,
+  clock: Clock01Icon,
+  list: ListViewIcon,
+  filter: FilterHorizontalIcon,
+  logout: Logout03Icon,
+
+  // ---- storefront ----
+  bag: ShoppingBag02Icon,
+  heart: FavouriteIcon,
+  phone: Call02Icon,
+  location: Location01Icon,
+  whatsapp: WhatsappIcon,
+  facebook: Facebook01Icon,
+  instagram: InstagramIcon,
+  tiktok: TiktokIcon,
+  youtube: YoutubeIcon,
+  menu: Menu01Icon,
+  external: ArrowUpRight01Icon,
+  secure: SecurityCheckIcon,
+  refresh: RefreshIcon,
+  question: MessageQuestionIcon,
+  support: CustomerSupportIcon,
+  store: Store01Icon,
+  link: Link01Icon,
+  copy: Copy01Icon,
+  home: Home01Icon,
+  userCircle: UserCircleIcon,
+  delivered: PackageDeliveredIcon,
+  processing: PackageProcessIcon,
+  shipping: TruckDeliveryIcon,
+  badgeCheck: CheckmarkBadge01Icon,
+  cancelCircle: CancelCircleIcon,
+  layers: Layers01Icon,
+  gridView: GridViewIcon,
+  camera: Camera01Icon,
+  chevUp: ArrowUp01Icon,
+  login: Login03Icon,
+  trend: ChartIncreaseIcon,
+  money: MoneyReceive01Icon,
+  sliders: Settings02Icon,
+
+  // ---- feedback / state icons (loaders, empty states) ----
+  loader: Loading03Icon,
+  inbox: InboxIcon,
+  sparkles: SparklesIcon,
+  folder: FolderLibraryIcon,
+  alert: Alert02Icon,
+  info: InformationCircleIcon,
+  checkCircle: CheckmarkCircle01Icon,
+  help: HelpCircleIcon,
+} satisfies Record<string, IconSvgElement>;
+
+export type IconRegistryKey = keyof typeof REGISTRY;
+
+type IconProps = {
+  name: IconRegistryKey;
+  size?: number;
+  /** Stroke width, mapped to hugeicons' `strokeWidth`. */
+  stroke?: number;
+  className?: string;
+};
+
+export function Icon({ name, size = 16, stroke = 1.5, className }: IconProps) {
+  const glyph: IconSvgElement | undefined = REGISTRY[name];
+  if (!glyph) return null;
+  return (
+    <HugeiconsIcon
+      icon={glyph}
+      size={size}
+      strokeWidth={stroke}
+      className={cn('shrink-0', className)}
+      aria-hidden="true"
+    />
+  );
+}

@@ -1,0 +1,3 @@
+# The HTML prototype is a frozen reference — the prototype-to-module skill
+# addresses it by line number, so it must never be reformatted.
+prototype/

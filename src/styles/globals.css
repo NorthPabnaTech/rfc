@@ -1,0 +1,631 @@
+@import 'tailwindcss';
+@plugin 'tailwindcss-animate';
+@import './tokens.css';
+
+@theme {
+  --font-weight-medium: 600;
+
+  --animate-pop: pop 0.2s ease-out;
+  --animate-pop-out: pop-out 0.15s ease-in forwards;
+  --animate-fade: fade 0.2s ease-out;
+  --animate-fade-out: fade-out 0.15s ease-in forwards;
+  --animate-slide-in-left: slide-in-left 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-slide-out-left: slide-out-left 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  --animate-slide-in-right: slide-in-right 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-slide-out-right: slide-out-right 0.18s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes pop-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out-right {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@layer base {
+  /* Tailwind v4 defaults bare `border`/`border-*` utilities to currentColor,
+   * which renders as the dark ink text color. Restore the v3 behaviour so an
+   * unspecified border falls back to our faint hairline token. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
+
+  html,
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  body {
+    -webkit-font-smoothing: antialiased;
+    /* Long unbroken words (URLs, SKUs) wrap instead of widening layouts. */
+    overflow-wrap: break-word;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Elements the browser or a third-party stylesheet would otherwise give their
+   * own family. Everything else simply inherits the body font. */
+  input,
+  button,
+  select,
+  textarea,
+  optgroup,
+  table,
+  th,
+  td,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  label {
+    font-family: inherit;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-sans);
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.905 0.004 265);
+    border-radius: 999px;
+    border: 2px solid var(--color-surface);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.84 0.005 265);
+  }
+}
+
+@layer components {
+  /* Inset ring — no layout cost, so it suits controls, chips and popovers.
+     NOTE: an inset shadow paints BELOW descendants, so anything whose children
+     have their own background (a table with row hover, tinted cells) must use
+     a real border instead — see the shared `TableFrame`. */
+  .hairline {
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+  .hairline-2 {
+    box-shadow: inset 0 0 0 1px var(--color-line-2);
+  }
+  .row-hover:hover {
+    background: var(--color-well);
+  }
+  /* Scrollable but with the scrollbar hidden (sidebar only). */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .input-flat {
+    background: #ffffff;
+    border: 1px solid var(--color-line);
+    border-radius: 6px;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    transition:
+      border-color 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+  .input-flat:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+  }
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 5px;
+    border-radius: 4px;
+    color: var(--color-muted);
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+}
+
+@layer utilities {
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px var(--brand-ring),
+      0 0 0 1px var(--color-accent);
+  }
+
+  .submenu {
+    overflow: hidden;
+    transition: grid-template-rows 0.2s ease;
+    display: grid;
+    grid-template-rows: 0fr;
+  }
+  .submenu.open {
+    grid-template-rows: 1fr;
+  }
+  .submenu > div {
+    min-height: 0;
+  }
+}
+
+/* ─── Loaders ──────────────────────────────────────────────────────────────
+ * Two distinct, logo-free motifs:
+ *   • App loader   → "radar": expanding ripple rings + spinning orbit + core.
+ *   • Section loader → "equalizer": bouncing bars (data-fetching feel).
+ *   • Spinner      → tapered arc, for inline / button use. */
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes loader-bob {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0) scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+}
+@keyframes loader-core {
+  0%,
+  100% {
+    transform: scale(0.78);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+@keyframes loader-ripple {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes loader-shimmer {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@layer components {
+  /* Indeterminate shimmer bar (app loader progress hint). */
+  .loader-track {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-well);
+    border-radius: 9999px;
+  }
+  .loader-track::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 38%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--color-accent) 55%, transparent),
+      transparent
+    );
+    animation: loader-shimmer 1.25s ease-in-out infinite;
+  }
+
+  /* ── App "radar" loader ── */
+  .loader-ripple {
+    border-radius: 9999px;
+    border: 1.5px solid color-mix(in oklch, var(--color-accent) 60%, transparent);
+    animation: loader-ripple 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  }
+  .brand-orbit {
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 90deg,
+      transparent 0 18%,
+      color-mix(in oklch, var(--color-accent) 35%, transparent) 45%,
+      var(--color-accent) 82%,
+      transparent 100%
+    );
+    -webkit-mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - 2.5px),
+      #000 calc(100% - 2.5px)
+    );
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+    animation: loader-spin 0.95s cubic-bezier(0.5, 0.15, 0.5, 0.85) infinite;
+  }
+  .loader-core {
+    border-radius: 9999px;
+    background: var(--color-brand);
+    animation: loader-core 1.4s ease-in-out infinite;
+  }
+
+  /* ── Section loader: smooth accent gradient ring with a rounded head ── */
+  .loader-ring {
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0%,
+      color-mix(in oklch, var(--color-accent) 18%, transparent) 50%,
+      var(--color-accent) 100%
+    );
+    -webkit-mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - 3px),
+      #000 calc(100% - 3px)
+    );
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+    animation: loader-spin 0.8s linear infinite;
+  }
+  .loader-ring::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 3px;
+    height: 3px;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    transform: translateX(-50%);
+  }
+
+  /* ── Inline spinner + message dots ── */
+  .spinner-arc {
+    animation: loader-spin 0.7s linear infinite;
+  }
+  .loader-dot {
+    animation: loader-bob 1.1s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop,
+  .animate-pop-out,
+  .animate-fade,
+  .animate-fade-out,
+  .anim-slide-in-right,
+  .anim-slide-out-right,
+  .anim-slide-in-left,
+  .anim-slide-out-left,
+  .brand-orbit,
+  .spinner-arc,
+  .loader-dot,
+  .loader-ring,
+  .loader-track::after {
+    animation-duration: 1.6s !important;
+  }
+  .loader-ripple,
+  .loader-core {
+    animation: none !important;
+  }
+}
+
+/* Quill ships its own Helvetica stack and injects quill.snow.css at runtime, so
+   these rules stay unlayered (and one step more specific) to win regardless of
+   stylesheet order. Part of the global Lato rule — not a per-component font. */
+html .ql-toolbar.ql-snow,
+html .ql-container.ql-snow,
+html .ql-snow .ql-editor,
+html .ql-snow .ql-picker,
+html .ql-snow .ql-picker-label,
+html .ql-snow .ql-picker-item,
+html .ql-snow .ql-tooltip,
+html .ql-snow .ql-tooltip input[type='text'] {
+  font-family: var(--font-sans);
+}
+
+/* ═══ RFC Gadget storefront ═══════════════════════════════════════════════ */
+
+@utility container-page {
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 80rem) {
+    padding-inline: 2rem;
+  }
+}
+
+/* Cyan → blue text, matching the logo's gradient. */
+@utility text-brand-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-cyan) 0%,
+    var(--color-brand-400) 45%,
+    var(--color-brand-600) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-brand-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-cyan) 0%,
+    var(--color-brand-500) 50%,
+    var(--color-brand-700) 100%
+  );
+}
+
+/* Subtle radial glow used behind the hero and noir sections. */
+@utility bg-noir-glow {
+  background-color: var(--color-noir);
+  background-image:
+    radial-gradient(
+      60% 80% at 85% 10%,
+      color-mix(in oklch, var(--color-brand-400) 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 60% at 0% 100%,
+      color-mix(in oklch, var(--color-brand-600) 14%, transparent),
+      transparent 70%
+    );
+}
+
+@theme {
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -400px 0;
+    }
+    to {
+      background-position: 400px 0;
+    }
+  }
+}
+
+@layer components {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-well) 0px,
+      color-mix(in oklch, var(--color-well) 40%, white) 120px,
+      var(--color-well) 240px
+    );
+    background-size: 800px 100%;
+    animation: var(--animate-shimmer);
+    border-radius: 0.5rem;
+  }
+
+  /* Rich-text product descriptions (sanitized HTML from the admin editor). */
+  .prose-store {
+    color: var(--color-base-700);
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .prose-store > * + * {
+    margin-top: 0.9em;
+  }
+  .prose-store h1,
+  .prose-store h2,
+  .prose-store h3 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 1.4em;
+  }
+  .prose-store h1 {
+    font-size: 1.5em;
+  }
+  .prose-store h2 {
+    font-size: 1.3em;
+  }
+  .prose-store h3 {
+    font-size: 1.12em;
+  }
+  .prose-store ul {
+    list-style: disc;
+    padding-left: 1.3em;
+  }
+  .prose-store ol {
+    list-style: decimal;
+    padding-left: 1.3em;
+  }
+  .prose-store a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-store img {
+    border-radius: 0.75rem;
+    max-width: 100%;
+    height: auto;
+  }
+  .prose-store blockquote {
+    border-left: 3px solid var(--color-brand-300);
+    padding-left: 1em;
+    color: var(--color-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Trim a text block's line box to the capital letters (top) and the baseline
+ * (bottom). With `align-items: center` this centres the *visible* glyphs on an
+ * adjacent icon, instead of the font's ascender/descender box, which sits
+ * letters slightly high. Browsers without `text-box` support simply ignore it.
+ */
+@utility cap-trim {
+  text-box: trim-both cap alphabetic;
+}
+
+/* ═══ Typography scale ══════════════════════════════════════════════════════
+ * One set of text styles for the whole app. Shared components use these, so
+ * pages never invent sizes. (Named `type-*`, not `text-*`, so tailwind-merge
+ * never mistakes them for colour utilities.)
+ */
+@utility type-display {
+  overflow-wrap: break-word;
+  font-family: var(--font-display);
+  font-size: 1.875rem; /* 30px */
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  @media (width >= 40rem) {
+    font-size: 2.25rem; /* 36px */
+  }
+}
+@utility type-page-title {
+  overflow-wrap: break-word;
+  font-size: 1.5rem; /* 24px */
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+@utility type-section-title {
+  overflow-wrap: break-word;
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+@utility type-card-title {
+  overflow-wrap: break-word;
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.4;
+  font-weight: 700;
+}
+@utility type-label {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.35;
+  font-weight: 600;
+}
+@utility type-body {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.6;
+}
+@utility type-helper {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.45;
+}
+@utility type-caption {
+  font-size: 0.71875rem; /* 11.5px */
+  line-height: 1.4;
+}
+@utility type-overline {
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
