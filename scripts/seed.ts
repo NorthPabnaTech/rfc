@@ -23,18 +23,13 @@ const SUPPLIERS = [
 ];
 
 const STARTER_CATEGORIES: Record<string, string[]> = {
-  'Men’s Fashion': ['T-Shirts & Polos', 'Shirts', 'Pants & Jeans', 'Panjabi'],
-  'Women’s Fashion': ['Three-Piece', 'Kurti & Tops', 'Saree', 'Hijab & Abaya'],
-  'Bags & Accessories': ['Handbags', 'Wallets', 'Backpacks', 'Belts'],
-  Watches: ['Men’s Watches', 'Women’s Watches', 'Smart Watches'],
-  'Gadgets & Electronics': [
-    'Earbuds & Headphones',
-    'Chargers & Cables',
-    'Mobile Accessories',
-    'Smart Gadgets',
-  ],
-  'Home & Kitchen': ['Kitchen Tools', 'Home Decor', 'Storage & Organizers'],
-  'Beauty & Personal Care': ['Skin Care', 'Hair Care', 'Grooming'],
+  'Mobile Accessories': ['Cases & Covers', 'Screen Protectors', 'Holders & Stands'],
+  'Chargers & Cables': ['Wall Chargers', 'Cables', 'Car Chargers', 'Wireless Chargers'],
+  'Power Banks': ['Fast-Charging Power Banks', 'Magnetic Power Banks'],
+  Audio: ['Earbuds', 'Headphones', 'Neckbands', 'Bluetooth Speakers'],
+  'Smart Watches & Bands': ['Smart Watches', 'Fitness Bands', 'Watch Straps'],
+  'Computer Accessories': ['Mouse & Keyboards', 'USB Hubs', 'Storage & Pendrives'],
+  'Smart Gadgets': ['Smart Home', 'Lights & Fans', 'Trimmers & Grooming'],
 };
 
 function required(name: string): string {
@@ -44,7 +39,9 @@ function required(name: string): string {
 }
 
 async function main() {
-  await mongoose.connect(required('MONGODB_URI'), { dbName: process.env.MONGODB_DB || 'rfc_gadget' });
+  await mongoose.connect(required('MONGODB_URI'), {
+    dbName: process.env.MONGODB_DB || 'rfc_gadget',
+  });
   console.log(`Connected to database "${mongoose.connection.name}"`);
 
   // Make sure unique indexes exist before inserting.
