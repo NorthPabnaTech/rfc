@@ -39,7 +39,7 @@ react-hook-form · zustand (cart only) · jose + bcryptjs (auth).
      ChipMultiSelect
    - `src/features/*` — ProductCard/Grid, ProductImage (Cloudinary + external),
      Price/Taka, RatingStars, ImageUploader (Cloudinary upload + URLs), order
-     badges/timeline/items, cart QuantityStepper/QuickAdd
+     badges/timeline/items, cart QuantityStepper/QuickAdd, NotificationBell
    - `src/hooks/use-url-filters.ts` — list filters/pagination in the URL
    - `src/lib/action-client.ts` — `handleActionResult` (toast + field errors)
 2. **Next.js App Router only.** No React Router, no route config arrays, no
@@ -53,6 +53,9 @@ react-hook-form · zustand (cart only) · jose + bcryptjs (auth).
    `revalidatePath(...)`, wrapped in `runAction()` so it returns
    `ActionResult` (`{ ok, data } | { ok: false, error, fieldErrors }`).
    The only Route Handler is `POST /api/upload` (multipart → Cloudinary).
+   Notifications: call `services/notifications.ts` (`notify*` helpers — they
+   store + push over Pusher and never throw) from the service that changes
+   the data; Pusher private-channel auth is a server action, not a route.
 5. **Layering:** `app` → `actions` → `services` → `database`. Pages and
    components never import Mongoose models; services return DTOs from
    `src/types` (string ids, ISO dates), mapped in `services/mappers.ts`.

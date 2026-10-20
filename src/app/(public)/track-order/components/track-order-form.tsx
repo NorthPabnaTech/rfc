@@ -39,7 +39,7 @@ export function TrackOrderForm({ initialOrderNumber }: { initialOrderNumber: str
           if (handleActionResult(res, form, { successToast: false })) setOrder(res.data);
         }}
       >
-        <FormInput name="orderNumber" label="Order number" placeholder="NV-100001" required />
+        <FormInput name="orderNumber" label="Order number" placeholder="RFC-100001" required />
         <FormInput
           name="phone"
           label="Mobile number"

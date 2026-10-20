@@ -1094,7 +1094,7 @@ async function main() {
         price: p.price,
         salePrice: p.sale ?? null,
         stockStatus: p.stock ?? 'in_stock',
-        sku: `NV-${String(idx + 1).padStart(3, '0')}`,
+        sku: `RFC-${String(idx + 1).padStart(3, '0')}`,
         images: images.map((img, n) => ({ ...img, alt: `${p.name} — image ${n + 1}` })),
         variations: p.variations ?? [],
         specifications: p.specs.map(([label, value]) => ({ label, value })),
@@ -1318,7 +1318,7 @@ async function main() {
     ];
     const deliveredAt = history.find((h) => h.status === 'delivered')?.at;
     const order = await OrderModel.create({
-      orderNumber: `NV-${await nextSequence('order')}`,
+      orderNumber: `RFC-${await nextSequence('order')}`,
       user: o.user ?? null,
       customer: { name: o.name, phone: o.phone, email: o.email },
       shippingAddress: {

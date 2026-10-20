@@ -1,9 +1,9 @@
 'use client';
 
+import * as React from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import * as React from 'react';
 import { useWatch } from 'react-hook-form';
 
 import { saveProductAction } from '@/actions/admin';
@@ -380,7 +380,7 @@ export function ProductForm({ product, categories, tags, suppliers }: Props) {
                   />
                 )}
               </FormItem>
-              <FormInput name="sku" label="SKU" placeholder="Optional, e.g. NV-WAL-001" />
+              <FormInput name="sku" label="SKU" placeholder="Optional, e.g. RFC-EAR-001" />
             </FormSection>
           </Panel>
 

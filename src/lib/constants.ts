@@ -188,6 +188,22 @@ export const BANNER_POSITION_HINTS: Record<BannerPosition, string> = {
   combo: 'Header banner on the Combo Offers page. ~1600×480.',
 };
 
+/* ─── Notifications ──────────────────────────────────────────────────────── */
+
+/**
+ * `order_placed` / `order_cancelled` go to every admin; `order_status` goes to
+ * the customer who owns the order (guest orders have nobody to notify).
+ */
+export const NOTIFICATION_TYPES = ['order_placed', 'order_cancelled', 'order_status'] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** How many recent notifications the bell loads. */
+export const NOTIFICATION_LIST_LIMIT = 20;
+/** Without realtime (no Pusher keys) the bell re-checks this often. */
+export const NOTIFICATION_POLL_MS = 30_000;
+/** Pusher event name for a new notification on a user's private channel. */
+export const NOTIFICATION_EVENT = 'notification:new';
+
 /* ─── Users & uploads ────────────────────────────────────────────────────── */
 
 export const USER_ROLES = ['customer', 'admin'] as const;

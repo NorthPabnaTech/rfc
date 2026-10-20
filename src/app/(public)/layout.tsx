@@ -1,6 +1,8 @@
 import { getCategoryTree } from '@/services/catalog';
+import { getNotificationFeed } from '@/services/notifications';
 import { getSettings } from '@/services/settings';
 import { getCurrentUser } from '@lib/auth/current-user';
+import { realtimeClientConfig } from '@lib/realtime/channels';
 
 import { CartDrawer } from './components/cart-drawer';
 import { SiteFooter } from './components/site-footer';
@@ -12,6 +14,7 @@ export default async function PublicLayout({ children }: { children: React.React
     getCategoryTree(),
     getCurrentUser(),
   ]);
+  const notifications = user ? await getNotificationFeed(user.id) : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -26,6 +29,11 @@ export default async function PublicLayout({ children }: { children: React.React
         user={user && { name: user.name, role: user.role, avatarUrl: user.avatarUrl }}
         supportPhone={settings.supportPhone}
         announcement={settings.announcement}
+        notifications={
+          user && notifications
+            ? { userId: user.id, initial: notifications, realtime: realtimeClientConfig() }
+            : null
+        }
       />
       <main id="main" className="flex-1">
         {children}

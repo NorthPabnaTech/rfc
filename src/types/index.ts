@@ -6,6 +6,7 @@
 import type {
   BannerPosition,
   ImageSourceType,
+  NotificationType,
   OrderPlatform,
   OrderStatus,
   PaymentMethod,
@@ -384,3 +385,17 @@ export type SettingsDTO = {
     youtube?: string;
   };
 };
+
+export type NotificationDTO = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  link: string;
+  seen: boolean;
+  read: boolean;
+  createdAt: string;
+};
+
+/** What the bell needs: the latest notifications + the badge count. */
+export type NotificationFeedDTO = { items: NotificationDTO[]; unseen: number };

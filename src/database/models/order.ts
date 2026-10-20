@@ -25,7 +25,7 @@ export interface OrderStatusEvent {
 
 export interface Order {
   _id: Types.ObjectId;
-  /** Human-friendly, sequential: NV-100001. */
+  /** Human-friendly, sequential: RFC-100001. */
   orderNumber: string;
   /** Null for guest checkouts and manual orders for unregistered customers. */
   user?: Types.ObjectId | null;

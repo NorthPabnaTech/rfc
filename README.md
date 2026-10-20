@@ -74,7 +74,23 @@ and change every demo password.**
 | `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | Image uploads                            |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`                  | Same cloud name, for browser URLs        |
 | `NEXT_PUBLIC_SITE_URL`                               | Public URL (SEO, sitemap)                |
+| `PUSHER_APP_ID` / `PUSHER_SECRET`                    | Realtime notifications (optional)        |
+| `NEXT_PUBLIC_PUSHER_KEY` / `_CLUSTER`                | Same Pusher app, for the browser         |
 | `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD`      | First admin, used by `npm run seed`      |
+
+### Notifications
+
+The bell in the admin header and the store header (signed-in customers) shows
+the unseen count; opening it marks everything seen, clicking one marks it read.
+
+- **Admins** get one when a customer places or cancels an order.
+- **Customers** get one each time the admin changes their order's status
+  (guest orders have no account, so nothing is sent).
+
+Notifications are stored in MongoDB (`notifications`, auto-deleted after 90
+days) and pushed live over **Pusher Channels** — Vercel functions can't hold a
+WebSocket open, so a hosted socket service carries the push. Without Pusher
+keys everything still works; the bell just re-checks every 30 seconds.
 
 Secrets live only in `.env.local` (git-ignored). In production, set them in
 your host's environment settings.

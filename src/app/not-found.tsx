@@ -6,7 +6,13 @@ import { Button } from '@components/ui/button';
 export default function NotFound() {
   return (
     <main className="bg-noir-glow flex min-h-dvh flex-col items-center justify-center px-6 text-center text-white">
-      <Image src="/brand/rfc-mark-light.png" alt="" width={180} height={79} className="opacity-90" />
+      <Image
+        src="/brand/rfc-mark-light.png"
+        alt=""
+        width={180}
+        height={79}
+        className="opacity-90"
+      />
       <p className="text-brand-300 mt-8 text-[11px] font-bold tracking-[0.3em] uppercase">
         Error 404
       </p>

@@ -89,7 +89,7 @@ export const trackOrderSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^NV-\d{6,}$/, 'Order number looks like NV-100001'),
+    .regex(/^RFC-\d{6,}$/, 'Order number looks like RFC-100001'),
   phone: addressFields.phone,
 });
 

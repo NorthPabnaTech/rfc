@@ -63,8 +63,8 @@ export function SiteFooter({
         <div className="md:col-span-4">
           <Logo tone="light" size="lg" tagline />
           <p className="text-noir-fg mt-5 max-w-sm text-sm leading-relaxed">
-            Curated fashion, gadgets and lifestyle essentials, delivered to your door anywhere in
-            Bangladesh.
+            Phones, smart watches, earbuds, chargers and the latest gadgets, delivered to your door
+            anywhere in Bangladesh.
           </p>
           {socials.length > 0 && (
             <div className="mt-6 flex gap-2">

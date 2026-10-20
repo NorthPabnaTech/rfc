@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import type { CategoryTreeDTO } from '@/types';
 import { IconText } from '@components/common/icon-text';
 import { Logo } from '@components/common/logo';
@@ -21,9 +22,11 @@ type Props = {
   user: HeaderUser;
   supportPhone: string;
   announcement?: string;
+  /** Signed-in visitors only. */
+  notifications: React.ComponentProps<typeof NotificationBell> | null;
 };
 
-export function SiteHeader({ categories, user, supportPhone, announcement }: Props) {
+export function SiteHeader({ categories, user, supportPhone, announcement, notifications }: Props) {
   return (
     <header className="sticky top-0 z-40 shadow-[0_1px_0_var(--color-line)]">
       {/* Utility bar */}
@@ -79,6 +82,7 @@ export function SiteHeader({ categories, user, supportPhone, announcement }: Pro
             <div className="hidden sm:block">
               <WishlistLink />
             </div>
+            {notifications && <NotificationBell {...notifications} tone="light" />}
             <CartButton />
           </div>
         </div>

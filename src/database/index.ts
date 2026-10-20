@@ -5,6 +5,7 @@ export { type Address, AddressModel, type AddressSnapshot } from './models/addre
 export { type Banner, BannerModel } from './models/banner';
 export { type Category, CategoryModel } from './models/category';
 export { nextSequence } from './models/counter';
+export { type Notification, NotificationModel } from './models/notification';
 export { type Order, OrderModel, type OrderStatusEvent } from './models/order';
 export { type OrderItem, type OrderItemComponent } from './models/order-item';
 export {

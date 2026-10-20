@@ -34,7 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!p) return { title: 'Product not found' };
   const title = p.seo.metaTitle || p.name;
   const description =
-    p.seo.metaDescription || p.shortDescription || `Buy ${p.name} at RFC Gadget with Cash on Delivery.`;
+    p.seo.metaDescription ||
+    p.shortDescription ||
+    `Buy ${p.name} at RFC Gadget with Cash on Delivery.`;
   const image = p.images[0]?.url;
   return {
     title,

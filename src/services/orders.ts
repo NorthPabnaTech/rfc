@@ -30,6 +30,11 @@ import { AppError } from '@lib/errors';
 import type { CartLineInput } from '@lib/validators/order';
 
 import { toImage, toOrder, toReturn } from './mappers';
+import {
+  notifyAdminsOrderCancelled,
+  notifyAdminsOrderPlaced,
+  notifyCustomerOrderStatus,
+} from './notifications';
 import { getSettings } from './settings';
 
 /* ─── Pricing ────────────────────────────────────────────────────────────── */
@@ -186,7 +191,9 @@ type NewOrder = {
   includeDrafts?: boolean;
 };
 
-async function createOrder(input: NewOrder): Promise<{ id: string; orderNumber: string }> {
+async function createOrder(
+  input: NewOrder,
+): Promise<{ id: string; orderNumber: string; total: number }> {
   const priced = await priceLines(input.lines, { includeDrafts: input.includeDrafts });
   const problem = priced.find((l) => !l.available);
   if (problem) throw new AppError(`${problem.name}: ${problem.issue}`);
@@ -200,7 +207,7 @@ async function createOrder(input: NewOrder): Promise<{ id: string; orderNumber: 
   const status = input.status ?? 'pending';
   const now = new Date();
 
-  const orderNumber = `NV-${await nextSequence('order')}`;
+  const orderNumber = `RFC-${await nextSequence('order')}`;
   const order = await OrderModel.create({
     orderNumber,
     user: input.userId,
@@ -233,7 +240,7 @@ async function createOrder(input: NewOrder): Promise<{ id: string; orderNumber: 
     })),
   );
 
-  return { id: String(order._id), orderNumber };
+  return { id: String(order._id), orderNumber, total: order.total };
 }
 
 export async function placeWebsiteOrder(input: {
@@ -253,6 +260,12 @@ export async function placeWebsiteOrder(input: {
     shippingAddress: input.address,
     platform: 'website',
     customerNote: input.customerNote,
+  });
+  await notifyAdminsOrderPlaced({
+    _id: result.id,
+    orderNumber: result.orderNumber,
+    customer: { name: input.name },
+    total: result.total,
   });
 
   if (input.userId && input.saveAddress) {
@@ -456,6 +469,7 @@ export async function updateOrderStatus(
   }
   await order.save();
   if (next === 'cancelled') await revertSoldCounts(order);
+  await notifyCustomerOrderStatus(order, next);
 }
 
 export async function updateOrderMeta(
@@ -489,6 +503,7 @@ export async function cancelOrderByCustomer(userId: string, orderId: string, rea
     throw new AppError('This order can no longer be cancelled — it has already been confirmed.');
   }
   await revertSoldCounts(order);
+  await notifyAdminsOrderCancelled(order);
 }
 
 export { withinReturnWindow };

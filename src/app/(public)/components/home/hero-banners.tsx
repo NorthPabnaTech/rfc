@@ -19,7 +19,8 @@ const DEFAULT_SLIDES: (BannerContent & { id: string })[] = [
     id: 'default-1',
     eyebrow: 'New arrivals',
     title: 'Smart gadgets, delivered.',
-    description: 'Phones, smart watches, earbuds and accessories — Cash on Delivery across Bangladesh.',
+    description:
+      'Phones, smart watches, earbuds and accessories — Cash on Delivery across Bangladesh.',
     ctaLabel: 'Shop now',
     link: '/products',
   },

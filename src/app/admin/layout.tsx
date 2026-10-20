@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import { getAdminBadges } from '@/services/dashboard';
+import { getNotificationFeed } from '@/services/notifications';
 import { Icon } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
 import { requireAdminPage } from '@lib/auth/current-user';
+import { realtimeClientConfig } from '@lib/realtime/channels';
 
 import { AdminMobileNav, AdminSidebar } from './components/admin-sidebar';
 
@@ -15,7 +18,10 @@ export const metadata: Metadata = {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdminPage();
-  const badges = await getAdminBadges();
+  const [badges, notifications] = await Promise.all([
+    getAdminBadges(),
+    getNotificationFeed(user.id),
+  ]);
   const shellUser = { name: user.name, email: user.email };
 
   return (
@@ -25,6 +31,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <header className="border-line sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-white/85 px-4 backdrop-blur sm:px-6">
           <AdminMobileNav badges={badges} user={shellUser} />
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell
+              userId={user.id}
+              initial={notifications}
+              realtime={realtimeClientConfig()}
+            />
             <Button variant="ghost" size="sm" asChild>
               <Link href="/" target="_blank">
                 <Icon name="external" size={15} /> View store

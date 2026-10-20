@@ -18,6 +18,7 @@ import {
   BannerModel,
   CategoryModel,
   connectDB,
+  NotificationModel,
   OrderModel,
   ProductModel,
   QuestionModel,
@@ -40,6 +41,12 @@ import {
   listProductReviews,
   setReviewHidden,
 } from '@/services/engagement';
+import {
+  getNotificationFeed,
+  markAllNotificationsRead,
+  markNotificationRead,
+  markNotificationsSeen,
+} from '@/services/notifications';
 import {
   cancelOrderByCustomer,
   createManualOrder,
@@ -191,6 +198,15 @@ async function main() {
       assert.equal(detail?.category?.id, cat.id);
     });
 
+    // An admin of our own, so admin notifications have a known recipient.
+    const smokeAdmin = await UserModel.create({
+      name: `${tag} Admin`,
+      email: `${tag}-admin@example.com`,
+      passwordHash: 'x',
+      role: 'admin',
+    });
+    created.users.push(String(smokeAdmin._id));
+
     // ── Customer ──────────────────────────────────────────────────────────
     const email = `${tag}@example.com`;
     const phone = `017${String(Date.now()).slice(-8)}`;
@@ -260,7 +276,7 @@ async function main() {
         address,
         saveAddress: true,
       });
-      assert.match(order1.orderNumber, /^NV-\d{6,}$/);
+      assert.match(order1.orderNumber, /^RFC-\d{6,}$/);
       const o = await OrderModel.findById(order1.id).lean();
       assert.equal(o!.subtotal, 2000);
       assert.equal(o!.total, 2000 + o!.shippingFee);
@@ -329,6 +345,44 @@ async function main() {
         o!.statusHistory.map((e) => e.status),
         ['pending', 'confirmed', 'processing', 'shipped', 'delivered'],
       );
+    });
+
+    await step('notifications: admins hear about orders, customers about status', async () => {
+      const adminFeed = await getNotificationFeed(String(smokeAdmin._id));
+      const mine = adminFeed.items.filter((n) => n.title.includes(order1.orderNumber));
+      assert.deepEqual(mine.map((n) => n.type).sort(), ['order_cancelled', 'order_placed']);
+      assert.ok(adminFeed.items.some((n) => n.title === `New order #${order2.orderNumber}`));
+      assert.equal(mine[0]!.link, `/admin/orders/${order1.id}`);
+
+      const feed = await getNotificationFeed(customer.id);
+      assert.deepEqual(
+        feed.items.map((n) => n.title),
+        ['Delivered', 'Shipped', 'Processing', 'Confirmed'].map(
+          (l) => `Order #${order2.orderNumber}: ${l}`,
+        ),
+        'one per status change, newest first; none for their own cancel',
+      );
+      assert.equal(feed.unseen, 4);
+      assert.ok(feed.items.every((n) => n.link === `/account/orders/${order2.id}`));
+
+      await markNotificationsSeen(customer.id);
+      const seen = await getNotificationFeed(customer.id);
+      assert.equal(seen.unseen, 0);
+      assert.ok(
+        seen.items.every((n) => n.seen && !n.read),
+        'seen is not read',
+      );
+
+      await markNotificationRead(customer.id, seen.items[0]!.id);
+      await markNotificationRead(String(smokeAdmin._id), seen.items[1]!.id); // not theirs
+      const one = await getNotificationFeed(customer.id);
+      assert.deepEqual(
+        one.items.map((n) => n.read),
+        [true, false, false, false],
+      );
+
+      await markAllNotificationsRead(customer.id);
+      assert.ok((await getNotificationFeed(customer.id)).items.every((n) => n.read));
     });
 
     await step('reviews: only purchasers, once, hidden excluded from rating', async () => {
@@ -604,6 +658,7 @@ async function main() {
       TagModel.deleteMany({ name: new RegExp(`^${tag}`) }),
       BannerModel.deleteMany({ title: new RegExp(`^${tag}`) }),
       UserModel.deleteMany({ _id: { $in: created.users } }),
+      NotificationModel.deleteMany({ user: { $in: created.users } }),
     ]);
     await mongoose.disconnect();
   }
