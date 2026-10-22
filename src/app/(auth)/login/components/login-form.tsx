@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { loginAction } from '@/actions/auth';
@@ -12,7 +13,7 @@ export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
   const form = Form.useForm<LoginInput>({
     schema: loginSchema,
-    defaultValues: { email: '', password: '' },
+    defaultValues: { identifier: '', password: '' },
   });
   const { isSubmitting } = form.formState;
 
@@ -28,8 +29,28 @@ export function LoginForm({ next }: { next?: string }) {
         }
       }}
     >
-      <FormInput name="email" label="Email" type="email" autoComplete="email" required />
-      <FormPassword name="password" label="Password" autoComplete="current-password" required />
+      <FormInput
+        name="identifier"
+        label="Email or mobile number"
+        placeholder="you@example.com or 01XXXXXXXXX"
+        autoComplete="username"
+        required
+      />
+      <FormPassword
+        name="password"
+        label="Password"
+        placeholder="Enter your password"
+        autoComplete="current-password"
+        required
+      />
+      <div className="flex justify-end">
+        <Link
+          href="/forgot-password"
+          className="type-helper text-accent hover:text-accent-hover font-semibold"
+        >
+          Forgot password?
+        </Link>
+      </div>
       <Button
         type="submit"
         variant="noir"

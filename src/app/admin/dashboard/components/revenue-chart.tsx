@@ -80,7 +80,7 @@ export function RevenueChart({ data }: { data: Point[] }) {
                 >
                   <span
                     className={cn(
-                      'block w-full max-w-6 rounded-t-[4px] bg-[#a67a31] transition-opacity',
+                      'block w-full max-w-6 rounded-t-[4px] bg-brand-500 transition-opacity',
                       active !== null && active !== i && 'opacity-40',
                       d.revenue === 0 && 'bg-transparent',
                     )}
@@ -169,7 +169,7 @@ export function BarList({ rows }: { rows: { label: string; value: number; hint?:
           </div>
           <div className="bg-well h-2 overflow-hidden rounded-full">
             <div
-              className="h-full rounded-full bg-[#a67a31]"
+              className="h-full rounded-full bg-brand-500"
               style={{ width: `${(r.value / max) * 100}%` }}
             />
           </div>

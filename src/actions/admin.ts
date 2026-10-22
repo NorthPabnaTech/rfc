@@ -209,6 +209,7 @@ export async function createManualOrderAction(
         fullName: d.fullName,
         phone: d.phone,
         addressLine: d.addressLine,
+        division: d.division,
         area: d.area,
         city: d.city,
         zone: d.zone,

@@ -39,6 +39,7 @@ export async function placeOrderAction(
         fullName: data.fullName,
         phone: data.phone,
         addressLine: data.addressLine,
+        division: data.division,
         area: data.area,
         city: data.city,
         zone: data.zone,

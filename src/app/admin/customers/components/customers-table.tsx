@@ -32,7 +32,7 @@ export function CustomersTable({ data }: { data: Paginated<CustomerRowDTO> }) {
           )}
           <div>
             <p className="text-ink font-semibold">{c.name}</p>
-            <p className="text-subtle text-[11.5px]">{c.email}</p>
+            <p className="text-subtle text-[11.5px]">{c.phone ?? c.email}</p>
           </div>
         </div>
       ),

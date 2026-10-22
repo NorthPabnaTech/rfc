@@ -1,5 +1,6 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 import {
@@ -7,11 +8,12 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationsSeen,
+  savePushSubscription,
 } from '@/services/notifications';
 import type { NotificationFeedDTO } from '@/types';
 import { requireUser } from '@lib/auth/current-user';
 import { type ActionResult, AppError, runAction } from '@lib/errors';
-import { userIdFromChannel } from '@lib/realtime/channels';
+import { PUSH_COOKIE, userIdFromChannel } from '@lib/realtime/channels';
 import { authorizeChannel } from '@lib/realtime/server';
 import { objectId } from '@lib/validators/common';
 
@@ -42,6 +44,35 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
   return runAction(async () => {
     const user = await requireUser();
     await markAllNotificationsRead(user.id);
+    return undefined;
+  });
+}
+
+const pushSubscriptionSchema = z.object({
+  endpoint: z.url({ protocol: /^https$/ }).max(1000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(100),
+  }),
+  userAgent: z.string().max(300).optional(),
+});
+
+/**
+ * Registers this browser for system notifications. Its id goes in a cookie so
+ * `logoutAction` can unregister the browser on sign-out.
+ */
+export async function savePushSubscriptionAction(input: unknown): Promise<ActionResult> {
+  return runAction(async () => {
+    const user = await requireUser();
+    const id = await savePushSubscription(user.id, pushSubscriptionSchema.parse(input));
+    const store = await cookies();
+    store.set(PUSH_COOKIE, id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
     return undefined;
   });
 }

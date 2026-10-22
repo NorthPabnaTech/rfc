@@ -2,7 +2,7 @@ import { getCategoryTree } from '@/services/catalog';
 import { getNotificationFeed } from '@/services/notifications';
 import { getSettings } from '@/services/settings';
 import { getCurrentUser } from '@lib/auth/current-user';
-import { realtimeClientConfig } from '@lib/realtime/channels';
+import { pushClientKey, realtimeClientConfig } from '@lib/realtime/channels';
 
 import { CartDrawer } from './components/cart-drawer';
 import { SiteFooter } from './components/site-footer';
@@ -31,7 +31,12 @@ export default async function PublicLayout({ children }: { children: React.React
         announcement={settings.announcement}
         notifications={
           user && notifications
-            ? { userId: user.id, initial: notifications, realtime: realtimeClientConfig() }
+            ? {
+                userId: user.id,
+                initial: notifications,
+                realtime: realtimeClientConfig(),
+                pushKey: pushClientKey(),
+              }
             : null
         }
       />

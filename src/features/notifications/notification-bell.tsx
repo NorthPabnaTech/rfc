@@ -12,22 +12,28 @@ import {
 } from '@/actions/notifications';
 import type { NotificationDTO, NotificationFeedDTO } from '@/types';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
+import { Button } from '@components/ui/button';
 import { Dropdown } from '@components/ui/dropdown';
 import {
   NOTIFICATION_EVENT,
   NOTIFICATION_LIST_LIMIT,
   NOTIFICATION_POLL_MS,
+  NOTIFICATION_SOUND,
   type NotificationType,
 } from '@lib/constants';
 import { userChannel } from '@lib/realtime/channels';
 import { toast } from '@lib/toast';
 import { cn, formatRelative } from '@lib/utils';
 
+import { usePushNotifications } from './use-push-notifications';
+
 type Props = {
   userId: string;
   initial: NotificationFeedDTO;
   /** Pusher key + cluster; `null` falls back to polling. */
   realtime: { key: string; cluster: string } | null;
+  /** VAPID public key for system notifications; `null` hides the option. */
+  pushKey: string | null;
   /** `light` = icon for dark (noir) headers; `dark` = for light headers. */
   tone?: 'light' | 'dark';
   className?: string;
@@ -40,12 +46,63 @@ const TYPE_ICON: Record<NotificationType, IconRegistryKey> = {
 };
 
 /**
+ * Plays the notification sound. Browsers only allow audio after the visitor
+ * has interacted with the page, so the clip is unlocked (played muted) on the
+ * first click / key press; before that a blocked play() is silently ignored
+ * and the system notification's own sound covers it.
+ */
+function useNotificationSound() {
+  const audio = React.useRef<HTMLAudioElement | null>(null);
+
+  React.useEffect(() => {
+    const unlock = () => {
+      audio.current ??= new Audio(NOTIFICATION_SOUND);
+      const a = audio.current;
+      a.muted = true;
+      a.play()
+        .then(() => {
+          a.pause();
+          a.currentTime = 0;
+        })
+        .catch(() => {})
+        .finally(() => {
+          a.muted = false;
+        });
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  return React.useCallback(() => {
+    audio.current ??= new Audio(NOTIFICATION_SOUND);
+    audio.current.muted = false;
+    audio.current.currentTime = 0;
+    void audio.current.play().catch(() => {});
+  }, []);
+}
+
+/**
  * Notification bell: badge = unseen count. Opening the panel marks all as
  * seen; clicking a notification marks it read and opens its link. New
- * notifications arrive live over Pusher (or by polling without it).
+ * notifications arrive live over Pusher (or by polling without it) and chime.
  */
-export function NotificationBell({ userId, initial, realtime, tone = 'dark', className }: Props) {
+export function NotificationBell({
+  userId,
+  initial,
+  realtime,
+  pushKey,
+  tone = 'dark',
+  className,
+}: Props) {
   const router = useRouter();
+  const push = usePushNotifications(pushKey);
+  const [enabling, setEnabling] = React.useState(false);
   const [items, setItems] = React.useState<NotificationDTO[]>(initial.items);
   const [unseen, setUnseen] = React.useState(initial.unseen);
   const [open, setOpen] = React.useState(false);
@@ -53,13 +110,19 @@ export function NotificationBell({ userId, initial, realtime, tone = 'dark', cla
   React.useEffect(() => {
     openRef.current = open;
   }, [open]);
+  const playSound = useNotificationSound();
+  // Ids already shown, so a refresh only chimes for genuinely new ones.
+  const knownIds = React.useRef(new Set(initial.items.map((n) => n.id)));
 
   const refresh = React.useCallback(async () => {
     const res = await getNotificationsAction();
     if (!res.ok) return;
+    const fresh = res.data.items.filter((n) => !knownIds.current.has(n.id) && !n.seen);
+    res.data.items.forEach((n) => knownIds.current.add(n.id));
+    if (fresh.length > 0) playSound();
     setItems(res.data.items);
     setUnseen(openRef.current ? 0 : res.data.unseen);
-  }, []);
+  }, [playSound]);
 
   // Live push over Pusher.
   React.useEffect(() => {
@@ -81,6 +144,8 @@ export function NotificationBell({ userId, initial, realtime, tone = 'dark', cla
       });
       const channel = pusher.subscribe(userChannel(userId));
       channel.bind(NOTIFICATION_EVENT, (n: NotificationDTO) => {
+        knownIds.current.add(n.id);
+        playSound();
         setItems((prev) =>
           [n, ...prev.filter((p) => p.id !== n.id)].slice(0, NOTIFICATION_LIST_LIMIT),
         );
@@ -99,7 +164,7 @@ export function NotificationBell({ userId, initial, realtime, tone = 'dark', cla
       cancelled = true;
       cleanup();
     };
-  }, [realtime, userId, router]);
+  }, [realtime, userId, router, playSound]);
 
   // Without realtime, poll; either way, catch up when the tab regains focus.
   React.useEffect(() => {
@@ -137,6 +202,17 @@ export function NotificationBell({ userId, initial, realtime, tone = 'dark', cla
     void markAllNotificationsReadAction();
   };
 
+  const onEnablePush = async () => {
+    setEnabling(true);
+    try {
+      await push.enable();
+    } catch {
+      toast.error("Couldn't turn on desktop notifications. Please try again.");
+    } finally {
+      setEnabling(false);
+    }
+  };
+
   const unread = items.filter((n) => !n.read).length;
 
   return (
@@ -159,6 +235,29 @@ export function NotificationBell({ userId, initial, realtime, tone = 'dark', cla
               </button>
             )}
           </div>
+          {push.state === 'default' && (
+            <div className="border-line bg-well flex items-center gap-3 border-b px-4 py-3">
+              <Icon name="bell" size={18} className="text-muted shrink-0" />
+              <p className="type-helper text-muted min-w-0 flex-1">
+                Get desktop alerts, even when this site is closed.
+              </p>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={enabling}
+                onClick={onEnablePush}
+              >
+                {enabling ? 'Turning on…' : 'Turn on'}
+              </Button>
+            </div>
+          )}
+          {push.state === 'denied' && (
+            <p className="border-line bg-well type-helper text-muted border-b px-4 py-3">
+              Desktop alerts are blocked. Allow notifications for this site in your browser settings
+              to get them.
+            </p>
+          )}
           {items.length === 0 ? (
             <div className="text-muted flex flex-col items-center gap-2 px-6 py-10 text-center">
               <Icon name="inbox" size={28} className="text-subtle" />

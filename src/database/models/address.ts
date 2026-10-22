@@ -12,7 +12,11 @@ export interface Address {
   fullName: string;
   phone: string;
   addressLine: string;
+  /** Older addresses (before the location dropdowns) may not have one. */
+  division?: string;
+  /** Upazila / thana. */
   area?: string;
+  /** District. */
   city: string;
   zone: ShippingZone;
   isDefault: boolean;
@@ -26,7 +30,7 @@ export interface Address {
  */
 export type AddressSnapshot = Pick<
   Address,
-  'fullName' | 'phone' | 'addressLine' | 'area' | 'city' | 'zone'
+  'fullName' | 'phone' | 'addressLine' | 'division' | 'area' | 'city' | 'zone'
 >;
 
 export const addressSnapshotSchema = new Schema<AddressSnapshot>(
@@ -34,6 +38,7 @@ export const addressSnapshotSchema = new Schema<AddressSnapshot>(
     fullName: { type: String, required: true, trim: true, maxlength: 80 },
     phone: { type: String, required: true, trim: true, maxlength: 20 },
     addressLine: { type: String, required: true, trim: true, maxlength: 300 },
+    division: { type: String, trim: true, maxlength: 40 },
     area: { type: String, trim: true, maxlength: 100 },
     city: { type: String, required: true, trim: true, maxlength: 80 },
     zone: { type: String, enum: SHIPPING_ZONES, required: true },
@@ -48,6 +53,7 @@ const addressSchema = new Schema<Address>(
     fullName: { type: String, required: true, trim: true, maxlength: 80 },
     phone: { type: String, required: true, trim: true, maxlength: 20 },
     addressLine: { type: String, required: true, trim: true, maxlength: 300 },
+    division: { type: String, trim: true, maxlength: 40 },
     area: { type: String, trim: true, maxlength: 100 },
     city: { type: String, required: true, trim: true, maxlength: 80 },
     zone: { type: String, enum: SHIPPING_ZONES, required: true },

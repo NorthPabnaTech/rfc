@@ -7,7 +7,7 @@ import { getNotificationFeed } from '@/services/notifications';
 import { Icon } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
 import { requireAdminPage } from '@lib/auth/current-user';
-import { realtimeClientConfig } from '@lib/realtime/channels';
+import { pushClientKey, realtimeClientConfig } from '@lib/realtime/channels';
 
 import { AdminMobileNav, AdminSidebar } from './components/admin-sidebar';
 
@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getAdminBadges(),
     getNotificationFeed(user.id),
   ]);
-  const shellUser = { name: user.name, email: user.email };
+  const shellUser = { name: user.name, email: user.email ?? user.phone };
 
   return (
     <div className="bg-surface flex min-h-dvh">
@@ -35,6 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               userId={user.id}
               initial={notifications}
               realtime={realtimeClientConfig()}
+              pushKey={pushClientKey()}
             />
             <Button variant="ghost" size="sm" asChild>
               <Link href="/" target="_blank">

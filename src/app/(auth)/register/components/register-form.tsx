@@ -28,26 +28,42 @@ export function RegisterForm({ next }: { next?: string }) {
         }
       }}
     >
-      <FormInput name="name" label="Full name" autoComplete="name" required />
-      <FormInput name="email" label="Email" type="email" autoComplete="email" required />
+      <FormInput
+        name="name"
+        label="Full name"
+        placeholder="e.g. Rahim Uddin"
+        autoComplete="name"
+        required
+      />
       <FormInput
         name="phone"
         label="Mobile number"
         placeholder="01XXXXXXXXX"
         inputMode="tel"
         autoComplete="tel"
+        hint="You'll sign in with this number"
+        required
+      />
+      <FormInput
+        name="email"
+        label="Email"
+        type="email"
+        placeholder="you@example.com"
+        autoComplete="email"
+        hint="We'll send password-reset links here"
         required
       />
       <FormPassword
         name="password"
         label="Password"
+        placeholder="At least 8 characters"
         autoComplete="new-password"
-        hint="At least 8 characters"
         required
       />
       <FormPassword
         name="confirmPassword"
         label="Confirm password"
+        placeholder="Re-enter your password"
         autoComplete="new-password"
         required
       />

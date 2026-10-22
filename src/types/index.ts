@@ -204,6 +204,7 @@ export type AddressDTO = {
   fullName: string;
   phone: string;
   addressLine: string;
+  division?: string;
   area?: string;
   city: string;
   zone: ShippingZone;
@@ -349,7 +350,7 @@ export type ReturnDTO = {
 export type CustomerRowDTO = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   avatarUrl?: string;
   isActive: boolean;
@@ -362,7 +363,7 @@ export type CustomerRowDTO = {
 export type ProfileDTO = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   avatar?: ImageDTO;
 };

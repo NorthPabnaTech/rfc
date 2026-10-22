@@ -18,7 +18,7 @@ export type AdminBadges = {
   unansweredQuestions: number;
 };
 
-type Props = { badges: AdminBadges; user: { name: string; email: string } };
+type Props = { badges: AdminBadges; user: { name: string; email?: string } };
 
 function NavLinks({ badges, onNavigate }: { badges: AdminBadges; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -77,7 +77,7 @@ function UserFooter({ user }: Pick<Props, 'user'>) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sidebar-fg-strong truncate text-[13px] font-semibold">{user.name}</p>
-        <p className="text-sidebar-muted truncate text-[11.5px]">{user.email}</p>
+        {user.email && <p className="text-sidebar-muted truncate text-[11.5px]">{user.email}</p>}
       </div>
       <form action={logoutAction}>
         <button

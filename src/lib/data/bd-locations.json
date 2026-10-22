@@ -1,0 +1,925 @@
+[
+  {
+    "name": "Barishal",
+    "nameBn": "বরিশাল",
+    "districts": [
+      {
+        "name": "Barguna",
+        "nameBn": "বরগুনা",
+        "areas": [
+          "Amtali",
+          "Bamna",
+          "Barguna Sadar",
+          "Betagi",
+          "Patharghata",
+          "Taltali"
+        ]
+      },
+      {
+        "name": "Barishal",
+        "nameBn": "বরিশাল",
+        "areas": [
+          "Agailjhara",
+          "Babuganj",
+          "Bakerganj",
+          "Banaripara",
+          "Barisal Sadar",
+          "Gaurnadi",
+          "Hizla",
+          "Mehendiganj",
+          "Muladi",
+          "Wazirpur"
+        ]
+      },
+      {
+        "name": "Bhola",
+        "nameBn": "ভোলা",
+        "areas": [
+          "Bhola Sadar",
+          "Burhanuddin",
+          "Char Fasson",
+          "Daulatkhan",
+          "Lalmohan",
+          "Manpura",
+          "Tazumuddin"
+        ]
+      },
+      {
+        "name": "Jhalokati",
+        "nameBn": "ঝালকাঠী",
+        "areas": [
+          "Jhalokati Sadar",
+          "Kathalia",
+          "Nalchhiti",
+          "Rajapur"
+        ]
+      },
+      {
+        "name": "Patuakhali",
+        "nameBn": "পটুয়াখালী",
+        "areas": [
+          "Bauphal",
+          "Dashmina",
+          "Dumki",
+          "Galachipa",
+          "Kalapara",
+          "Mirzaganj",
+          "Patuakhali Sadar",
+          "Rangabali"
+        ]
+      },
+      {
+        "name": "Pirojpur",
+        "nameBn": "পিরোজপুর",
+        "areas": [
+          "Bhandaria",
+          "Indurkani",
+          "Kawkhali",
+          "Mathbaria",
+          "Nazirpur",
+          "Nesarabad (Swarupkati)",
+          "Pirojpur Sadar"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Chattogram",
+    "nameBn": "চট্টগ্রাম",
+    "districts": [
+      {
+        "name": "Bandarban",
+        "nameBn": "বান্দরবান",
+        "areas": [
+          "Ali Kadam",
+          "Bandarban Sadar",
+          "Lama",
+          "Naikhongchhari",
+          "Rowangchhari",
+          "Ruma",
+          "Thanchi"
+        ]
+      },
+      {
+        "name": "Brahmanbaria",
+        "nameBn": "ব্রাহ্মণবাড়িয়া",
+        "areas": [
+          "Akhaura",
+          "Ashuganj",
+          "Bancharampur",
+          "Bijoynagar",
+          "Brahmanbaria Sadar",
+          "Kasba",
+          "Nabinagar",
+          "Nasirnagar",
+          "Sarail"
+        ]
+      },
+      {
+        "name": "Chandpur",
+        "nameBn": "চাঁদপুর",
+        "areas": [
+          "Chandpur Sadar",
+          "Faridganj",
+          "Haimchar",
+          "Haziganj",
+          "Kachua",
+          "Matlab Dakshin",
+          "Matlab Uttar",
+          "Shahrasti"
+        ]
+      },
+      {
+        "name": "Chattogram",
+        "nameBn": "চট্টগ্রাম",
+        "areas": [
+          "Anwara",
+          "Banshkhali",
+          "Boalkhali",
+          "Chandanaish",
+          "Fatikchhari",
+          "Hathazari",
+          "Karnaphuli",
+          "Lohagara",
+          "Mirsharai",
+          "Patiya",
+          "Rangunia",
+          "Raozan",
+          "Sandwip",
+          "Satkania",
+          "Sitakunda"
+        ]
+      },
+      {
+        "name": "Cox's Bazar",
+        "nameBn": "কক্স বাজার",
+        "areas": [
+          "Chakaria",
+          "Cox's Bazar Sadar",
+          "Kutubdia",
+          "Maheshkhali",
+          "Pekua",
+          "Ramu",
+          "Teknaf",
+          "Ukhia"
+        ]
+      },
+      {
+        "name": "Cumilla",
+        "nameBn": "কুমিল্লা",
+        "areas": [
+          "Barura",
+          "Brahmanpara",
+          "Burichang",
+          "Chandina",
+          "Chauddagram",
+          "Cumilla Adarsha Sadar",
+          "Cumilla Sadar Dakshin",
+          "Daudkandi",
+          "Debidwar",
+          "Homna",
+          "Laksam",
+          "Lalmai",
+          "Meghna",
+          "Monohargonj",
+          "Muradnagar",
+          "Nangalkot",
+          "Titas"
+        ]
+      },
+      {
+        "name": "Feni",
+        "nameBn": "ফেনী",
+        "areas": [
+          "Chhagalnaiya",
+          "Daganbhuiyan",
+          "Feni Sadar",
+          "Fulgazi",
+          "Parshuram",
+          "Sonagazi"
+        ]
+      },
+      {
+        "name": "Khagrachari",
+        "nameBn": "খাগড়াছড়ি",
+        "areas": [
+          "Dighinala",
+          "Khagrachhari Sadar",
+          "Lakshmichhari",
+          "Mahalchhari",
+          "Manikchhari",
+          "Matiranga",
+          "Panchhari",
+          "Ramgarh"
+        ]
+      },
+      {
+        "name": "Lakshmipur",
+        "nameBn": "লক্ষ্মীপুর",
+        "areas": [
+          "Kamalnagar",
+          "Lakshmipur Sadar",
+          "Raipur",
+          "Ramganj",
+          "Ramgati"
+        ]
+      },
+      {
+        "name": "Noakhali",
+        "nameBn": "নোয়াখালী",
+        "areas": [
+          "Begumganj",
+          "Chatkhil",
+          "Companiganj",
+          "Hatiya",
+          "Kabirhat",
+          "Noakhali Sadar",
+          "Senbagh",
+          "Sonaimuri",
+          "Subarnachar"
+        ]
+      },
+      {
+        "name": "Rangamati",
+        "nameBn": "রাঙ্গামাটি",
+        "areas": [
+          "Bagaichhari",
+          "Barkal",
+          "Belaichhari",
+          "Juraichhari",
+          "Kaptai",
+          "Kawkhali",
+          "Langadu",
+          "Naniyachar",
+          "Rajasthali",
+          "Rangamati Sadar"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Dhaka",
+    "nameBn": "ঢাকা",
+    "districts": [
+      {
+        "name": "Dhaka",
+        "nameBn": "ঢাকা",
+        "areas": [
+          "Dhamrai",
+          "Dohar",
+          "Keraniganj",
+          "Nawabganj",
+          "Savar"
+        ]
+      },
+      {
+        "name": "Faridpur",
+        "nameBn": "ফরিদপুর",
+        "areas": [
+          "Alfadanga",
+          "Bhanga",
+          "Boalmari",
+          "Charbhadrasan",
+          "Faridpur Sadar",
+          "Madhukhali",
+          "Nagarkanda",
+          "Sadarpur",
+          "Saltha"
+        ]
+      },
+      {
+        "name": "Gazipur",
+        "nameBn": "গাজীপুর",
+        "areas": [
+          "Gazipur Sadar",
+          "Kaliakair",
+          "Kaliganj",
+          "Kapasia",
+          "Sreepur"
+        ]
+      },
+      {
+        "name": "Gopalganj",
+        "nameBn": "গোপালগঞ্জ",
+        "areas": [
+          "Gopalganj Sadar",
+          "Kashiani",
+          "Kotalipara",
+          "Muksudpur",
+          "Tungipara"
+        ]
+      },
+      {
+        "name": "Kishoreganj",
+        "nameBn": "কিশোরগঞ্জ",
+        "areas": [
+          "Austagram",
+          "Bajitpur",
+          "Bhairab",
+          "Hossainpur",
+          "Itna",
+          "Karimganj",
+          "Katiadi",
+          "Kishoreganj Sadar",
+          "Kuliarchar",
+          "Mithamain",
+          "Nikli",
+          "Pakundia",
+          "Tarail"
+        ]
+      },
+      {
+        "name": "Madaripur",
+        "nameBn": "মাদারীপুর",
+        "areas": [
+          "Kalkini",
+          "Madaripur Sadar",
+          "Rajoir",
+          "Shibchar"
+        ]
+      },
+      {
+        "name": "Manikganj",
+        "nameBn": "মানিকগঞ্জ",
+        "areas": [
+          "Daulatpur",
+          "Ghior",
+          "Harirampur",
+          "Manikgonj Sadar",
+          "Saturia",
+          "Shivalaya",
+          "Singair"
+        ]
+      },
+      {
+        "name": "Munshiganj",
+        "nameBn": "মুন্সিগঞ্জ",
+        "areas": [
+          "Gazaria",
+          "Lohajang",
+          "Munshiganj Sadar",
+          "Sirajdikhan",
+          "Sreenagar",
+          "Tongibari"
+        ]
+      },
+      {
+        "name": "Narayanganj",
+        "nameBn": "নারায়ণগঞ্জ",
+        "areas": [
+          "Araihazar",
+          "Bandar",
+          "Narayanganj Sadar",
+          "Rupganj",
+          "Sonargaon"
+        ]
+      },
+      {
+        "name": "Narsingdi",
+        "nameBn": "নরসিংদী",
+        "areas": [
+          "Belabo",
+          "Monohardi",
+          "Narsingdi Sadar",
+          "Palash",
+          "Raipura",
+          "Shibpur"
+        ]
+      },
+      {
+        "name": "Rajbari",
+        "nameBn": "রাজবাড়ী",
+        "areas": [
+          "Baliakandi",
+          "Goalandaghat",
+          "Kalukhali",
+          "Pangsha",
+          "Rajbari Sadar"
+        ]
+      },
+      {
+        "name": "Shariatpur",
+        "nameBn": "শরিয়তপুর",
+        "areas": [
+          "Bhedarganj",
+          "Damudya",
+          "Gosairhat",
+          "Naria",
+          "Shariatpur Sadar",
+          "Zajira"
+        ]
+      },
+      {
+        "name": "Tangail",
+        "nameBn": "টাঙ্গাইল",
+        "areas": [
+          "Basail",
+          "Bhuapur",
+          "Delduar",
+          "Dhanbari",
+          "Ghatail",
+          "Gopalpur",
+          "Kalihati",
+          "Madhupur",
+          "Mirzapur",
+          "Nagarpur",
+          "Sakhipur",
+          "Tangail Sadar"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Khulna",
+    "nameBn": "খুলনা",
+    "districts": [
+      {
+        "name": "Bagerhat",
+        "nameBn": "বাগেরহাট",
+        "areas": [
+          "Bagerhat Sadar",
+          "Chitalmari",
+          "Fakirhat",
+          "Kachua",
+          "Mollahat",
+          "Mongla",
+          "Morrelganj",
+          "Rampal",
+          "Sarankhola"
+        ]
+      },
+      {
+        "name": "Chuadanga",
+        "nameBn": "চুয়াডাঙ্গা",
+        "areas": [
+          "Alamdanga",
+          "Chuadanga Sadar",
+          "Damurhuda",
+          "Jibannagar"
+        ]
+      },
+      {
+        "name": "Jashore",
+        "nameBn": "যশোর",
+        "areas": [
+          "Abhaynagar",
+          "Bagherpara",
+          "Chaugachha",
+          "Jashore Sadar",
+          "Jhikargachha",
+          "Keshabpur",
+          "Manirampur",
+          "Sharsha"
+        ]
+      },
+      {
+        "name": "Jhenaidah",
+        "nameBn": "ঝিনাইদহ",
+        "areas": [
+          "Harinakunda",
+          "Jhenaidah Sadar",
+          "Kaliganj",
+          "Kotchandpur",
+          "Maheshpur",
+          "Shailkupa"
+        ]
+      },
+      {
+        "name": "Khulna",
+        "nameBn": "খুলনা",
+        "areas": [
+          "Batiaghata",
+          "Dacope",
+          "Dighalia",
+          "Dumuria",
+          "Koyra",
+          "Paikgachha",
+          "Phultala",
+          "Rupsha",
+          "Terokhada"
+        ]
+      },
+      {
+        "name": "Kushtia",
+        "nameBn": "কুষ্টিয়া",
+        "areas": [
+          "Bheramara",
+          "Daulatpur",
+          "Khoksa",
+          "Kumarkhali",
+          "Kushtia Sadar",
+          "Mirpur"
+        ]
+      },
+      {
+        "name": "Magura",
+        "nameBn": "মাগুরা",
+        "areas": [
+          "Magura Sadar",
+          "Mohammadpur",
+          "Shalikha",
+          "Sreepur"
+        ]
+      },
+      {
+        "name": "Meherpur",
+        "nameBn": "মেহেরপুর",
+        "areas": [
+          "Gangni",
+          "Meherpur Sadar",
+          "Mujibnagar"
+        ]
+      },
+      {
+        "name": "Narail",
+        "nameBn": "নড়াইল",
+        "areas": [
+          "Kalia",
+          "Lohagara",
+          "Narail Sadar"
+        ]
+      },
+      {
+        "name": "Satkhira",
+        "nameBn": "সাতক্ষীরা",
+        "areas": [
+          "Assasuni",
+          "Debhata",
+          "Kalaroa",
+          "Kaliganj",
+          "Satkhira Sadar",
+          "Shyamnagar",
+          "Tala"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Mymensingh",
+    "nameBn": "ময়মনসিংহ",
+    "districts": [
+      {
+        "name": "Jamalpur",
+        "nameBn": "জামালপুর",
+        "areas": [
+          "Baksiganj",
+          "Dewanganj",
+          "Islampur",
+          "Jamalpur Sadar",
+          "Madarganj",
+          "Melandaha",
+          "Sarishabari"
+        ]
+      },
+      {
+        "name": "Mymensingh",
+        "nameBn": "ময়মনসিংহ",
+        "areas": [
+          "Bhaluka",
+          "Dhobaura",
+          "Fulbaria",
+          "Gafargaon",
+          "Gauripur",
+          "Haluaghat",
+          "Ishwarganj",
+          "Muktagachha",
+          "Mymensingh Sadar",
+          "Nandail",
+          "Phulpur",
+          "Tara Khanda",
+          "Trishal"
+        ]
+      },
+      {
+        "name": "Netrokona",
+        "nameBn": "নেত্রকোনা",
+        "areas": [
+          "Atpara",
+          "Barhatta",
+          "Durgapur",
+          "Kalmakanda",
+          "Kendua",
+          "Khaliajuri",
+          "Madan",
+          "Mohanganj",
+          "Netrokona Sadar",
+          "Purbadhala"
+        ]
+      },
+      {
+        "name": "Sherpur",
+        "nameBn": "শেরপুর",
+        "areas": [
+          "Jhenaigati",
+          "Nakla",
+          "Nalitabari",
+          "Sherpur Sadar",
+          "Sreebardi"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Rajshahi",
+    "nameBn": "রাজশাহী",
+    "districts": [
+      {
+        "name": "Bogura",
+        "nameBn": "বগুড়া",
+        "areas": [
+          "Adamdighi",
+          "Bogura Sadar",
+          "Dhunat",
+          "Dhupchanchia",
+          "Gabtali",
+          "Kahaloo",
+          "Nandigram",
+          "Sariakandi",
+          "Shajahanpur",
+          "Sherpur",
+          "Shibganj",
+          "Sonatola"
+        ]
+      },
+      {
+        "name": "Chapai Nawabganj",
+        "nameBn": "চাঁপাইনবাবগঞ্জ",
+        "areas": [
+          "Bholahat",
+          "Chapai Nawabganj Sadar",
+          "Gomastapur",
+          "Nachole",
+          "Shibganj"
+        ]
+      },
+      {
+        "name": "Joypurhat",
+        "nameBn": "জয়পুরহাট",
+        "areas": [
+          "Akkelpur",
+          "Joypurhat Sadar",
+          "Kalai",
+          "Khetlal",
+          "Panchbibi"
+        ]
+      },
+      {
+        "name": "Naogaon",
+        "nameBn": "নওগাঁ",
+        "areas": [
+          "Atrai",
+          "Badalgachhi",
+          "Dhamoirhat",
+          "Manda",
+          "Mohadevpur",
+          "Naogaon Sadar",
+          "Niamatpur",
+          "Patnitala",
+          "Porsha",
+          "Raninagar",
+          "Sapahar"
+        ]
+      },
+      {
+        "name": "Natore",
+        "nameBn": "নাটোর",
+        "areas": [
+          "Bagatipara",
+          "Baraigram",
+          "Gurudaspur",
+          "Lalpur",
+          "Naldanga",
+          "Natore Sadar",
+          "Singra"
+        ]
+      },
+      {
+        "name": "Pabna",
+        "nameBn": "পাবনা",
+        "areas": [
+          "Atgharia",
+          "Bera",
+          "Bhangura",
+          "Chatmohar",
+          "Faridpur",
+          "Ishwardi",
+          "Pabna Sadar",
+          "Santhia",
+          "Sujanagar"
+        ]
+      },
+      {
+        "name": "Rajshahi",
+        "nameBn": "রাজশাহী",
+        "areas": [
+          "Bagha",
+          "Bagmara",
+          "Charghat",
+          "Durgapur",
+          "Godagari",
+          "Mohanpur",
+          "Paba",
+          "Puthia",
+          "Tanore"
+        ]
+      },
+      {
+        "name": "Sirajganj",
+        "nameBn": "সিরাজগঞ্জ",
+        "areas": [
+          "Belkuchi",
+          "Chauhali",
+          "Kamarkhanda",
+          "Kazipur",
+          "Raiganj",
+          "Shahjadpur",
+          "Sirajganj Sadar",
+          "Tarash",
+          "Ullahpara"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Rangpur",
+    "nameBn": "রংপুর",
+    "districts": [
+      {
+        "name": "Dinajpur",
+        "nameBn": "দিনাজপুর",
+        "areas": [
+          "Biral",
+          "Birampur",
+          "Birganj",
+          "Bochaganj",
+          "Chirirbandar",
+          "Dinajpur Sadar",
+          "Ghoraghat",
+          "Hakimpur",
+          "Kaharole",
+          "Khansama",
+          "Nawabganj",
+          "Parbatipur",
+          "Phulbari"
+        ]
+      },
+      {
+        "name": "Gaibandha",
+        "nameBn": "গাইবান্ধা",
+        "areas": [
+          "Gaibandha Sadar",
+          "Gobindaganj",
+          "Palashbari",
+          "Phulchhari",
+          "Sadullapur",
+          "Sughatta",
+          "Sundarganj"
+        ]
+      },
+      {
+        "name": "Kurigram",
+        "nameBn": "কুড়িগ্রাম",
+        "areas": [
+          "Bhurungamari",
+          "Char Rajibpur",
+          "Chilmari",
+          "Kurigram Sadar",
+          "Nageshwari",
+          "Phulbari",
+          "Rajarhat",
+          "Raomari",
+          "Ulipur"
+        ]
+      },
+      {
+        "name": "Lalmonirhat",
+        "nameBn": "লালমনিরহাট",
+        "areas": [
+          "Aditmari",
+          "Hatibandha",
+          "Kaliganj",
+          "Lalmonirhat Sadar",
+          "Patgram"
+        ]
+      },
+      {
+        "name": "Nilphamari",
+        "nameBn": "নিলফামারী",
+        "areas": [
+          "Dimla",
+          "Domar",
+          "Jaldhaka",
+          "Kishoreganj",
+          "Nilphamari Sadar",
+          "Saidpur"
+        ]
+      },
+      {
+        "name": "Panchagarh",
+        "nameBn": "পঞ্চগড়",
+        "areas": [
+          "Atwari",
+          "Boda",
+          "Debiganj",
+          "Panchagarh Sadar",
+          "Tetulia"
+        ]
+      },
+      {
+        "name": "Rangpur",
+        "nameBn": "রংপুর",
+        "areas": [
+          "Badarganj",
+          "Gangachhara",
+          "Kaunia",
+          "Mithapukur",
+          "Pirgachha",
+          "Pirganj",
+          "Rangpur Sadar",
+          "Taraganj"
+        ]
+      },
+      {
+        "name": "Thakurgaon",
+        "nameBn": "ঠাকুরগাঁও",
+        "areas": [
+          "Baliadangi",
+          "Haripur",
+          "Pirganj",
+          "Ranisankail",
+          "Thakurgaon Sadar"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Sylhet",
+    "nameBn": "সিলেট",
+    "districts": [
+      {
+        "name": "Habiganj",
+        "nameBn": "হবিগঞ্জ",
+        "areas": [
+          "Ajmiriganj",
+          "Bahubal",
+          "Baniyachong",
+          "Chunarughat",
+          "Habiganj Sadar",
+          "Lakhai",
+          "Madhabpur",
+          "Nabiganj",
+          "Sayestaganj"
+        ]
+      },
+      {
+        "name": "Moulvibazar",
+        "nameBn": "মৌলভীবাজার",
+        "areas": [
+          "Barlekha",
+          "Juri",
+          "Kamalganj",
+          "Kulaura",
+          "Moulvibazar Sadar",
+          "Rajnagar",
+          "Sreemangal"
+        ]
+      },
+      {
+        "name": "Sunamganj",
+        "nameBn": "সুনামগঞ্জ",
+        "areas": [
+          "Bishwamvarpur",
+          "Chhatak",
+          "Dakshin Sunamganj",
+          "Derai",
+          "Dharamapasha",
+          "Dowarabazar",
+          "Jagannathpur",
+          "Jamalganj",
+          "Sullah",
+          "Sunamganj Sadar",
+          "Tahirpur"
+        ]
+      },
+      {
+        "name": "Sylhet",
+        "nameBn": "সিলেট",
+        "areas": [
+          "Balaganj",
+          "Beanibazar",
+          "Bishwanath",
+          "Companigonj",
+          "Dakshin Surma",
+          "Fenchuganj",
+          "Golapganj",
+          "Gowainghat",
+          "Jaintiapur",
+          "Kanaighat",
+          "Osmani Nagar",
+          "Sylhet Sadar",
+          "Zakiganj"
+        ]
+      }
+    ]
+  }
+]

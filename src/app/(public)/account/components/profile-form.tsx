@@ -10,6 +10,7 @@ import type { ProfileDTO } from '@/types';
 import { Form, FormInput } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { Spinner } from '@components/shared';
+import { Callout } from '@components/shared/callout';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
 import { ACCEPTED_IMAGE_TYPES } from '@lib/constants';
@@ -25,6 +26,7 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
     defaultValues: {
       name: profile.name,
       phone: profile.phone ?? '',
+      email: profile.email ?? '',
       avatar: profile.avatar ?? null,
     },
   });
@@ -98,12 +100,29 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
         </div>
       </div>
       <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-        <FormInput name="name" label="Full name" required />
-        <FormInput name="phone" label="Mobile number" required inputMode="tel" />
+        <FormInput name="name" label="Full name" placeholder="e.g. Rahim Uddin" required />
+        <FormInput
+          name="phone"
+          label="Mobile number"
+          placeholder="01XXXXXXXXX"
+          required
+          inputMode="tel"
+        />
+        <FormInput
+          name="email"
+          label="Email"
+          type="email"
+          placeholder="you@example.com"
+          autoComplete="email"
+          hint="Used to reset your password"
+          required
+        />
       </div>
-      <p className="text-muted text-sm">
-        Email: <span className="text-ink font-medium">{profile.email}</span>
-      </p>
+      {!profile.email && (
+        <Callout tone="warn" title="Add your email">
+          Without an email you can&apos;t reset your password if you forget it.
+        </Callout>
+      )}
       <div>
         <Button
           type="submit"

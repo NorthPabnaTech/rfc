@@ -66,17 +66,21 @@ and change every demo password.**
 
 ### Environment variables
 
-| Variable                                             | Purpose                                  |
-| ---------------------------------------------------- | ---------------------------------------- |
-| `MONGODB_URI`                                        | MongoDB connection string                |
-| `MONGODB_DB`                                         | Database name (default `rfc_gadget`)     |
-| `AUTH_SECRET`                                        | ≥ 32 random chars; signs session cookies |
-| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | Image uploads                            |
-| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`                  | Same cloud name, for browser URLs        |
-| `NEXT_PUBLIC_SITE_URL`                               | Public URL (SEO, sitemap)                |
-| `PUSHER_APP_ID` / `PUSHER_SECRET`                    | Realtime notifications (optional)        |
-| `NEXT_PUBLIC_PUSHER_KEY` / `_CLUSTER`                | Same Pusher app, for the browser         |
-| `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD`      | First admin, used by `npm run seed`      |
+| Variable                                              | Purpose                                  |
+| ----------------------------------------------------- | ---------------------------------------- |
+| `MONGODB_URI`                                         | MongoDB connection string                |
+| `MONGODB_DB`                                          | Database name (default `rfc_gadget`)     |
+| `AUTH_SECRET`                                         | ≥ 32 random chars; signs session cookies |
+| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET`  | Image uploads                            |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`                   | Same cloud name, for browser URLs        |
+| `NEXT_PUBLIC_SITE_URL`                                | Public URL (SEO, sitemap)                |
+| `PUSHER_APP_ID` / `PUSHER_SECRET`                     | Realtime notifications (optional)        |
+| `NEXT_PUBLIC_PUSHER_KEY` / `_CLUSTER`                 | Same Pusher app, for the browser         |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Password-reset email (Gmail, optional)   |
+| `MAIL_FROM`                                           | Sender name/address (optional)           |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`  | System (Web Push) notifications          |
+| `VAPID_SUBJECT`                                       | `mailto:` contact for push services      |
+| `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD`       | First admin, used by `npm run seed`      |
 
 ### Notifications
 
@@ -91,6 +95,27 @@ Notifications are stored in MongoDB (`notifications`, auto-deleted after 90
 days) and pushed live over **Pusher Channels** — Vercel functions can't hold a
 WebSocket open, so a hosted socket service carries the push. Without Pusher
 keys everything still works; the bell just re-checks every 30 seconds.
+
+**System notifications (Web Push).** With VAPID keys set, the bell offers
+"Turn on" for desktop alerts. Once allowed, `public/sw.js` shows each new
+notification as an OS notification (with the system sound) even when no tab of
+the site is open; clicking it opens the order. Subscriptions are stored per
+browser (`pushsubscriptions`), follow whoever signs in on that browser, are
+removed on sign-out, and are cleaned up when the push service reports them
+gone. Web Push needs HTTPS (localhost is allowed for development).
+
+### Password reset
+
+`/forgot-password` takes the account's email (every account registers with
+one) and sends a one-time link (`/reset-password?token=…`, valid 30 minutes,
+only its SHA-256 hash is stored). Setting a new password signs the user in and
+signs out every older session. The form shows the same message whether or not
+the email has an account, so it never reveals which accounts exist.
+
+Mail goes out over SMTP — a free Gmail account with an
+[App Password](https://myaccount.google.com/apppasswords) is enough (see
+`.env.example`). Without SMTP credentials the link is printed to the server
+console, which is handy in development.
 
 Secrets live only in `.env.local` (git-ignored). In production, set them in
 your host's environment settings.

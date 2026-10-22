@@ -4,8 +4,9 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
 import { deleteAddressAction, saveAddressAction } from '@/actions/account';
+import { DeliveryZoneNote, LocationFields } from '@/features/address/location-fields';
 import type { AddressDTO } from '@/types';
-import { Form, FormCheckbox, FormInput, FormSelect } from '@components/form';
+import { Form, FormCheckbox, FormInput } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, EmptyState } from '@components/shared';
 import { Button } from '@components/ui/button';
@@ -19,7 +20,7 @@ import {
 } from '@components/ui/dialog';
 import { useModal } from '@hooks/use-modal';
 import { handleActionResult } from '@lib/action-client';
-import { SHIPPING_ZONE_LABELS, SHIPPING_ZONES } from '@lib/constants';
+import { SHIPPING_ZONE_LABELS } from '@lib/constants';
 import { type AddressInput, addressSchema } from '@lib/validators/auth';
 
 export function AddressBook({ addresses }: { addresses: AddressDTO[] }) {
@@ -125,15 +126,16 @@ function AddressDialog({
   const form = Form.useForm<AddressInput>({
     schema: addressSchema,
     defaultValues: address
-      ? { ...address, area: address.area ?? '' }
+      ? { ...address, division: address.division ?? '', area: address.area ?? '' }
       : {
           label: 'Home',
           fullName: '',
           phone: '',
           addressLine: '',
-          area: '',
+          division: '',
           city: '',
-          zone: 'inside_dhaka',
+          area: '',
+          zone: 'outside_dhaka',
           isDefault: false,
         },
   });
@@ -155,17 +157,23 @@ function AddressDialog({
           </DialogHeader>
           <DialogBody className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <FormInput name="label" label="Label" placeholder="Home, Office…" />
-            <FormSelect
-              name="zone"
-              label="Delivery zone"
+            <FormInput name="fullName" label="Full name" placeholder="Receiver's name" required />
+            <FormInput
+              name="phone"
+              label="Mobile number"
+              placeholder="01XXXXXXXXX"
               required
-              items={SHIPPING_ZONES.map((z) => ({ value: z, label: SHIPPING_ZONE_LABELS[z] }))}
+              inputMode="tel"
             />
-            <FormInput name="fullName" label="Full name" required />
-            <FormInput name="phone" label="Mobile number" required inputMode="tel" />
-            <FormInput name="addressLine" label="Address" required className="sm:col-span-2" />
-            <FormInput name="area" label="Area / Thana" />
-            <FormInput name="city" label="City / District" required />
+            <LocationFields />
+            <FormInput
+              name="addressLine"
+              label="Address"
+              placeholder="House, road, block / village"
+              required
+              className="sm:col-span-2"
+            />
+            <DeliveryZoneNote className="sm:col-span-2" />
             <div className="sm:col-span-2">
               <FormCheckbox name="isDefault" label="Use as my default address" />
             </div>

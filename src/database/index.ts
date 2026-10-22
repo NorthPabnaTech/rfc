@@ -15,6 +15,7 @@ export {
   type ProductSpecification,
   type ProductVariation,
 } from './models/product';
+export { type PushSubscription, PushSubscriptionModel } from './models/push-subscription';
 export { type Question, QuestionModel } from './models/question';
 export { type ReturnRequest, ReturnRequestModel } from './models/return-request';
 export { type Review, ReviewModel } from './models/review';

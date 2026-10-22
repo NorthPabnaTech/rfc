@@ -11,7 +11,7 @@ import { readSession } from './session';
 export type CurrentUser = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   role: 'customer' | 'admin';
   avatarUrl?: string;
@@ -19,7 +19,8 @@ export type CurrentUser = {
 
 /**
  * The signed-in user, verified against the database (so deactivated or
- * deleted accounts lose access immediately, not when their cookie expires).
+ * deleted accounts — and sessions from before a password reset — lose access
+ * immediately, not when their cookie expires).
  * Memoized per request with React `cache`, so layouts and pages can all call
  * it without extra queries.
  */
@@ -30,6 +31,10 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   await connectDB();
   const user = await UserModel.findById(session.sub).lean();
   if (!user || !user.isActive) return null;
+  // A password reset signs out every session issued before it.
+  if (user.passwordChangedAt && session.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+    return null;
+  }
 
   return {
     id: String(user._id),

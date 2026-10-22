@@ -25,7 +25,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     <>
       <PageHeader
         title={customer.name}
-        description={`${customer.email}${customer.phone ? ` · ${customer.phone}` : ''}`}
+        description={[customer.phone, customer.email].filter(Boolean).join(' · ')}
         backHref="/admin/customers"
         backLabel="Customers"
         actions={<CustomerStatusToggle id={customer.id} active={customer.isActive} />}

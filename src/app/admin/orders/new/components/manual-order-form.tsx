@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useWatch } from 'react-hook-form';
 
 import { createManualOrderAction, customerSearchAction } from '@/actions/admin';
+import { DeliveryZoneNote, LocationFields } from '@/features/address/location-fields';
 import { QuantityStepper } from '@/features/cart/quantity-stepper';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
@@ -25,8 +26,6 @@ import { handleActionResult } from '@lib/action-client';
 import {
   ORDER_PLATFORM_LABELS,
   ORDER_PLATFORMS,
-  SHIPPING_ZONE_LABELS,
-  SHIPPING_ZONES,
   type ShippingZone,
 } from '@lib/constants';
 import { cn } from '@lib/utils';
@@ -37,7 +36,7 @@ import { type PickedLine, ProductPicker } from '../../../components/product-pick
 type FoundCustomer = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   defaultAddress: AddressDTO | null;
 };
@@ -55,9 +54,10 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
       fullName: '',
       phone: '',
       addressLine: '',
+      division: '',
+      city: '',
       area: '',
-      city: 'Dhaka',
-      zone: 'inside_dhaka',
+      zone: 'outside_dhaka',
       items: [],
       shippingFee: '',
       discount: '',
@@ -197,7 +197,13 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
                   phone: a?.phone ?? c.phone ?? '',
                   fullName: a?.fullName ?? c.name,
                   ...(a
-                    ? { addressLine: a.addressLine, area: a.area ?? '', city: a.city, zone: a.zone }
+                    ? {
+                        addressLine: a.addressLine,
+                        division: a.division ?? '',
+                        city: a.city,
+                        area: a.area ?? '',
+                        zone: a.zone,
+                      }
                     : {}),
                 });
               }}
@@ -206,16 +212,24 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
               <FormInput
                 name="customerName"
                 label="Customer name"
+                placeholder="As in the chat"
                 required
                 onBlur={(e) =>
                   !form.getValues('fullName') && form.setValue('fullName', e.target.value)
                 }
               />
-              <FormInput name="phone" label="Mobile number" required inputMode="tel" />
+              <FormInput
+                name="phone"
+                label="Mobile number"
+                placeholder="01XXXXXXXXX"
+                required
+                inputMode="tel"
+              />
               <FormInput
                 name="email"
                 label="Email (optional)"
                 type="email"
+                placeholder="customer@example.com"
                 className="sm:col-span-2"
               />
             </div>
@@ -225,19 +239,21 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
         <Panel>
           <FormSection title="Delivery" icon="shipping">
             <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-              <FormInput name="fullName" label="Recipient name" required />
-              <FormSelect
-                name="zone"
-                label="Delivery zone"
+              <FormInput
+                name="fullName"
+                label="Recipient name"
+                placeholder="Who receives the parcel"
                 required
-                items={SHIPPING_ZONES.map((z) => ({
-                  value: z,
-                  label: `${SHIPPING_ZONE_LABELS[z]} (৳${fees[z]})`,
-                }))}
               />
-              <FormInput name="addressLine" label="Address" required className="sm:col-span-2" />
-              <FormInput name="area" label="Area / Thana" />
-              <FormInput name="city" label="City / District" required />
+              <LocationFields />
+              <FormInput
+                name="addressLine"
+                label="Address"
+                placeholder="House, road, block / village"
+                required
+                className="sm:col-span-2"
+              />
+              <DeliveryZoneNote className="sm:col-span-2" />
             </div>
           </FormSection>
         </Panel>
@@ -291,7 +307,12 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
                 </dd>
               </div>
             </dl>
-            <FormTextarea name="customerNote" label="Customer note" rows={2} />
+            <FormTextarea
+              name="customerNote"
+              label="Customer note"
+              rows={2}
+              placeholder="e.g. Call before delivery"
+            />
             <FormTextarea
               name="adminNote"
               label="Internal note"
@@ -348,7 +369,7 @@ function CustomerSearch({
       <div className="bg-brand-soft flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm">
         <Icon name="userCircle" size={18} className="text-accent" />
         <span className="text-ink flex-1">
-          Linked to account <strong>{selected.name}</strong> ({selected.email})
+          Linked to account <strong>{selected.name}</strong> ({selected.phone ?? selected.email})
         </span>
         <button
           type="button"
@@ -391,7 +412,7 @@ function CustomerSearch({
               >
                 <p className="text-ink text-sm font-medium">{c.name}</p>
                 <p className="text-subtle text-xs">
-                  {c.phone ?? 'No phone'} · {c.email}
+                  {[c.phone ?? 'No phone', c.email].filter(Boolean).join(' · ')}
                 </p>
               </button>
             </li>

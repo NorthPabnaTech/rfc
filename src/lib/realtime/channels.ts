@@ -14,6 +14,14 @@ export function userIdFromChannel(channel: string): string | null {
   return channel.startsWith(USER_CHANNEL_PREFIX) ? channel.slice(USER_CHANNEL_PREFIX.length) : null;
 }
 
+/** Cookie holding this browser's Web Push subscription id (cleared on sign-out). */
+export const PUSH_COOKIE = 'rfc_gadget_push';
+
+/** VAPID public key for Web Push; `null` when system notifications are off. */
+export function pushClientKey(): string | null {
+  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null;
+}
+
 /** Browser-side config; `null` when realtime isn't configured. */
 export function realtimeClientConfig(): { key: string; cluster: string } | null {
   const key = process.env.NEXT_PUBLIC_PUSHER_KEY;

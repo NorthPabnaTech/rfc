@@ -8,7 +8,8 @@ import { USER_ROLES, type UserRole } from '@lib/constants';
  */
 export const SESSION_COOKIE = 'rfc_gadget_session';
 
-export type SessionPayload = { sub: string; role: UserRole };
+/** `iat` = issued-at, in seconds. */
+export type SessionPayload = { sub: string; role: UserRole; iat: number };
 
 export function sessionKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
@@ -23,7 +24,7 @@ export async function verifySessionToken(
     const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] });
     const role = payload.role as UserRole;
     if (typeof payload.sub !== 'string' || !USER_ROLES.includes(role)) return null;
-    return { sub: payload.sub, role };
+    return { sub: payload.sub, role, iat: payload.iat ?? 0 };
   } catch {
     return null;
   }

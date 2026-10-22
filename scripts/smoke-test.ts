@@ -10,6 +10,7 @@
  * dashboard numbers. Cleans up everything it created.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import mongoose from 'mongoose';
 
@@ -61,7 +62,7 @@ import { getProductBySlug, saveProduct, searchProducts } from '@/services/produc
 import { deleteProduct } from '@/services/products';
 import { createReturnRequest, updateReturn } from '@/services/returns';
 import { getSettings } from '@/services/settings';
-import { authenticate, registerCustomer } from '@/services/users';
+import { authenticate, isResetTokenValid, registerCustomer, resetPassword } from '@/services/users';
 import { type BannerOutput, bannerSchema } from '@lib/validators/banner';
 import {
   categorySchema,
@@ -220,8 +221,12 @@ async function main() {
         confirmPassword: 'secret123',
       });
       created.users.push(customer.id);
-      assert.equal((await authenticate(email, 'secret123')).id, customer.id);
-      await expectReject(() => authenticate(email, 'nope'), /Incorrect email or password/);
+      assert.equal((await authenticate({ email }, 'secret123')).id, customer.id);
+      assert.equal((await authenticate({ phone }, 'secret123')).id, customer.id);
+      await expectReject(
+        () => authenticate({ email }, 'nope'),
+        /Incorrect email \/ mobile number or password/,
+      );
       await expectReject(
         () =>
           registerCustomer({
@@ -233,6 +238,33 @@ async function main() {
           }),
         /already exists/,
       );
+    });
+
+    await step('password reset link works once, then expires', async () => {
+      // Plant a token directly rather than emailing one from the test.
+      const plant = (token: string, expiresInMs: number) =>
+        UserModel.updateOne(
+          { _id: customer.id },
+          {
+            passwordResetTokenHash: createHash('sha256').update(token).digest('hex'),
+            passwordResetExpiresAt: new Date(Date.now() + expiresInMs),
+          },
+        );
+      await plant('smoke-reset-token', 60_000);
+      assert.equal(await isResetTokenValid('smoke-reset-token'), true);
+      const reset = {
+        token: 'smoke-reset-token',
+        password: 'newsecret123',
+        confirmPassword: 'newsecret123',
+      };
+      assert.equal((await resetPassword(reset)).id, customer.id);
+      assert.equal((await authenticate({ phone }, 'newsecret123')).id, customer.id);
+      await expectReject(() => authenticate({ phone }, 'secret123'), /Incorrect/);
+      await expectReject(() => resetPassword(reset), /invalid or has expired/);
+      await plant('smoke-expired-token', -1_000);
+      assert.equal(await isResetTokenValid('smoke-expired-token'), false);
+      const user = await UserModel.findById(customer.id).lean();
+      assert.ok(user?.passwordChangedAt, 'passwordChangedAt is set so old sessions end');
     });
 
     const settings = await getSettings();

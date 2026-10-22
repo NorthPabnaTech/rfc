@@ -95,6 +95,13 @@ export const SHIPPING_ZONE_LABELS: Record<ShippingZone, string> = {
   outside_dhaka: 'Outside Dhaka',
 };
 
+/**
+ * Delivery zone rule: only Dhaka city thanas (`DHAKA_CITY_AREAS` in
+ * lib/locations.ts) inside this district are "Inside Dhaka". Dhaka district's
+ * outer upazilas (Savar, Keraniganj…) and every other district are outside.
+ */
+export const INSIDE_DHAKA_DISTRICT = 'Dhaka';
+
 /* ─── Returns ────────────────────────────────────────────────────────────── */
 
 /** A return may be requested within this many hours of delivery (7 days). */
@@ -203,11 +210,18 @@ export const NOTIFICATION_LIST_LIMIT = 20;
 export const NOTIFICATION_POLL_MS = 30_000;
 /** Pusher event name for a new notification on a user's private channel. */
 export const NOTIFICATION_EVENT = 'notification:new';
+/** Played when a new notification arrives (file in /public). */
+export const NOTIFICATION_SOUND = '/notification.mp3';
 
 /* ─── Users & uploads ────────────────────────────────────────────────────── */
 
 export const USER_ROLES = ['customer', 'admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
+
+/** A password-reset link works once, for this many minutes. */
+export const PASSWORD_RESET_TTL_MINUTES = 30;
+/** Ignore repeat reset requests for the same account within this window. */
+export const PASSWORD_RESET_COOLDOWN_SECONDS = 60;
 
 /** Cloudinary folders, one per upload purpose. */
 export const UPLOAD_FOLDERS = {

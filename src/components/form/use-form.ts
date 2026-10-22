@@ -76,8 +76,14 @@ export function useForm<T extends FieldValues = FieldValues>(
   const rhf = useReactHookForm<T>({
     mode: 'onTouched',
     // An explicit resolver wins; otherwise derive one from the zod schema.
+    // `raw`: the schema only validates — submit handlers get the input values
+    // (typed `z.input<>`), and the server action parses them itself. Passing
+    // the parsed output instead would double-apply transforms such as
+    // `loginIdentifier` (string → { email }) and fail server validation.
     // (cast: the schema is intentionally untyped against T at this boundary.)
-    resolver: resolver ?? (schema ? (zodResolver(schema as never) as Resolver<T>) : undefined),
+    resolver:
+      resolver ??
+      (schema ? (zodResolver(schema as never, undefined, { raw: true }) as Resolver<T>) : undefined),
     ...rhfProps,
   });
 

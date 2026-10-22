@@ -1,6 +1,13 @@
 import 'server-only';
 
-import { connectDB, type Notification, NotificationModel, type Order, UserModel } from '@/database';
+import {
+  connectDB,
+  type Notification,
+  NotificationModel,
+  type Order,
+  PushSubscriptionModel,
+  UserModel,
+} from '@/database';
 import type { NotificationDTO, NotificationFeedDTO } from '@/types';
 import {
   NOTIFICATION_EVENT,
@@ -9,6 +16,7 @@ import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
 } from '@lib/constants';
+import { pushToUser } from '@lib/realtime/push';
 import { publishToUsers } from '@lib/realtime/server';
 import { formatBDT, logger } from '@lib/utils';
 
@@ -51,11 +59,17 @@ async function notify(userIds: string[], n: NewNotification): Promise<void> {
         order: n.orderId ?? null,
       })),
     );
-    // Each recipient gets their own document (own id + seen/read state).
+    // Each recipient gets their own document (own id + seen/read state): live
+    // to open tabs over Pusher, and as a system notification over Web Push.
     await Promise.all(
-      docs.map((d) =>
-        publishToUsers([String(d.user)], NOTIFICATION_EVENT, toNotification(d.toObject())),
-      ),
+      docs.flatMap((d) => {
+        const dto = toNotification(d.toObject());
+        const userId = String(d.user);
+        return [
+          publishToUsers([userId], NOTIFICATION_EVENT, dto),
+          pushToUser(userId, { id: dto.id, title: dto.title, body: dto.body, link: dto.link }),
+        ];
+      }),
     );
   } catch (error) {
     logger.error('Failed to send notification:', error);
@@ -122,6 +136,28 @@ export async function notifyCustomerOrderStatus(
     link: `/account/orders/${order._id}`,
     orderId: String(order._id),
   });
+}
+
+/* ─── System notifications (Web Push) ────────────────────────────────────── */
+
+/** Saves (or moves to this user) a browser's push subscription; returns its id. */
+export async function savePushSubscription(
+  userId: string,
+  sub: { endpoint: string; keys: { p256dh: string; auth: string }; userAgent?: string },
+): Promise<string> {
+  await connectDB();
+  const doc = await PushSubscriptionModel.findOneAndUpdate(
+    { endpoint: sub.endpoint },
+    { $set: { user: userId, keys: sub.keys, userAgent: sub.userAgent } },
+    { upsert: true, new: true, projection: { _id: 1 } },
+  ).lean();
+  return String(doc!._id);
+}
+
+/** Forgets a browser — on sign-out, so the next person on it gets nothing. */
+export async function deletePushSubscription(id: string): Promise<void> {
+  await connectDB();
+  await PushSubscriptionModel.deleteOne({ _id: id });
 }
 
 /* ─── The bell ───────────────────────────────────────────────────────────── */

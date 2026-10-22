@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useWatch } from 'react-hook-form';
 
 import { placeOrderAction } from '@/actions/checkout';
+import { LocationFields } from '@/features/address/location-fields';
 import { LineOptions } from '@/features/cart/line-options';
 import { useCartQuote } from '@/features/cart/use-cart-quote';
 import { Taka } from '@/features/products/price';
@@ -19,15 +20,16 @@ import { useHydrated } from '@hooks/use-hydrated';
 import { handleActionResult } from '@lib/action-client';
 import { SHIPPING_ZONE_LABELS, SHIPPING_ZONES, type ShippingZone } from '@lib/constants';
 import { cn } from '@lib/utils';
-import { type CheckoutInput, checkoutSchema } from '@lib/validators/order';
+import { checkLocation } from '@lib/validators/common';
+import { checkoutFields, type CheckoutInput } from '@lib/validators/order';
 
 // The cart lines live in the cart store, not in the form; they are attached on
 // submit and the server validates the full payload.
-const formSchema = checkoutSchema.omit({ items: true });
+const formSchema = checkoutFields.omit({ items: true }).superRefine(checkLocation);
 type FormValues = Omit<CheckoutInput, 'items'>;
 
 type Props = {
-  user: { name: string; email: string; phone?: string } | null;
+  user: { name: string; email?: string; phone?: string } | null;
   addresses: AddressDTO[];
   fees: Record<ShippingZone, number>;
   className?: string;
@@ -38,8 +40,9 @@ function fromAddress(a: AddressDTO) {
     fullName: a.fullName,
     phone: a.phone,
     addressLine: a.addressLine,
-    area: a.area ?? '',
+    division: a.division ?? '',
     city: a.city,
+    area: a.area ?? '',
     zone: a.zone,
   };
 }
@@ -63,9 +66,10 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             fullName: user?.name ?? '',
             phone: user?.phone ?? '',
             addressLine: '',
+            division: '',
+            city: '',
             area: '',
-            city: 'Dhaka',
-            zone: 'inside_dhaka',
+            zone: 'outside_dhaka',
           }),
       email: user?.email ?? '',
       customerNote: '',
@@ -88,8 +92,9 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             fullName: user?.name ?? '',
             phone: user?.phone ?? '',
             addressLine: '',
-            area: '',
+            division: '',
             city: '',
+            area: '',
           }),
       saveAddress: !a,
     });
@@ -175,7 +180,13 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             </div>
           )}
           <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-            <FormInput name="fullName" label="Full name" required autoComplete="name" />
+            <FormInput
+              name="fullName"
+              label="Full name"
+              placeholder="Receiver's name"
+              required
+              autoComplete="name"
+            />
             <FormInput
               name="phone"
               label="Mobile number"
@@ -192,20 +203,13 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
               autoComplete="street-address"
               className="sm:col-span-2"
             />
-            <FormInput name="area" label="Area / Thana" placeholder="e.g. Badda" />
-            <FormInput
-              name="city"
-              label="City / District"
-              required
-              placeholder="e.g. Dhaka"
-              autoComplete="address-level2"
-            />
+            <LocationFields />
             <FormInput
               name="email"
               label="Email (optional)"
               type="email"
+              placeholder="you@example.com"
               autoComplete="email"
-              className="sm:col-span-2"
             />
           </div>
           {user && addressId === 'new' && (
@@ -216,14 +220,14 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
         </Step>
 
         <Step n={2} title="Delivery area">
-          <FormItem name="zone">
+          <FormItem name="zone" hint="Selected automatically from your district and area.">
             {(field) => (
-              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup">
+              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-readonly>
                 {SHIPPING_ZONES.map((z) => (
                   <AddressChoice
                     key={z}
                     active={field.value === z}
-                    onClick={() => field.onChange(z)}
+                    disabled={field.value !== z}
                     role="radio"
                   >
                     <div className="flex items-center justify-between">
@@ -376,11 +380,14 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 function AddressChoice({
   active,
   onClick,
+  disabled,
   children,
   role = 'radio',
 }: {
   active: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  /** Display-only choice (e.g. the delivery zone, which follows the address). */
+  disabled?: boolean;
   children: React.ReactNode;
   role?: string;
 }) {
@@ -390,9 +397,12 @@ function AddressChoice({
       role={role}
       aria-checked={active}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         'rounded-2xl border-2 bg-white px-4 py-3.5 text-left transition',
         active ? 'border-noir shadow-pop' : 'border-line hover:border-line-2',
+        disabled && 'pointer-events-none opacity-50',
+        !onClick && 'cursor-default',
       )}
     >
       {children}

@@ -8,7 +8,17 @@ import {
   RETURN_STATUSES,
 } from '@lib/constants';
 
-import { addressFields, imageAsset, money, objectId, optionalText, requiredText } from './common';
+import {
+  addressFields,
+  checkLocation,
+  imageAsset,
+  money,
+  objectId,
+  optionalEmail,
+  optionalText,
+  requiredText,
+  withDeliveryZone,
+} from './common';
 
 export const cartLineSchema = z.object({
   productId: objectId,
@@ -17,54 +27,45 @@ export const cartLineSchema = z.object({
 });
 export type CartLineInput = z.infer<typeof cartLineSchema>;
 
-export const checkoutSchema = z.object({
+/** Plain shape, for forms that drop or add fields (see checkoutSchema). */
+export const checkoutFields = z.object({
   items: z.array(cartLineSchema).min(1, 'Your cart is empty').max(50),
   ...addressFields,
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Enter a valid email')
-    .optional()
-    .or(z.literal(''))
-    .transform((v) => v || undefined),
+  email: optionalEmail,
   customerNote: optionalText(1000),
   /** Optional: save this address to the signed-in customer's address book. */
   saveAddress: z.boolean().default(false),
 });
+export const checkoutSchema = checkoutFields.superRefine(checkLocation).transform(withDeliveryZone);
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
-export const manualOrderSchema = z.object({
-  platform: z.enum(ORDER_PLATFORMS),
-  /** Link to an existing customer account (optional). */
-  userId: objectId
-    .nullish()
-    .or(z.literal(''))
-    .transform((v) => v || null),
-  customerName: requiredText('Customer name', 80),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Enter a valid email')
-    .optional()
-    .or(z.literal(''))
-    .transform((v) => v || undefined),
-  ...addressFields,
-  items: z.array(cartLineSchema).min(1, 'Add at least one product').max(50),
-  /** Override the per-zone shipping fee (e.g. negotiated in chat). */
-  shippingFee: z
-    .union([money('Shipping fee'), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' || v === undefined ? undefined : v)),
-  discount: z
-    .union([money('Discount'), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' || v === undefined ? 0 : v)),
-  status: z.enum(['pending', 'confirmed']).default('confirmed'),
-  customerNote: optionalText(1000),
-  adminNote: optionalText(2000),
-});
+export const manualOrderSchema = z
+  .object({
+    platform: z.enum(ORDER_PLATFORMS),
+    /** Link to an existing customer account (optional). */
+    userId: objectId
+      .nullish()
+      .or(z.literal(''))
+      .transform((v) => v || null),
+    customerName: requiredText('Customer name', 80),
+    email: optionalEmail,
+    ...addressFields,
+    items: z.array(cartLineSchema).min(1, 'Add at least one product').max(50),
+    /** Override the per-zone shipping fee (e.g. negotiated in chat). */
+    shippingFee: z
+      .union([money('Shipping fee'), z.literal('')])
+      .optional()
+      .transform((v) => (v === '' || v === undefined ? undefined : v)),
+    discount: z
+      .union([money('Discount'), z.literal('')])
+      .optional()
+      .transform((v) => (v === '' || v === undefined ? 0 : v)),
+    status: z.enum(['pending', 'confirmed']).default('confirmed'),
+    customerNote: optionalText(1000),
+    adminNote: optionalText(2000),
+  })
+  .superRefine(checkLocation)
+  .transform(withDeliveryZone);
 export type ManualOrderInput = z.input<typeof manualOrderSchema>;
 
 export const updateOrderStatusSchema = z.object({

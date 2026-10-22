@@ -1,12 +1,26 @@
 import 'server-only';
 
+import { createHash, randomBytes } from 'node:crypto';
+
+import { SITE } from '@/config/site';
 import { AddressModel, connectDB, OrderModel, UserModel } from '@/database';
 import type { AddressDTO, CustomerRowDTO, Paginated, ProfileDTO } from '@/types';
 import { hashPassword, verifyPassword } from '@lib/auth/password';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
-import { ADMIN_PAGE_SIZE } from '@lib/constants';
+import {
+  ADMIN_PAGE_SIZE,
+  PASSWORD_RESET_COOLDOWN_SECONDS,
+  PASSWORD_RESET_TTL_MINUTES,
+} from '@lib/constants';
 import { AppError } from '@lib/errors';
-import type { AddressOutput, ProfileOutput, RegisterOutput } from '@lib/validators/auth';
+import { mailLayout, sendMail } from '@lib/mail';
+import type {
+  AddressOutput,
+  LoginIdentifier,
+  ProfileOutput,
+  RegisterOutput,
+  ResetPasswordOutput,
+} from '@lib/validators/auth';
 
 import { toAddress, toImage } from './mappers';
 
@@ -14,6 +28,9 @@ import { toAddress, toImage } from './mappers';
 
 export async function registerCustomer(input: RegisterOutput) {
   await connectDB();
+  if (await UserModel.exists({ phone: input.phone })) {
+    throw new AppError('An account with this mobile number already exists. Try signing in.');
+  }
   if (await UserModel.exists({ email: input.email })) {
     throw new AppError('An account with this email already exists. Try signing in.');
   }
@@ -34,17 +51,93 @@ export async function registerCustomer(input: RegisterOutput) {
   return { id: String(user._id), role: user.role };
 }
 
-/** Same message for unknown email and wrong password — never reveal which. */
-const INVALID_LOGIN = 'Incorrect email or password.';
+/** Same message for an unknown account and a wrong password — never reveal which. */
+const INVALID_LOGIN = 'Incorrect email / mobile number or password.';
 
-export async function authenticate(email: string, password: string) {
+/** Signs in with either an email or a mobile number (see `loginIdentifier`). */
+export async function authenticate(identifier: LoginIdentifier, password: string) {
   await connectDB();
-  const user = await UserModel.findOne({ email }).select('+passwordHash');
+  const filter = identifier.email ? { email: identifier.email } : { phone: identifier.phone };
+  const user = await UserModel.findOne(filter).select('+passwordHash');
   const ok = await verifyPassword(password, user?.passwordHash);
   if (!user || !ok) throw new AppError(INVALID_LOGIN, 401);
   if (!user.isActive)
     throw new AppError('This account has been disabled. Please contact support.', 403);
   user.lastLoginAt = new Date();
+  await user.save();
+  return { id: String(user._id), role: user.role };
+}
+
+/* ─── Password reset ─────────────────────────────────────────────────────── */
+
+const hashResetToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
+const INVALID_RESET_LINK = 'This reset link is invalid or has expired. Please request a new one.';
+
+/**
+ * Emails a one-time reset link to the account's email address. Silently does
+ * nothing for unknown, disabled or email-less accounts, or for a repeat
+ * request inside the cooldown — the caller always shows the same message.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await connectDB();
+  const user = await UserModel.findOne({ email }).select('+passwordResetExpiresAt');
+  if (!user?.isActive || !user.email) return;
+
+  const ttlMs = PASSWORD_RESET_TTL_MINUTES * 60_000;
+  const lastIssuedAt = (user.passwordResetExpiresAt?.getTime() ?? 0) - ttlMs;
+  if (Date.now() - lastIssuedAt < PASSWORD_RESET_COOLDOWN_SECONDS * 1000) return;
+
+  const token = randomBytes(32).toString('base64url');
+  user.passwordResetTokenHash = hashResetToken(token);
+  user.passwordResetExpiresAt = new Date(Date.now() + ttlMs);
+  await user.save();
+
+  const url = `${SITE.url}/reset-password?token=${token}`;
+  try {
+    await sendMail({
+      to: user.email,
+      subject: `Reset your ${SITE.name} password`,
+      ...mailLayout({
+        greeting: `Hi ${user.name},`,
+        paragraphs: [
+          `We received a request to reset the password for your ${SITE.name} account.`,
+          `This link works once and expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`,
+        ],
+        action: { label: 'Reset password', url },
+        footnote:
+          "If you didn't ask for this, you can ignore this email — your password won't change.",
+      }),
+    });
+  } catch (error) {
+    console.error('[password reset] mail failed', error);
+    throw new AppError("We couldn't send the email right now. Please try again in a few minutes.");
+  }
+}
+
+/** Whether a reset token is still usable (for rendering the reset page). */
+export async function isResetTokenValid(token: string): Promise<boolean> {
+  await connectDB();
+  return !!(await UserModel.exists({
+    passwordResetTokenHash: hashResetToken(token),
+    passwordResetExpiresAt: { $gt: new Date() },
+    isActive: true,
+  }));
+}
+
+/** Sets a new password from a reset link, then signs out every other session. */
+export async function resetPassword(input: ResetPasswordOutput) {
+  await connectDB();
+  const user = await UserModel.findOne({
+    passwordResetTokenHash: hashResetToken(input.token),
+    passwordResetExpiresAt: { $gt: new Date() },
+    isActive: true,
+  });
+  if (!user) throw new AppError(INVALID_RESET_LINK);
+  user.passwordHash = await hashPassword(input.password);
+  user.passwordChangedAt = new Date();
+  user.passwordResetTokenHash = undefined;
+  user.passwordResetExpiresAt = undefined;
   await user.save();
   return { id: String(user._id), role: user.role };
 }
@@ -74,9 +167,22 @@ export async function updateProfile(userId: string, input: ProfileOutput) {
   }
   const user = await UserModel.findById(userId);
   if (!user) throw new AppError('Account not found.', 404);
+  if (
+    input.phone !== user.phone &&
+    (await UserModel.exists({ phone: input.phone, _id: { $ne: user._id } }))
+  ) {
+    throw new AppError('Another account already uses this mobile number.');
+  }
+  if (
+    input.email !== user.email &&
+    (await UserModel.exists({ email: input.email, _id: { $ne: user._id } }))
+  ) {
+    throw new AppError('Another account already uses this email.');
+  }
   const oldAvatar = user.avatar;
   user.name = input.name;
   user.phone = input.phone;
+  user.email = input.email;
   if (input.avatar === null) user.set('avatar', undefined);
   else if (input.avatar) user.set('avatar', input.avatar);
   await user.save();
