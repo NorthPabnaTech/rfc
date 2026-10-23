@@ -43,6 +43,7 @@
     "jose": "^6.2.12",
     "mongoose": "^9.10.3",
     "next": "^16.3.8",
+    "nextjs-toploader": "^3.9.17",
     "nodemailer": "^10.2.1",
     "pusher": "^5.3.4",
     "pusher-js": "^8.6.0",

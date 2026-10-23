@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 
 import { deleteProductAction } from '@/actions/admin';
 import { Taka } from '@/features/products/price';

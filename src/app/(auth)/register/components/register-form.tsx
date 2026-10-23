@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 
 import { registerAction } from '@/actions/auth';
 import { Form, FormInput, FormPassword } from '@components/form';

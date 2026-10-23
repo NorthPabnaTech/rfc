@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 import { useWatch } from 'react-hook-form';
 
 import { createManualOrderAction, customerSearchAction } from '@/actions/admin';
@@ -23,11 +23,7 @@ import { FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { useDebouncedValue } from '@hooks/use-debounced-value';
 import { handleActionResult } from '@lib/action-client';
-import {
-  ORDER_PLATFORM_LABELS,
-  ORDER_PLATFORMS,
-  type ShippingZone,
-} from '@lib/constants';
+import { ORDER_PLATFORM_LABELS, ORDER_PLATFORMS, type ShippingZone } from '@lib/constants';
 import { cn } from '@lib/utils';
 import { type ManualOrderInput, manualOrderSchema } from '@lib/validators/order';
 

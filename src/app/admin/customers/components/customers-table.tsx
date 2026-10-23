@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 
 import { Taka } from '@/features/products/price';
 import type { CustomerRowDTO, Paginated } from '@/types';

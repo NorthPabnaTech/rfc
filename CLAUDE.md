@@ -102,6 +102,9 @@ react-hook-form · zustand (cart only) · jose + bcryptjs (auth).
     mobile, `lg:grid-cols-[minmax(0,1fr)_360px]`) so long words can't widen the
     page. Long table text uses DataTable columns with `wrap` + `minWidth`
     rather than truncating. `body` sets `overflow-wrap: break-word`.
+18. **Navigation progress:** `NextTopLoader` (root layout) shows the top bar on
+    `<Link>` clicks. For `router.push` / `router.replace`, import `useRouter`
+    from `nextjs-toploader/app` (not `next/navigation`) so the bar shows too.
 
 ## Commands
 

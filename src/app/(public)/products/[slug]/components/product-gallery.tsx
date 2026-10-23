@@ -35,7 +35,7 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
       )}
 
       <div
-        className="bg-cream relative aspect-square flex-1 cursor-zoom-in overflow-hidden rounded-3xl md:aspect-[4/5]"
+        className="bg-cream relative aspect-square flex-1 cursor-zoom-in overflow-hidden rounded-3xl"
         onMouseMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           setZoom({
@@ -52,7 +52,8 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
           fill
           priority
           sizes="(min-width: 1024px) 600px, 100vw"
-          className="animate-fade transition-transform duration-200"
+          // contain: supplier photos come in any ratio — show the whole photo.
+          className="animate-fade object-contain transition-transform duration-200"
           style={
             zoom ? { transform: 'scale(1.8)', transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined
           }

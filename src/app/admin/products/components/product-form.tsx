@@ -3,7 +3,7 @@
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 import { useWatch } from 'react-hook-form';
 
 import { saveProductAction } from '@/actions/admin';

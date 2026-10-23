@@ -2,6 +2,7 @@ import '@styles/globals.css';
 
 import type { Metadata, Viewport } from 'next';
 import { Hind_Siliguri, Jost, Nunito_Sans } from 'next/font/google';
+import NextTopLoader from 'nextjs-toploader';
 
 import { AppProviders } from '@/providers/app-providers';
 import { SITE } from '@config/site';
@@ -47,6 +48,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${body.variable} ${heading.variable} ${bangla.variable}`}>
       <body className="min-h-dvh">
+        {/* Thin progress bar at the top while a route is loading. */}
+        <NextTopLoader
+          color="var(--color-brand)"
+          height={3}
+          showSpinner={false}
+          shadow="0 0 10px var(--color-brand),0 0 5px var(--color-brand)"
+          zIndex={9999}
+        />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 
 import { QuantityStepper } from '@/features/cart/quantity-stepper';
 import { WishlistButton } from '@/features/wishlist/wishlist-button';

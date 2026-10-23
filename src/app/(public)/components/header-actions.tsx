@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 
 import { logoutAction } from '@/actions/auth';
 import { Taka } from '@/features/products/price';
