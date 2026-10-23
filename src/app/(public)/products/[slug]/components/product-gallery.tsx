@@ -11,11 +11,16 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
   const [zoom, setZoom] = React.useState<{ x: number; y: number } | null>(null);
   const list = images.length ? images : [undefined];
   const current = list[Math.min(active, list.length - 1)];
+  // The frame takes each photo's own shape (measured on load when the DTO has
+  // no size), so the whole photo shows with no empty bands around it.
+  const [ratios, setRatios] = React.useState<Record<string, number>>({});
+  const known = current?.width && current.height ? current.width / current.height : 1;
+  const ratio = Math.min(Math.max((current && ratios[current.url]) ?? known, 0.4), 2.5);
 
   return (
     <div className="flex flex-col-reverse gap-3 md:flex-row">
       {list.length > 1 && (
-        <div className="scrollbar-hidden flex gap-2.5 overflow-x-auto md:max-h-[640px] md:w-20 md:flex-col md:overflow-y-auto">
+        <div className="scrollbar-hidden -m-1 flex gap-2.5 overflow-x-auto p-1 md:max-h-[640px] md:w-22 md:flex-col md:overflow-y-auto">
           {images.map((img, i) => (
             <button
               key={`${img.url}-${i}`}
@@ -24,8 +29,8 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
               aria-label={`Show image ${i + 1}`}
               aria-current={i === active}
               className={cn(
-                'bg-cream relative aspect-square w-[72px] shrink-0 overflow-hidden rounded-xl ring-2 transition md:w-full',
-                i === active ? 'ring-noir' : 'opacity-70 ring-transparent hover:opacity-100',
+                'bg-cream relative aspect-square w-[72px] shrink-0 overflow-hidden rounded-xl transition md:w-full',
+                i === active ? 'ring-noir ring-2' : 'ring-line opacity-70 ring-1 hover:opacity-100',
               )}
             >
               <ProductImage src={img.url} alt="" fill sizes="80px" />
@@ -35,7 +40,8 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
       )}
 
       <div
-        className="bg-cream relative aspect-square flex-1 cursor-zoom-in overflow-hidden rounded-3xl"
+        className="bg-cream relative min-w-0 flex-1 cursor-zoom-in overflow-hidden rounded-3xl md:self-start"
+        style={{ aspectRatio: ratio }}
         onMouseMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           setZoom({
@@ -52,7 +58,12 @@ export function ProductGallery({ images, name }: { images: ImageDTO[]; name: str
           fill
           priority
           sizes="(min-width: 1024px) 600px, 100vw"
-          // contain: supplier photos come in any ratio — show the whole photo.
+          onLoad={(e) => {
+            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+            const url = current?.url;
+            if (url && w && h) setRatios((r) => (r[url] ? r : { ...r, [url]: w / h }));
+          }}
+          // contain: only matters for extreme ratios clamped above.
           className="animate-fade object-contain transition-transform duration-200"
           style={
             zoom ? { transform: 'scale(1.8)', transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined
