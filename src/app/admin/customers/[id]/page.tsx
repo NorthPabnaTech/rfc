@@ -7,7 +7,7 @@ import { OrderStatusBadge } from '@/features/orders/order-ui';
 import { Taka } from '@/features/products/price';
 import { listCustomerOrders } from '@/services/orders';
 import { getCustomerDetail } from '@/services/users';
-import { PageHeader, StatCard } from '@components/shared';
+import { PageHeader, StatCard, StatCardGrid } from '@components/shared';
 import { SHIPPING_ZONE_LABELS } from '@lib/constants';
 import { formatStoreDate, formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
@@ -33,45 +33,32 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         leading={<CustomerAvatar name={customer.name} avatarUrl={customer.avatarUrl} />}
         actions={<CustomerStatusToggle id={customer.id} active={customer.isActive} />}
       />
-      <div className="mb-6 space-y-3.5">
-        <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-          <StatCard label="Orders" value={customer.totalOrders} icon="cart" />
-          <StatCard label="Delivered" value={customer.deliveredCount} icon="delivered" tone="ok" />
-          <StatCard
-            label="Cancelled"
-            value={customer.cancelledCount}
-            icon="cancelCircle"
-            tone="danger"
-          />
-          <StatCard label="Returned" value={customer.returnedCount} icon="refresh" tone="warn" />
-        </div>
-        <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-          <StatCard
-            label="Total spent"
-            value={<Taka amount={customer.totalSpent} />}
-            icon="coin"
-            tone="ok"
-          />
-          <StatCard
-            label="Total profit"
-            value={<Taka amount={customer.totalProfit} />}
-            icon="trend"
-            tone={customer.totalProfit >= 0 ? 'ok' : 'danger'}
-          />
-          <StatCard
-            label="Customer since"
-            value={formatStoreDate(customer.createdAt)}
-            icon="calendar"
-            tone="info"
-          />
-          <StatCard
-            label="Last sign-in"
-            value={customer.lastLoginAt ? formatStoreDate(customer.lastLoginAt) : '—'}
-            icon="clock"
-            tone="neutral"
-          />
-        </div>
-      </div>
+      <StatCardGrid>
+        <StatCard
+          label="Total spent"
+          value={<Taka amount={customer.totalSpent} />}
+          icon="coin"
+          tone="info"
+        />
+        <StatCard
+          label="Total profit"
+          value={<Taka amount={customer.totalProfit} />}
+          icon="trend"
+          tone={customer.totalProfit >= 0 ? 'ok' : 'danger'}
+        />
+        <StatCard
+          label="Customer since"
+          value={formatStoreDate(customer.createdAt)}
+          icon="calendar"
+          tone="warn"
+        />
+        <StatCard
+          label="Last sign-in"
+          value={customer.lastLoginAt ? formatStoreDate(customer.lastLoginAt) : '—'}
+          icon="clock"
+          tone="neutral"
+        />
+      </StatCardGrid>
 
       <section className="bg-panel hairline rounded-xl2 mb-6 p-5">
         <h2 className="text-ink mb-4 text-[14px] font-semibold">
