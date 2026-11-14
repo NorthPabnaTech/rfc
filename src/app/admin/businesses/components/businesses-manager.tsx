@@ -139,7 +139,7 @@ function BusinessDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <Form
           form={form}
           onFinish={async (values) => {
@@ -154,14 +154,25 @@ function BusinessDialog({
             <DialogTitle>{business ? `Edit ${business.name}` : 'Add business / store'}</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <FormInput name="name" label="Business name" placeholder="e.g. Fashion Store" required />
             <div className="grid gap-4 sm:grid-cols-2">
+              <FormInput
+                name="name"
+                label="Business name"
+                placeholder="e.g. Fashion Store"
+                required
+              />
               <FormInput
                 name="invoicePrefix"
                 label="Invoice prefix"
                 placeholder="e.g. FSH"
                 required
               />
+              <FormInput
+                name="phone"
+                label="Support phone (for invoices)"
+                placeholder="01XXXXXXXXX"
+              />
+              <FormInput name="address" label="Business address (for invoices)" />
               {!business && (
                 <FormInput
                   name="slug"
@@ -170,8 +181,6 @@ function BusinessDialog({
                 />
               )}
             </div>
-            <FormInput name="phone" label="Support phone (for invoices)" placeholder="01XXXXXXXXX" />
-            <FormInput name="address" label="Business address (for invoices)" />
             <FormItem name="logo" label="Logo (for invoices)">
               {(field) => (
                 <ImageUploader
