@@ -120,7 +120,7 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
           <input
             ref={fileRef}
             type="file"
-            accept={ACCEPTED_IMAGE_TYPES.join(',')}
+            accept="image/*"
             hidden
             onChange={(e) => void onPick(e.target.files)}
           />

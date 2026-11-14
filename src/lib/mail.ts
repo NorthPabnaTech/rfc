@@ -37,6 +37,7 @@ export async function sendMail(mail: Mail): Promise<void> {
   try {
     await smtp.sendMail({
       from: serverEnv.MAIL_FROM ?? `${SITE.name} <${serverEnv.SMTP_USER}>`,
+      replyTo: serverEnv.SMTP_USER,
       ...mail,
     });
   } catch (error) {
@@ -61,21 +62,23 @@ export function mailLayout(opts: {
     ...paragraphs,
     `${action.label}: ${action.url}`,
     footnote,
-    `— ${SITE.name}`,
+    `— ${SITE.name}\n${SITE.support.address}`,
   ]
     .filter(Boolean)
     .join('\n\n');
   const p = (s: string) =>
     `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">${escapeHtml(s)}</p>`;
-  const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:Arial,Helvetica,sans-serif">
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px">
 <tr><td style="padding:28px 28px 8px;font-size:20px;font-weight:bold;color:#0f172a">${escapeHtml(SITE.name)}</td></tr>
-<tr><td style="padding:12px 28px 28px">
+<tr><td style="padding:12px 28px 20px">
 ${p(greeting)}
 ${paragraphs.map(p).join('\n')}
 <p style="margin:24px 0"><a href="${escapeHtml(action.url)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:12px 22px;border-radius:8px">${escapeHtml(action.label)}</a></p>
 <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b">Or paste this link into your browser:<br><a href="${escapeHtml(action.url)}" style="color:#2563eb;word-break:break-all">${escapeHtml(action.url)}</a></p>
 ${footnote ? `<p style="margin:0;font-size:13px;line-height:1.6;color:#64748b">${escapeHtml(footnote)}</p>` : ''}
-</td></tr></table></body></html>`;
+</td></tr>
+<tr><td style="padding:14px 28px 24px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.5;color:#94a3b8">${escapeHtml(SITE.name)} · ${escapeHtml(SITE.support.address)}</td></tr>
+</table></body></html>`;
   return { text, html };
 }

@@ -272,7 +272,7 @@ export function ImageUploader({
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPTED_IMAGE_TYPES.join(',')}
+            accept="image/*"
             multiple={max > 1}
             hidden
             onChange={(e) => void handleFiles(e.target.files)}
