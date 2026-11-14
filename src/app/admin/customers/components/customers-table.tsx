@@ -46,6 +46,17 @@ export function CustomersTable({ data }: { data: Paginated<CustomerRowDTO> }) {
       cell: (c) => <Taka amount={c.totalSpent} className="font-semibold" />,
     },
     {
+      key: 'profit',
+      header: 'Profit',
+      align: 'right',
+      cell: (c) => (
+        <Taka
+          amount={c.totalProfit}
+          className={c.totalProfit >= 0 ? 'font-semibold text-emerald-500' : 'font-semibold text-rose-500'}
+        />
+      ),
+    },
+    {
       key: 'joined',
       header: 'Joined',
       cell: (c) => <span className="text-muted">{formatStoreDate(c.createdAt)}</span>,

@@ -131,16 +131,26 @@ export default async function AdminOrderPage({
             </Card>
           )}
           <Card title="History">
-            <ol className="space-y-3">
-              {[...order.statusHistory].reverse().map((e, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className="bg-brand-400 mt-1.5 size-2 shrink-0 rounded-full" />
-                  <div>
-                    <p className="text-ink">
+            <ol>
+              {[...order.statusHistory].reverse().map((e, i, arr) => (
+                <li key={i} className="relative flex gap-3.5 pb-5 text-sm last:pb-0">
+                  {i < arr.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="bg-line absolute top-4 bottom-0 left-[5px] w-0.5 -translate-x-1/2"
+                    />
+                  )}
+                  <span className="bg-brand-400 ring-panel relative z-10 mt-1.5 size-2.5 shrink-0 rounded-full ring-2" />
+                  <div className="min-w-0 flex-1">
+                    <div>
                       <OrderStatusBadge status={e.status} />
-                      {e.note && <span className="text-muted ml-2">{e.note}</span>}
-                    </p>
-                    <p className="text-subtle mt-0.5 text-xs">
+                    </div>
+                    {e.note && (
+                      <p className="text-muted mt-1 text-xs leading-relaxed break-words">
+                        {e.note}
+                      </p>
+                    )}
+                    <p className="text-subtle mt-1 text-xs">
                       {formatStoreDateTime(e.at)}
                       {e.byName ? ` · by ${e.byName}` : ''}
                     </p>

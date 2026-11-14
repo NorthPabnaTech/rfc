@@ -15,7 +15,7 @@ export function CancelOrderButton({ orderId }: { orderId: string }) {
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
         Cancel order
       </Button>
       <ConfirmDialog

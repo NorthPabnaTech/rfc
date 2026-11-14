@@ -46,13 +46,14 @@ export function OrderToolbar({
         type="button"
         variant="primary"
         size="sm"
-        onClick={() =>
-          downloadOrderInvoicePdf(order, {
+        onClick={() => {
+          void downloadOrderInvoicePdf(order, {
             name: business?.name,
             address: business?.address,
             phone: business?.phone,
-          })
-        }
+            logoUrl: business?.logo?.url,
+          });
+        }}
       >
         <Icon name="download" size={14} /> Download invoice
       </Button>

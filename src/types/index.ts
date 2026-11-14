@@ -456,6 +456,7 @@ export type CustomerRowDTO = {
   role: UserRole;
   orderCount: number;
   totalSpent: number;
+  totalProfit: number;
   createdAt: string;
 };
 
@@ -513,6 +514,7 @@ export type BusinessDTO = {
   invoicePrefix: string;
   phone?: string;
   address?: string;
+  logo?: ImageDTO;
   isPublicStorefront: boolean;
   isActive: boolean;
   productCount?: number;

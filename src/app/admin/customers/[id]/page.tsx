@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { OrdersPieChart } from '@/app/admin/analysis/components/analysis-charts';
 import { OrderStatusBadge } from '@/features/orders/order-ui';
 import { Taka } from '@/features/products/price';
 import { listCustomerOrders } from '@/services/orders';
@@ -28,6 +30,21 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         description={[customer.phone, customer.email].filter(Boolean).join(' · ')}
         backHref="/admin/customers"
         backLabel="Customers"
+        leading={
+          <span className="bg-brand/15 text-brand border-line relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border text-xl font-bold">
+            {customer.avatarUrl ? (
+              <Image
+                src={customer.avatarUrl}
+                alt={customer.name}
+                fill
+                sizes="56px"
+                className="object-cover"
+              />
+            ) : (
+              customer.name.trim().charAt(0).toUpperCase() || 'U'
+            )}
+          </span>
+        }
         actions={<CustomerStatusToggle id={customer.id} active={customer.isActive} />}
       />
       <StatCardGrid>
@@ -38,6 +55,20 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           icon="coin"
           tone="ok"
         />
+        <StatCard
+          label="Total profit"
+          value={<Taka amount={customer.totalProfit} />}
+          icon="trend"
+          tone={customer.totalProfit >= 0 ? 'ok' : 'danger'}
+        />
+        <StatCard label="Delivered" value={customer.deliveredCount} icon="delivered" tone="ok" />
+        <StatCard
+          label="Cancelled"
+          value={customer.cancelledCount}
+          icon="cancelCircle"
+          tone="danger"
+        />
+        <StatCard label="Returned" value={customer.returnedCount} icon="refresh" tone="warn" />
         <StatCard
           label="Customer since"
           value={formatStoreDate(customer.createdAt)}
@@ -51,6 +82,18 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           tone="neutral"
         />
       </StatCardGrid>
+
+      <section className="bg-panel hairline rounded-xl2 mb-6 p-5">
+        <h2 className="text-ink mb-4 text-[14px] font-semibold">
+          Order breakdown (Delivered, Returned &amp; Cancelled)
+        </h2>
+        <OrdersPieChart
+          totalOrders={customer.totalOrders}
+          completedOrders={customer.deliveredCount}
+          cancelledOrders={customer.cancelledCount}
+          returnedOrders={customer.returnedCount}
+        />
+      </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="bg-panel hairline rounded-xl2 p-5">

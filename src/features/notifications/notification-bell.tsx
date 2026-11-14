@@ -138,7 +138,6 @@ export function NotificationBell({
   const push = usePushNotifications(pushKey);
   const [enabling, setEnabling] = React.useState(false);
   const [promptDismissed, setPromptDismissed] = React.useState(false);
-  const autoPrompted = React.useRef(false);
   const [items, setItems] = React.useState<NotificationDTO[]>(initial.items);
   const [unseen, setUnseen] = React.useState(initial.unseen);
   const [open, setOpen] = React.useState(false);
@@ -237,12 +236,6 @@ export function NotificationBell({
     void markAllNotificationsReadAction();
   };
 
-  React.useEffect(() => {
-    if (!pushKey || push.state !== 'default' || autoPrompted.current) return;
-    autoPrompted.current = true;
-    void push.enable().catch(() => {});
-  }, [pushKey, push]);
-
   const dismissPrompt = () => {
     setPromptDismissed(true);
   };
@@ -251,8 +244,14 @@ export function NotificationBell({
     setEnabling(true);
     try {
       await push.enable();
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        toast.success('Push notifications enabled');
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          toast.success('Push notifications enabled');
+        } else if (Notification.permission === 'denied') {
+          toast.info(
+            'Notifications are blocked by your browser. Tap the lock/settings icon in the address bar → Permissions → Notifications → Allow.',
+          );
+        }
       }
     } catch {
       toast.error("Couldn't turn on notifications. Please try again.");
@@ -284,11 +283,13 @@ export function NotificationBell({
               </button>
             )}
           </div>
-          {push.state === 'default' && (
+          {(push.state === 'default' || push.state === 'denied') && (
             <div className="border-line bg-well flex items-center gap-3 border-b px-4 py-3">
               <Icon name="bell" size={18} className="text-muted shrink-0" />
               <p className="type-helper text-muted min-w-0 flex-1">
-                Get system notifications, even when this site is closed.
+                {push.state === 'denied'
+                  ? 'System notifications are blocked. Allow them in browser settings, then tap Turn on.'
+                  : 'Get system notifications, even when this site is closed.'}
               </p>
               <Button
                 type="button"
@@ -300,12 +301,6 @@ export function NotificationBell({
                 {enabling ? 'Turning on…' : 'Turn on'}
               </Button>
             </div>
-          )}
-          {push.state === 'denied' && (
-            <p className="border-line bg-well type-helper text-muted border-b px-4 py-3">
-              System Notifications are blocked. Allow notifications for this site in your browser
-              settings to get them.
-            </p>
           )}
           {items.length === 0 ? (
             <div className="text-muted flex flex-col items-center gap-2 px-6 py-10 text-center">
@@ -379,15 +374,25 @@ export function NotificationBell({
         )}
       </button>
     </Dropdown>
-    {pushKey && push.state === 'default' && !promptDismissed && (
-      <div className="border-line bg-panel shadow-modal fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border p-3.5 sm:left-auto">
+    {pushKey && (push.state === 'default' || push.state === 'denied') && !promptDismissed && (
+      <div
+        role="dialog"
+        aria-label="Enable push notifications"
+        className="border-line bg-panel shadow-modal fixed right-4 bottom-20 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border p-3.5 sm:bottom-5 sm:left-auto"
+      >
         <span className="bg-brand/15 text-brand grid size-10 shrink-0 place-items-center rounded-xl">
           <Icon name="bell" size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-ink text-xs font-semibold">Enable push notifications</p>
+          <p className="text-ink text-xs font-semibold">
+            {push.state === 'denied'
+              ? 'System notifications are blocked'
+              : 'Turn on system notifications'}
+          </p>
           <p className="text-muted text-[11px] leading-snug">
-            Get order updates &amp; replies on your phone even when the browser is closed.
+            {push.state === 'denied'
+              ? 'Allow notifications in browser site settings, then tap Turn on.'
+              : 'Get order updates & replies on your phone even when the browser is closed.'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -401,7 +406,7 @@ export function NotificationBell({
             disabled={enabling}
             onClick={onEnablePush}
           >
-            {enabling ? 'Turning on…' : 'Allow'}
+            {enabling ? 'Turning on…' : 'Turn on'}
           </Button>
         </div>
       </div>

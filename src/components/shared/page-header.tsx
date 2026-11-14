@@ -10,6 +10,8 @@ type Props = {
   subtitle?: React.ReactNode;
   /** One-line description shown below the title (optional). */
   description?: React.ReactNode;
+  /** Optional leading media (e.g. avatar) shown beside the title. */
+  leading?: React.ReactNode;
   /** Right-aligned action buttons (optional). */
   actions?: React.ReactNode;
   className?: string;
@@ -33,6 +35,7 @@ export function PageHeader({
   title,
   subtitle,
   description,
+  leading,
   actions,
   className,
   onBack,
@@ -48,12 +51,15 @@ export function PageHeader({
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0">
-          {subtitle && <p className="type-helper text-muted mb-1">{subtitle}</p>}
+        <div className="flex min-w-0 items-center gap-3.5">
+          {leading}
+          <div className="min-w-0">
+            {subtitle && <p className="type-helper text-muted mb-1">{subtitle}</p>}
 
-          <h1 className="type-page-title text-ink break-words">{title}</h1>
+            <h1 className="type-page-title text-ink break-words">{title}</h1>
 
-          {description && <p className="type-body text-muted mt-1.5">{description}</p>}
+            {description && <p className="type-body text-muted mt-1.5">{description}</p>}
+          </div>
         </div>
 
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

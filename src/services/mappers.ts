@@ -484,6 +484,7 @@ export function toBusiness(
     invoicePrefix: b.invoicePrefix,
     phone: b.phone,
     address: b.address,
+    logo: b.logo ? toImage(b.logo) : undefined,
     isPublicStorefront: b.isPublicStorefront,
     isActive: b.isActive,
     productCount: b.productCount,

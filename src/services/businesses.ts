@@ -99,6 +99,7 @@ export async function saveBusiness(input: BusinessOutput, id?: string): Promise<
     doc.invoicePrefix = input.invoicePrefix;
     doc.phone = input.phone;
     doc.address = input.address;
+    doc.logo = input.logo ?? undefined;
     if (!doc.isPublicStorefront) {
       doc.isActive = input.isActive;
     }
@@ -118,6 +119,7 @@ export async function saveBusiness(input: BusinessOutput, id?: string): Promise<
     invoicePrefix: input.invoicePrefix,
     phone: input.phone,
     address: input.address,
+    logo: input.logo ?? undefined,
     isPublicStorefront: false,
     isActive: input.isActive,
   });

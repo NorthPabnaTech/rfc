@@ -312,6 +312,33 @@ export async function deleteAddress(userId: string, id: string) {
 
 /* ─── Admin: customers ───────────────────────────────────────────────────── */
 
+function computeOrderProfit(o: {
+  status: string;
+  total: number;
+  shippingFee?: number;
+  supplierCost?: number;
+  refundedAmount?: number;
+  returnedItems?: Array<{ supplierPrice: number; quantity: number; lineTotal: number }>;
+}): number {
+  if (o.status === 'cancelled') return 0;
+  const returnedCost = (o.returnedItems ?? []).reduce(
+    (s, ri) => s + ri.supplierPrice * ri.quantity,
+    0,
+  );
+  const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
+  const orderRefund =
+    o.refundedAmount && o.refundedAmount > 0
+      ? o.refundedAmount
+      : o.status === 'returned'
+        ? returnedTotal > 0
+          ? returnedTotal
+          : o.total
+        : 0;
+  const netOrderRev = Math.max(0, o.total - orderRefund);
+  const netOrderCogs = Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+  return netOrderRev - (o.shippingFee ?? 0) - netOrderCogs;
+}
+
 export async function listCustomers(f: {
   q?: string;
   status?: 'active' | 'disabled';
@@ -340,24 +367,40 @@ export async function listCustomers(f: {
       .lean(),
     UserModel.countDocuments(query),
   ]);
-  const stats = await OrderModel.aggregate<{ _id: unknown; n: number; spent: number }>([
-    { $match: { user: { $in: docs.map((d) => d._id) }, status: { $nin: ['cancelled'] } } },
-    { $group: { _id: '$user', n: { $sum: 1 }, spent: { $sum: '$total' } } },
-  ]);
-  const byUser = new Map(stats.map((s) => [String(s._id), s]));
+  const customerOrders = await OrderModel.find({
+    user: { $in: docs.map((d) => d._id) },
+    status: { $nin: ['cancelled'] },
+  })
+    .select('user status total shippingFee supplierCost refundedAmount returnedItems')
+    .lean();
+
+  const byUser = new Map<string, { n: number; spent: number; profit: number }>();
+  for (const o of customerOrders) {
+    const uid = String(o.user);
+    const entry = byUser.get(uid) ?? { n: 0, spent: 0, profit: 0 };
+    entry.n += 1;
+    entry.spent += o.total;
+    entry.profit += computeOrderProfit(o);
+    byUser.set(uid, entry);
+  }
+
   return {
-    items: docs.map((u) => ({
-      id: String(u._id),
-      name: u.name,
-      email: u.email,
-      phone: u.phone,
-      avatarUrl: u.avatar?.url,
-      isActive: u.isActive,
-      role: u.role,
-      orderCount: byUser.get(String(u._id))?.n ?? 0,
-      totalSpent: byUser.get(String(u._id))?.spent ?? 0,
-      createdAt: new Date(u.createdAt).toISOString(),
-    })),
+    items: docs.map((u) => {
+      const s = byUser.get(String(u._id));
+      return {
+        id: String(u._id),
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        avatarUrl: u.avatar?.url,
+        isActive: u.isActive,
+        role: u.role,
+        orderCount: s?.n ?? 0,
+        totalSpent: s?.spent ?? 0,
+        totalProfit: s?.profit ?? 0,
+        createdAt: new Date(u.createdAt).toISOString(),
+      };
+    }),
     total,
     page,
     pageSize: ADMIN_PAGE_SIZE,
@@ -369,13 +412,32 @@ export async function getCustomerDetail(id: string) {
   await connectDB();
   const u = await UserModel.findById(id).lean();
   if (!u) return null;
-  const [addresses, stats] = await Promise.all([
+  const [addresses, customerOrders] = await Promise.all([
     listAddresses(id),
-    OrderModel.aggregate<{ n: number; spent: number }>([
-      { $match: { user: u._id, status: { $nin: ['cancelled'] } } },
-      { $group: { _id: null, n: { $sum: 1 }, spent: { $sum: '$total' } } },
-    ]),
+    OrderModel.find({ user: u._id })
+      .select('status total shippingFee supplierCost refundedAmount returnedItems')
+      .lean(),
   ]);
+
+  let orderCount = 0;
+  let totalSpent = 0;
+  let deliveredCount = 0;
+  let cancelledCount = 0;
+  let returnedCount = 0;
+  let totalProfit = 0;
+
+  for (const o of customerOrders) {
+    if (o.status === 'cancelled') {
+      cancelledCount += 1;
+      continue;
+    }
+    orderCount += 1;
+    totalSpent += o.total;
+    if (o.status === 'delivered' || o.status === 'completed') deliveredCount += 1;
+    if (o.status === 'returned') returnedCount += 1;
+    totalProfit += computeOrderProfit(o);
+  }
+
   return {
     id: String(u._id),
     name: u.name,
@@ -386,8 +448,13 @@ export async function getCustomerDetail(id: string) {
     createdAt: new Date(u.createdAt).toISOString(),
     lastLoginAt: u.lastLoginAt ? new Date(u.lastLoginAt).toISOString() : undefined,
     addresses,
-    orderCount: stats[0]?.n ?? 0,
-    totalSpent: stats[0]?.spent ?? 0,
+    orderCount,
+    totalOrders: customerOrders.length,
+    totalSpent,
+    totalProfit,
+    deliveredCount,
+    cancelledCount,
+    returnedCount,
   };
 }
 

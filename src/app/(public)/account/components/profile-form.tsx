@@ -10,7 +10,7 @@ import { uploadFiles } from '@/features/uploads/image-uploader';
 import type { ProfileDTO } from '@/types';
 import { Form, FormInput } from '@components/form';
 import { Icon } from '@components/icon/icon';
-import { Spinner } from '@components/shared';
+import { ConfirmDialog, Spinner } from '@components/shared';
 import { Callout } from '@components/shared/callout';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
@@ -22,6 +22,8 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
   const router = useRouter();
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [removing, setRemoving] = React.useState(false);
+  const [confirmRemove, setConfirmRemove] = React.useState(false);
   const [pendingAvatar, setPendingAvatar] = React.useState<File[]>([]);
   const form = Form.useForm<ProfileInput>({
     schema: profileSchema,
@@ -92,17 +94,8 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
               type="button"
               aria-label="Remove profile photo"
               title="Remove photo"
-              onClick={async () => {
-                if (avatar.type === 'cloudinary' && avatar.publicId) {
-                  await fetch('/api/upload', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ publicId: avatar.publicId, purpose: 'users' }),
-                  }).catch(() => {});
-                }
-                form.setValue('avatar', null, { shouldDirty: true });
-              }}
-              className="bg-danger text-white hover:bg-danger/90 absolute -top-1 -right-1 grid size-6 place-items-center rounded-full shadow ring-2 ring-white transition"
+              onClick={() => setConfirmRemove(true)}
+              className="absolute -top-1 -right-1 grid size-6 place-items-center rounded-full bg-red-600 text-white shadow ring-2 ring-white transition hover:bg-red-700"
             >
               <Icon name="trash" size={12} />
             </button>
@@ -166,6 +159,33 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
         purpose="users"
         onCancel={() => setPendingAvatar([])}
         onConfirm={uploadCroppedAvatar}
+      />
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        tone="danger"
+        title="Remove profile photo?"
+        description="Your current profile photo will be deleted."
+        confirmLabel="Remove photo"
+        cancelLabel="Keep photo"
+        loading={removing}
+        autoClose={false}
+        onConfirm={async () => {
+          setRemoving(true);
+          try {
+            if (avatar?.type === 'cloudinary' && avatar.publicId) {
+              await fetch('/api/upload', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ publicId: avatar.publicId, purpose: 'users' }),
+              }).catch(() => {});
+            }
+            form.setValue('avatar', null, { shouldDirty: true });
+          } finally {
+            setRemoving(false);
+            setConfirmRemove(false);
+          }
+        }}
       />
     </Form>
   );

@@ -99,20 +99,11 @@ export function OrderActions({ order }: { order: OrderDTO }) {
               )}
               {next.includes('cancelled') && effectiveStatus !== 'cancelled' && (
                 <Button
-                  variant="secondary"
+                  variant="danger"
                   disabled={busy}
                   onClick={() => setConfirm('cancelled')}
                 >
                   <Icon name="cancelCircle" size={15} /> Cancel
-                </Button>
-              )}
-              {next.includes('returned') && effectiveStatus !== 'returned' && (
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => setReturnOpen(true)}
-                >
-                  <Icon name="refresh" size={15} /> Return
                 </Button>
               )}
             </div>

@@ -17,6 +17,7 @@ export const businessSchema = z.object({
     .regex(/^[A-Z0-9-]+$/, 'Letters, numbers, and hyphens only'),
   phone: optionalText(30),
   address: optionalText(300),
+  logo: imageAsset.nullable().optional(),
   isActive: z.boolean().default(true),
 });
 export type BusinessInput = z.input<typeof businessSchema>;

@@ -1,6 +1,6 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
-import { baseSchemaOptions, defineModel } from './shared';
+import { baseSchemaOptions, defineModel, type ImageAsset, imageAssetSchema } from './shared';
 
 export interface Business {
   _id: Types.ObjectId;
@@ -10,6 +10,7 @@ export interface Business {
   invoicePrefix: string;
   phone?: string;
   address?: string;
+  logo?: ImageAsset;
   /** Only true for the public-facing RFC Gadget storefront. */
   isPublicStorefront: boolean;
   isActive: boolean;
@@ -25,6 +26,7 @@ const businessSchema = new Schema<Business>(
     invoicePrefix: { type: String, required: true, trim: true, uppercase: true, maxlength: 10 },
     phone: { type: String, trim: true, maxlength: 30 },
     address: { type: String, trim: true, maxlength: 300 },
+    logo: imageAssetSchema,
     isPublicStorefront: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true, index: true },
   },

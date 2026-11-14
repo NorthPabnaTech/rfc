@@ -4,8 +4,9 @@ import * as React from 'react';
 import { useRouter } from 'nextjs-toploader/app';
 
 import { saveBusinessAction } from '@/actions/admin';
-import type { BusinessDTO } from '@/types';
-import { Form, FormInput, FormSwitch, FormTextarea } from '@components/form';
+import { ImageUploader } from '@/features/uploads/image-uploader';
+import type { BusinessDTO, ImageDTO } from '@/types';
+import { Form, FormInput, FormItem, FormSwitch, FormTextarea } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { StatusBadge } from '@components/shared';
 import { Button } from '@components/ui/button';
@@ -39,11 +40,21 @@ export function BusinessesManager({ businesses }: { businesses: BusinessDTO[] })
           >
             <div>
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-ink text-base font-semibold">{b.name}</h2>
-                  <p className="text-subtle text-xs">
-                    Slug: <code>{b.slug}</code> · Prefix: <code>{b.invoicePrefix}</code>
-                  </p>
+                <div className="flex items-center gap-3">
+                  {b.logo?.url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={b.logo.url}
+                      alt={b.name}
+                      className="border-line bg-well size-10 shrink-0 rounded-lg border object-contain p-0.5"
+                    />
+                  )}
+                  <div>
+                    <h2 className="text-ink text-base font-semibold">{b.name}</h2>
+                    <p className="text-subtle text-xs">
+                      Slug: <code>{b.slug}</code> · Prefix: <code>{b.invoicePrefix}</code>
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-1.5">
                   <StatusBadge
@@ -110,6 +121,7 @@ function BusinessDialog({
           invoicePrefix: business.invoicePrefix,
           phone: business.phone ?? '',
           address: business.address ?? '',
+          logo: business.logo ?? null,
           isActive: business.isActive,
         }
       : {
@@ -119,6 +131,7 @@ function BusinessDialog({
           invoicePrefix: '',
           phone: '',
           address: '',
+          logo: null,
           isActive: true,
         },
   });
@@ -159,6 +172,17 @@ function BusinessDialog({
             </div>
             <FormInput name="phone" label="Support phone (for invoices)" placeholder="01XXXXXXXXX" />
             <FormInput name="address" label="Business address (for invoices)" />
+            <FormItem name="logo" label="Logo (for invoices)">
+              {(field) => (
+                <ImageUploader
+                  purpose="categories"
+                  nameHint={form.watch('name')}
+                  max={1}
+                  value={field.value ? [field.value as ImageDTO] : []}
+                  onChange={(imgs) => field.onChange(imgs[0] ?? null)}
+                />
+              )}
+            </FormItem>
             <FormTextarea name="description" label="Description" rows={2} />
             {!business?.isPublicStorefront && (
               <FormSwitch name="isActive" label="Active" />

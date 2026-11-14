@@ -80,43 +80,57 @@ export function OrderProgress({ order }: { order: Pick<OrderDTO, 'status' | 'sta
   const reachedAt = (s: OrderStatus) => order.statusHistory.find((e) => e.status === s)?.at;
 
   return (
-    <ol className="grid grid-cols-6 gap-1">
+    <ol className="flex flex-col sm:grid sm:grid-cols-6 sm:gap-1">
       {ORDER_FLOW.map((s, i) => {
         const done = i <= currentIdx;
         const at = reachedAt(s);
         return (
-          <li key={s} className="relative flex flex-col items-center text-center">
+          <li
+            key={s}
+            className="relative flex items-start gap-3.5 pb-6 last:pb-0 sm:flex-col sm:items-center sm:gap-0 sm:pb-0 sm:text-center"
+          >
+            {i < ORDER_FLOW.length - 1 && (
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute top-10 bottom-0 left-5 w-0.5 -translate-x-1/2 sm:hidden',
+                  i < currentIdx ? 'bg-brand-400' : 'bg-line',
+                )}
+              />
+            )}
             {i > 0 && (
               <span
                 aria-hidden
                 className={cn(
-                  'absolute top-5 right-1/2 h-0.5 w-full',
+                  'absolute top-5 right-1/2 hidden h-0.5 w-full sm:block',
                   i <= currentIdx ? 'bg-brand-400' : 'bg-line',
                 )}
               />
             )}
             <span
               className={cn(
-                'relative z-10 grid size-10 place-items-center rounded-full border-2 transition',
+                'relative z-10 grid size-10 shrink-0 place-items-center rounded-full border-2 transition',
                 done ? 'bg-noir border-noir text-brand-300' : 'border-line text-subtle bg-white',
                 i === currentIdx && 'ring-brand-200 ring-4',
               )}
             >
               <Icon name={STEP_ICON[s]} size={17} />
             </span>
-            <span
-              className={cn(
-                'mt-2 text-[11px] font-semibold sm:text-xs',
-                done ? 'text-ink' : 'text-subtle',
-              )}
-            >
-              {ORDER_STATUS_LABELS[s]}
-            </span>
-            {at && (
-              <span className="text-subtle hidden text-[10px] sm:block">
-                {formatStoreDateTime(at, 'DD MMM, h:mm A')}
+            <div className="flex min-h-10 flex-col justify-center sm:mt-2 sm:min-h-0 sm:items-center">
+              <span
+                className={cn(
+                  'text-sm font-semibold sm:text-xs',
+                  done ? 'text-ink' : 'text-subtle',
+                )}
+              >
+                {ORDER_STATUS_LABELS[s]}
               </span>
-            )}
+              {at && (
+                <span className="text-subtle text-xs sm:text-[10px]">
+                  {formatStoreDateTime(at, 'DD MMM, h:mm A')}
+                </span>
+              )}
+            </div>
           </li>
         );
       })}
