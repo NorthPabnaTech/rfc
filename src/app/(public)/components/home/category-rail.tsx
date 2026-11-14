@@ -48,7 +48,7 @@ export function CategoryRail({ categories }: { categories: CategoryTreeDTO[] }) 
         onScroll={onScroll}
         onMouseDown={onMouseDown}
         onClickCapture={onClickCapture}
-        className="scrollbar-hidden -mx-4 flex cursor-grab touch-pan-x flex-nowrap gap-3 overflow-x-auto px-4 pb-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
+        className="scrollbar-hidden -mx-4 flex cursor-grab flex-nowrap gap-3 overflow-x-auto px-4 pb-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
       >
         {copies.map((copyIdx) => (
           <ul

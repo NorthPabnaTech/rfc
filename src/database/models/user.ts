@@ -15,6 +15,10 @@ export interface User {
   role: UserRole;
   avatar?: ImageAsset;
   isActive: boolean;
+  /** False for newly registered customers until they click their email link. */
+  isEmailVerified?: boolean;
+  emailVerificationTokenHash?: string;
+  emailVerificationExpiresAt?: Date;
   lastLoginAt?: Date;
   /** Sessions issued before this are rejected (set on password reset). */
   passwordChangedAt?: Date;
@@ -37,6 +41,9 @@ const userSchema = new Schema<User>(
     role: { type: String, enum: USER_ROLES, default: 'customer', index: true },
     avatar: imageAssetSchema,
     isActive: { type: Boolean, default: true },
+    isEmailVerified: { type: Boolean, default: true },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
     lastLoginAt: Date,
     passwordChangedAt: Date,
     passwordResetTokenHash: { type: String, select: false },
@@ -57,6 +64,10 @@ userSchema.index(
 userSchema.index(
   { passwordResetTokenHash: 1 },
   { partialFilterExpression: { passwordResetTokenHash: { $type: 'string' } } },
+);
+userSchema.index(
+  { emailVerificationTokenHash: 1 },
+  { partialFilterExpression: { emailVerificationTokenHash: { $type: 'string' } } },
 );
 userSchema.index({ name: 'text', email: 'text', phone: 'text' });
 

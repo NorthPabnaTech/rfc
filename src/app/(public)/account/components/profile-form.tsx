@@ -74,18 +74,40 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
       }}
     >
       <div className="flex items-center gap-5">
-        <span className="bg-cream relative grid size-20 shrink-0 place-items-center overflow-hidden rounded-full">
-          {avatar?.url ? (
-            <ProductImage src={avatar.url} alt="Profile photo" fill sizes="80px" />
-          ) : (
-            <span className="font-display text-accent text-3xl">{profile.name.charAt(0)}</span>
+        <div className="relative size-20 shrink-0">
+          <span className="bg-cream relative grid size-full place-items-center overflow-hidden rounded-full">
+            {avatar?.url ? (
+              <ProductImage src={avatar.url} alt="Profile photo" fill sizes="80px" />
+            ) : (
+              <span className="font-display text-accent text-3xl">{profile.name.charAt(0)}</span>
+            )}
+            {uploading && (
+              <span className="absolute inset-0 grid place-items-center bg-white/70">
+                <Spinner size="md" />
+              </span>
+            )}
+          </span>
+          {avatar?.url && !uploading && (
+            <button
+              type="button"
+              aria-label="Remove profile photo"
+              title="Remove photo"
+              onClick={async () => {
+                if (avatar.type === 'cloudinary' && avatar.publicId) {
+                  await fetch('/api/upload', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ publicId: avatar.publicId, purpose: 'users' }),
+                  }).catch(() => {});
+                }
+                form.setValue('avatar', null, { shouldDirty: true });
+              }}
+              className="bg-danger text-white hover:bg-danger/90 absolute -top-1 -right-1 grid size-6 place-items-center rounded-full shadow ring-2 ring-white transition"
+            >
+              <Icon name="trash" size={12} />
+            </button>
           )}
-          {uploading && (
-            <span className="absolute inset-0 grid place-items-center bg-white/70">
-              <Spinner size="md" />
-            </span>
-          )}
-        </span>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -95,15 +117,6 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
           >
             <Icon name="camera" size={15} /> {avatar ? 'Change photo' : 'Upload photo'}
           </Button>
-          {avatar && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => form.setValue('avatar', null, { shouldDirty: true })}
-            >
-              Remove
-            </Button>
-          )}
           <input
             ref={fileRef}
             type="file"
@@ -128,7 +141,7 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
           type="email"
           placeholder="you@example.com"
           autoComplete="email"
-          hint="Used to reset your password"
+          disabled={Boolean(profile.email)}
           required
         />
       </div>

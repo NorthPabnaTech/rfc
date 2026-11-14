@@ -1,8 +1,9 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
+import { SITE } from '@/config/site';
 import { deletePushSubscription } from '@/services/notifications';
 import {
   authenticate,
@@ -41,22 +42,34 @@ export async function loginAction(
   });
 }
 
+async function getRequestOrigin(): Promise<string> {
+  const h = await headers();
+  const origin = h.get('origin');
+  if (origin && /^https?:\/\//i.test(origin)) return origin;
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+  if (host) {
+    const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+    return `${proto}://${host}`;
+  }
+  return SITE.url;
+}
+
 export async function registerAction(
   input: unknown,
-  next?: string,
-): Promise<ActionResult<{ redirectTo: string }>> {
+): Promise<ActionResult<{ email: string }>> {
   return runAction(async () => {
     const data = registerSchema.parse(input);
-    const user = await registerCustomer(data);
-    await createSession(user);
-    return { redirectTo: safeNext(next, '/account') };
+    const origin = await getRequestOrigin();
+    const user = await registerCustomer(data, origin);
+    return { email: user.email };
   });
 }
 
 export async function forgotPasswordAction(input: unknown): Promise<ActionResult> {
   return runAction(async () => {
     const { email } = forgotPasswordSchema.parse(input);
-    await requestPasswordReset(email);
+    const origin = await getRequestOrigin();
+    await requestPasswordReset(email, origin);
     return undefined;
   });
 }

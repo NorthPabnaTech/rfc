@@ -298,6 +298,8 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const PASSWORD_RESET_TTL_MINUTES = 30;
 /** Ignore repeat reset requests for the same account within this window. */
 export const PASSWORD_RESET_COOLDOWN_SECONDS = 60;
+/** An email-verification link expires after this many hours. */
+export const EMAIL_VERIFICATION_TTL_HOURS = 24;
 
 /** Cloudinary folders, one per upload purpose. */
 export const UPLOAD_FOLDERS = {

@@ -18,7 +18,7 @@ export function CarouselControls({
 }) {
   if (!visible) return null;
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="hidden items-center gap-1.5 sm:flex">
       <button
         type="button"
         onClick={onPrev}
@@ -45,11 +45,16 @@ export function CarouselControls({
  * - seamless infinite loop jump when scrolling past either end
  * - mouse drag-to-scroll (touch swipe works natively via overflow-x-auto + touch-pan-x)
  */
-export function useInfiniteCarousel(itemCount: number) {
+export function useInfiniteCarousel(
+  itemCount: number,
+  options?: { autoScrollMobileMs?: number },
+) {
+  const autoScrollMobileMs = options?.autoScrollMobileMs;
   const trackRef = React.useRef<HTMLDivElement | null>(null);
   const [overflowing, setOverflowing] = React.useState(false);
   const copyWidthRef = React.useRef(0);
   const draggingRef = React.useRef(false);
+  const touchingRef = React.useRef(false);
   const movedRef = React.useRef(false);
   const startXRef = React.useRef(0);
   const startScrollRef = React.useRef(0);
@@ -118,8 +123,28 @@ export function useInfiniteCarousel(itemCount: number) {
   const scrollByStep = React.useCallback((dir: -1 | 1) => {
     const el = trackRef.current;
     if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.7));
+    const step = Math.max(184, Math.round(el.clientWidth * 0.65));
     el.scrollBy({ left: dir * step, behavior: 'smooth' });
+  }, []);
+
+  // Auto-scroll left-to-right on mobile every `autoScrollMobileMs` when overflowing.
+  React.useEffect(() => {
+    if (!overflowing || !autoScrollMobileMs) return;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const timer = window.setInterval(() => {
+      if (!mq.matches || touchingRef.current || draggingRef.current) return;
+      if (document.visibilityState !== 'visible') return;
+      scrollByStep(1);
+    }, autoScrollMobileMs);
+    return () => window.clearInterval(timer);
+  }, [overflowing, autoScrollMobileMs, scrollByStep]);
+
+  const onTouchStart = React.useCallback(() => {
+    touchingRef.current = true;
+  }, []);
+
+  const onTouchEnd = React.useCallback(() => {
+    touchingRef.current = false;
   }, []);
 
   const onMouseDown = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -166,6 +191,8 @@ export function useInfiniteCarousel(itemCount: number) {
     onScroll,
     scrollByStep,
     onMouseDown,
+    onTouchStart,
+    onTouchEnd,
     onClickCapture,
   };
 }

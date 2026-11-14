@@ -62,7 +62,20 @@ function showDesktopNotification(n: NotificationDTO, onOpen: (link: string) => v
       notif.close();
     };
   } catch {
-    // Some mobile browsers require ServiceWorkerRegistration.showNotification
+    // Mobile browsers require ServiceWorkerRegistration.showNotification
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker.ready
+        .then((reg) =>
+          reg.showNotification(n.title, {
+            body: n.body,
+            icon: '/icon.png',
+            badge: '/icon.png',
+            tag: n.id,
+            data: { link: n.link },
+          }),
+        )
+        .catch(() => {});
+    }
   }
 }
 
@@ -124,6 +137,8 @@ export function NotificationBell({
   const router = useRouter();
   const push = usePushNotifications(pushKey);
   const [enabling, setEnabling] = React.useState(false);
+  const [promptDismissed, setPromptDismissed] = React.useState(false);
+  const autoPrompted = React.useRef(false);
   const [items, setItems] = React.useState<NotificationDTO[]>(initial.items);
   const [unseen, setUnseen] = React.useState(initial.unseen);
   const [open, setOpen] = React.useState(false);
@@ -222,12 +237,25 @@ export function NotificationBell({
     void markAllNotificationsReadAction();
   };
 
+  React.useEffect(() => {
+    if (!pushKey || push.state !== 'default' || autoPrompted.current) return;
+    autoPrompted.current = true;
+    void push.enable().catch(() => {});
+  }, [pushKey, push]);
+
+  const dismissPrompt = () => {
+    setPromptDismissed(true);
+  };
+
   const onEnablePush = async () => {
     setEnabling(true);
     try {
       await push.enable();
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        toast.success('Push notifications enabled');
+      }
     } catch {
-      toast.error("Couldn't turn on desktop notifications. Please try again.");
+      toast.error("Couldn't turn on notifications. Please try again.");
     } finally {
       setEnabling(false);
     }
@@ -236,7 +264,8 @@ export function NotificationBell({
   const unread = items.filter((n) => !n.read).length;
 
   return (
-    <Dropdown
+    <>
+      <Dropdown
       align="end"
       width="min(380px, calc(100vw - 2rem))"
       open={open}
@@ -259,7 +288,7 @@ export function NotificationBell({
             <div className="border-line bg-well flex items-center gap-3 border-b px-4 py-3">
               <Icon name="bell" size={18} className="text-muted shrink-0" />
               <p className="type-helper text-muted min-w-0 flex-1">
-                Get desktop alerts, even when this site is closed.
+                Get system notifications, even when this site is closed.
               </p>
               <Button
                 type="button"
@@ -274,8 +303,8 @@ export function NotificationBell({
           )}
           {push.state === 'denied' && (
             <p className="border-line bg-well type-helper text-muted border-b px-4 py-3">
-              Desktop alerts are blocked. Allow notifications for this site in your browser settings
-              to get them.
+              System Notifications are blocked. Allow notifications for this site in your browser
+              settings to get them.
             </p>
           )}
           {items.length === 0 ? (
@@ -350,5 +379,33 @@ export function NotificationBell({
         )}
       </button>
     </Dropdown>
+    {pushKey && push.state === 'default' && !promptDismissed && (
+      <div className="border-line bg-panel shadow-modal fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border p-3.5 sm:left-auto">
+        <span className="bg-brand/15 text-brand grid size-10 shrink-0 place-items-center rounded-xl">
+          <Icon name="bell" size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-ink text-xs font-semibold">Enable push notifications</p>
+          <p className="text-muted text-[11px] leading-snug">
+            Get order updates &amp; replies on your phone even when the browser is closed.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button type="button" variant="ghost" size="sm" onClick={dismissPrompt}>
+            Later
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={enabling}
+            onClick={onEnablePush}
+          >
+            {enabling ? 'Turning on…' : 'Allow'}
+          </Button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

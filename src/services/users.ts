@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword } from '@lib/auth/password';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
 import {
   ADMIN_PAGE_SIZE,
+  EMAIL_VERIFICATION_TTL_HOURS,
   PASSWORD_RESET_COOLDOWN_SECONDS,
   PASSWORD_RESET_TTL_MINUTES,
 } from '@lib/constants';
@@ -26,27 +27,84 @@ import { toAddress, toImage } from './mappers';
 
 /* ─── Auth ───────────────────────────────────────────────────────────────── */
 
-export async function registerCustomer(input: RegisterOutput) {
+export async function registerCustomer(input: RegisterOutput, origin?: string) {
   await connectDB();
-  if (await UserModel.exists({ phone: input.phone })) {
+  const email = input.email.trim().toLowerCase();
+
+  if (await UserModel.exists({ phone: input.phone, isEmailVerified: { $ne: false } })) {
     throw new AppError('An account with this mobile number already exists. Try signing in.');
   }
-  if (await UserModel.exists({ email: input.email })) {
+  if (await UserModel.exists({ email, isEmailVerified: { $ne: false } })) {
     throw new AppError('An account with this email already exists. Try signing in.');
   }
+
+  // Unverified registrations can be replaced cleanly so the user can re-register with the same email.
+  await UserModel.deleteMany({
+    isEmailVerified: false,
+    $or: [{ email }, { phone: input.phone }],
+  });
+
+  const token = randomBytes(32).toString('base64url');
+  const ttlMs = EMAIL_VERIFICATION_TTL_HOURS * 60 * 60_000;
   const user = await UserModel.create({
     name: input.name,
-    email: input.email,
+    email,
     phone: input.phone,
     passwordHash: await hashPassword(input.password),
     role: 'customer',
+    isEmailVerified: false,
+    emailVerificationTokenHash: hashResetToken(token),
+    emailVerificationExpiresAt: new Date(Date.now() + ttlMs),
   });
 
-  // Link earlier guest orders placed with the same phone number.
-  await OrderModel.updateMany(
-    { user: null, 'customer.phone': input.phone },
-    { $set: { user: user._id } },
-  );
+  const baseUrl = (origin || SITE.url).replace(/\/+$/, '');
+  const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  try {
+    await sendMail({
+      to: email,
+      subject: `Verify your ${SITE.name} account`,
+      ...mailLayout({
+        greeting: `Hi ${user.name},`,
+        paragraphs: [
+          `Thanks for creating an account with ${SITE.name}. Click the button below to verify your email address and sign in automatically.`,
+          `This verification link expires in ${EMAIL_VERIFICATION_TTL_HOURS} hours.`,
+        ],
+        action: { label: 'Verify email & sign in', url: verifyUrl },
+        footnote:
+          "If you didn't create this account, you can safely ignore this email — the account won't be activated.",
+      }),
+    });
+  } catch (error) {
+    await UserModel.deleteOne({ _id: user._id }).catch(() => {});
+    console.error('[register verification] mail failed', error);
+    throw new AppError("We couldn't send the verification email right now. Please try again.");
+  }
+
+  return { id: String(user._id), role: user.role, email };
+}
+
+export async function verifyEmailToken(token: string) {
+  await connectDB();
+  const user = await UserModel.findOne({
+    emailVerificationTokenHash: hashResetToken(token),
+    emailVerificationExpiresAt: { $gt: new Date() },
+    isActive: true,
+  });
+  if (!user) return null;
+
+  user.isEmailVerified = true;
+  user.emailVerificationTokenHash = undefined;
+  user.emailVerificationExpiresAt = undefined;
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  if (user.phone) {
+    // Link earlier guest orders placed with the same phone number.
+    await OrderModel.updateMany(
+      { user: null, 'customer.phone': user.phone },
+      { $set: { user: user._id } },
+    );
+  }
 
   return { id: String(user._id), role: user.role };
 }
@@ -61,6 +119,12 @@ export async function authenticate(identifier: LoginIdentifier, password: string
   const user = await UserModel.findOne(filter).select('+passwordHash');
   const ok = await verifyPassword(password, user?.passwordHash);
   if (!user || !ok) throw new AppError(INVALID_LOGIN, 401);
+  if (user.isEmailVerified === false) {
+    throw new AppError(
+      'Please verify your email first. Check your inbox for the verification link, or register again.',
+      403,
+    );
+  }
   if (!user.isActive)
     throw new AppError('This account has been disabled. Please contact support.', 403);
   user.lastLoginAt = new Date();
@@ -79,10 +143,11 @@ const INVALID_RESET_LINK = 'This reset link is invalid or has expired. Please re
  * nothing for unknown, disabled or email-less accounts, or for a repeat
  * request inside the cooldown — the caller always shows the same message.
  */
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(email: string, origin?: string): Promise<void> {
   await connectDB();
-  const user = await UserModel.findOne({ email }).select('+passwordResetExpiresAt');
-  if (!user?.isActive || !user.email) return;
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await UserModel.findOne({ email: normalizedEmail }).select('+passwordResetExpiresAt');
+  if (!user?.isActive || !user.email || user.isEmailVerified === false) return;
 
   const ttlMs = PASSWORD_RESET_TTL_MINUTES * 60_000;
   const lastIssuedAt = (user.passwordResetExpiresAt?.getTime() ?? 0) - ttlMs;
@@ -93,7 +158,8 @@ export async function requestPasswordReset(email: string): Promise<void> {
   user.passwordResetExpiresAt = new Date(Date.now() + ttlMs);
   await user.save();
 
-  const url = `${SITE.url}/reset-password?token=${token}`;
+  const baseUrl = (origin || SITE.url).replace(/\/+$/, '');
+  const url = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
   try {
     await sendMail({
       to: user.email,
@@ -173,8 +239,11 @@ export async function updateProfile(userId: string, input: ProfileOutput) {
   ) {
     throw new AppError('Another account already uses this mobile number.');
   }
+  if (user.email && input.email !== user.email) {
+    throw new AppError('Email address cannot be changed once set.');
+  }
   if (
-    input.email !== user.email &&
+    !user.email &&
     (await UserModel.exists({ email: input.email, _id: { $ne: user._id } }))
   ) {
     throw new AppError('Another account already uses this email.');
@@ -182,7 +251,7 @@ export async function updateProfile(userId: string, input: ProfileOutput) {
   const oldAvatar = user.avatar;
   user.name = input.name;
   user.phone = input.phone;
-  user.email = input.email;
+  if (!user.email) user.email = input.email;
   if (input.avatar === null) user.set('avatar', undefined);
   else if (input.avatar) user.set('avatar', input.avatar);
   await user.save();

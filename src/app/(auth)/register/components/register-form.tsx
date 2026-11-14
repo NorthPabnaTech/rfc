@@ -1,30 +1,52 @@
 'use client';
 
-import { useRouter } from 'nextjs-toploader/app';
+import * as React from 'react';
+import Link from 'next/link';
 
 import { registerAction } from '@/actions/auth';
 import { Form, FormInput, FormPassword } from '@components/form';
+import { Callout } from '@components/shared/callout';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
+import { EMAIL_VERIFICATION_TTL_HOURS } from '@lib/constants';
 import { type RegisterInput, registerSchema } from '@lib/validators/auth';
 
 export function RegisterForm({ next }: { next?: string }) {
-  const router = useRouter();
+  const [sentEmail, setSentEmail] = React.useState<string | null>(null);
   const form = Form.useForm<RegisterInput>({
     schema: registerSchema,
     defaultValues: { name: '', email: '', phone: '', password: '', confirmPassword: '' },
   });
   const { isSubmitting } = form.formState;
 
+  if (sentEmail) {
+    return (
+      <div className="mt-8 flex flex-col gap-4">
+        <Callout tone="success" title="Verify your email">
+          We sent a verification link to <strong>{sentEmail}</strong>. Click the link in your
+          inbox (or spam folder) to activate your account and sign in automatically. The link expires
+          in {EMAIL_VERIFICATION_TTL_HOURS} hours.
+        </Callout>
+        <Button type="button" variant="secondary" size="lg" onClick={() => setSentEmail(null)}>
+          Use a different email or resend
+        </Button>
+        <Button asChild variant="ghost" size="lg">
+          <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>
+            Already verified? Sign in
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Form
       form={form}
       className="mt-8"
       onFinish={async (values) => {
-        const res = await registerAction(values, next);
+        const res = await registerAction(values);
         if (handleActionResult(res, form, { successToast: false })) {
-          router.replace(res.data.redirectTo);
-          router.refresh();
+          setSentEmail(res.data.email);
         }
       }}
     >

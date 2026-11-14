@@ -32,10 +32,16 @@ export async function sendMail(mail: Mail): Promise<void> {
     log(`[mail] SMTP not configured — not sent to ${mail.to}: ${mail.subject}\n${mail.text}`);
     return;
   }
-  await smtp.sendMail({
-    from: serverEnv.MAIL_FROM ?? `${SITE.name} <${serverEnv.SMTP_USER}>`,
-    ...mail,
-  });
+  try {
+    await smtp.sendMail({
+      from: serverEnv.MAIL_FROM ?? `${SITE.name} <${serverEnv.SMTP_USER}>`,
+      ...mail,
+    });
+  } catch (error) {
+    // Reset cached transport so a stale socket never breaks subsequent emails.
+    transporter = null;
+    throw error;
+  }
 }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

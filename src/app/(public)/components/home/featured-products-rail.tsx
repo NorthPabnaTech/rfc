@@ -15,8 +15,10 @@ export function FeaturedProductsRail({ products }: { products: ProductCardDTO[] 
     onScroll,
     scrollByStep,
     onMouseDown,
+    onTouchStart,
+    onTouchEnd,
     onClickCapture,
-  } = useInfiniteCarousel(products.length);
+  } = useInfiniteCarousel(products.length, { autoScrollMobileMs: 5000 });
 
   if (products.length === 0) return null;
 
@@ -40,8 +42,11 @@ export function FeaturedProductsRail({ products }: { products: ProductCardDTO[] 
         ref={trackRef}
         onScroll={onScroll}
         onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
         onClickCapture={onClickCapture}
-        className="scrollbar-hidden -mx-4 flex cursor-grab touch-pan-x flex-nowrap gap-3 overflow-x-auto px-4 pb-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
+        className="scrollbar-hidden -mx-4 flex cursor-grab flex-nowrap gap-3 overflow-x-auto px-4 pb-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
       >
         {copies.map((copyIdx) => (
           <div
