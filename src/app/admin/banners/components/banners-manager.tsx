@@ -248,6 +248,8 @@ function BannerDialog({
               {(field) => (
                 <ImageUploader
                   purpose="banners"
+                  bannerPosition={form.watch('position')}
+                  nameHint={form.watch('title')}
                   max={1}
                   allowUrl
                   value={field.value ? [field.value as ImageDTO] : []}

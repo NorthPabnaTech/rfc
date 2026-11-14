@@ -55,19 +55,44 @@ export type UploadedMediaMeta = {
   sha256: string;
 };
 
+function sanitizeFileBase(raw: string): string {
+  const cleaned = raw
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60)
+    .replace(/_+$/g, '');
+  return cleaned || 'image';
+}
+
+function buildUniquePublicId(file: File, nameHint?: string): string {
+  const trimmedHint = nameHint?.trim();
+  const rawBase = trimmedHint || (file.name ? file.name.replace(/\.[^/.]+$/, '') : '');
+  const base = sanitizeFileBase(rawBase);
+  const uniqueId = crypto.randomBytes(4).toString('hex');
+  return `${base}_${uniqueId}`;
+}
+
 export async function uploadImageWithMeta(
   file: File,
   purpose: UploadPurpose,
+  nameHint?: string,
 ): Promise<UploadedMediaMeta> {
   assertValidImage(file);
   const buffer = Buffer.from(await file.arrayBuffer());
   const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
   const edge = MAX_EDGE[purpose];
+  const publicIdBase = buildUniquePublicId(file, nameHint);
 
   const result = await new Promise<UploadApiResponse>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: UPLOAD_FOLDERS[purpose],
+        public_id: publicIdBase,
+        unique_filename: false,
+        overwrite: false,
         resource_type: 'image',
         transformation: [{ width: edge, height: edge, crop: 'limit', quality: 'auto:good' }],
       },
@@ -75,6 +100,9 @@ export async function uploadImageWithMeta(
     );
     stream.end(buffer);
   });
+
+  const resolvedBase = result.public_id.split('/').pop() || publicIdBase;
+  const ext = result.format || file.name.split('.').pop()?.toLowerCase() || '';
 
   return {
     asset: {
@@ -84,7 +112,7 @@ export async function uploadImageWithMeta(
       width: result.width,
       height: result.height,
     },
-    filename: file.name || `${purpose}-${Date.now()}`,
+    filename: ext ? `${resolvedBase}.${ext}` : resolvedBase,
     mimeType: file.type,
     format: result.format,
     bytes: result.bytes ?? buffer.length,

@@ -38,6 +38,7 @@ export function OrderActions({ order }: { order: OrderDTO }) {
     selectedStatus && next.includes(selectedStatus) ? selectedStatus : (next[0] ?? '');
   const [note, setNote] = React.useState('');
   const [confirm, setConfirm] = React.useState<OrderStatus | null>(null);
+  const [metaConfirm, setMetaConfirm] = React.useState(false);
   const [returnOpen, setReturnOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [payment, setPayment] = React.useState(order.paymentStatus);
@@ -137,22 +138,35 @@ export function OrderActions({ order }: { order: OrderDTO }) {
           placeholder="Only visible to admins"
         />
         <Button
-          variant="secondary"
+          variant="primary"
           disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            const res = await updateOrderMetaAction({
-              orderId: order.id,
-              paymentStatus: payment,
-              adminNote,
-            });
-            setBusy(false);
-            if (handleActionResult(res)) router.refresh();
-          }}
+          onClick={() => setMetaConfirm(true)}
         >
           Save
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={metaConfirm}
+        onOpenChange={(o) => !o && setMetaConfirm(false)}
+        tone="info"
+        title="Save payment & internal note?"
+        description="The order’s payment status and internal admin note will be updated."
+        confirmLabel="Save"
+        loading={busy}
+        autoClose={false}
+        onConfirm={async () => {
+          setBusy(true);
+          const res = await updateOrderMetaAction({
+            orderId: order.id,
+            paymentStatus: payment,
+            adminNote,
+          });
+          setBusy(false);
+          setMetaConfirm(false);
+          if (handleActionResult(res)) router.refresh();
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirm}

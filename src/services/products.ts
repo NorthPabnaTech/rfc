@@ -92,10 +92,6 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
   const pageSize = filters.pageSize ?? PAGE_SIZE;
   const query: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
 
-  if (filters.q) {
-    const rx = new RegExp(escapeRegex(filters.q.trim().slice(0, 80)), 'i');
-    query.$or = [{ name: rx }, { shortDescription: rx }, { sku: rx }, { 'seo.keywords': rx }];
-  }
   if (filters.category) {
     const cat = await CategoryModel.findOne({ slug: filters.category, isActive: true }).lean();
     if (!cat) return paginate([], 0, page, pageSize);
@@ -113,6 +109,43 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
   }
   if (filters.availability === 'in_stock') query.stockStatus = { $ne: 'out_of_stock' };
   if (filters.onSale) query.salePrice = { $ne: null };
+
+  const rawQ = filters.q?.trim().slice(0, 80);
+  if (rawQ) {
+    const tokens = rawQ.split(/\s+/).filter(Boolean).slice(0, 6);
+    const tokenClauses = await Promise.all(
+      tokens.map(async (tok) => {
+        const rx = new RegExp(escapeRegex(tok), 'i');
+        const [catIds, tagIds] = await Promise.all([
+          CategoryModel.find({ name: rx }, '_id').lean(),
+          TagModel.find({ name: rx }, '_id').lean(),
+        ]);
+        const cIds = catIds.map((c) => c._id);
+        const tIds = tagIds.map((t) => t._id);
+        return {
+          $or: [
+            { name: rx },
+            { shortDescription: rx },
+            { description: rx },
+            { slug: rx },
+            { sku: rx },
+            { 'seo.keywords': rx },
+            ...(cIds.length ? [{ category: { $in: cIds } }, { subCategory: { $in: cIds } }] : []),
+            ...(tIds.length ? [{ tags: { $in: tIds } }] : []),
+          ],
+        };
+      }),
+    );
+
+    const strictQuery: QueryFilter<Product> = { ...query, $and: tokenClauses };
+    const strictCount = await ProductModel.countDocuments(strictQuery);
+    if (strictCount > 0 || tokens.length === 1) {
+      Object.assign(query, { $and: tokenClauses });
+    } else {
+      // Fall back to any matching token so partial matches still appear.
+      Object.assign(query, { $or: tokenClauses.flatMap((c) => c.$or) });
+    }
+  }
 
   const [docs, total] = await Promise.all([
     ProductModel.find(query, CARD_FIELDS)
@@ -138,7 +171,7 @@ export async function listProductCards(
   await connectDB();
   const base: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
   const variants: Record<typeof kind, [QueryFilter<Product>, Record<string, SortOrder>]> = {
-    featured: [{ ...base, isFeatured: true }, { updatedAt: -1 }],
+    featured: [{ ...base, isFeatured: true }, { createdAt: -1 }],
     new: [base, { createdAt: -1 }],
     bestsellers: [base, { soldCount: -1, ratingAverage: -1 }],
     deals: [{ ...base, salePrice: { $ne: null } }, { updatedAt: -1 }],
@@ -267,7 +300,7 @@ export async function listAdminProducts(
 
   const [docs, total] = await Promise.all([
     ProductModel.find(query)
-      .sort({ updatedAt: -1 })
+      .sort({ createdAt: -1 })
       .skip((page - 1) * ADMIN_PAGE_SIZE)
       .limit(ADMIN_PAGE_SIZE)
       .populate('category', 'name')

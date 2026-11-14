@@ -19,14 +19,59 @@ import { cn } from '@lib/utils';
 
 export type StatCardTone = 'accent' | 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | 'locked';
 
-const TONE: Record<StatCardTone, { bg: string; fg: string }> = {
-  accent: { bg: 'var(--color-accent-soft)', fg: 'var(--color-accent)' },
-  ok: { bg: 'var(--status-ok-bg)', fg: 'var(--status-ok-fg)' },
-  warn: { bg: 'var(--status-warn-bg)', fg: 'var(--status-warn-fg)' },
-  danger: { bg: 'var(--status-danger-bg)', fg: 'var(--status-danger-fg)' },
-  info: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
-  neutral: { bg: 'var(--color-well)', fg: 'var(--color-muted)' },
-  locked: { bg: '#eef2ff', fg: '#4f46e5' },
+const TONE: Record<
+  StatCardTone,
+  { bg: string; fg: string; cardGradient: string; cardBorder: string }
+> = {
+  accent: {
+    bg: 'linear-gradient(135deg, #1170f5, #19c6ff)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #1170f5 18%, var(--color-panel)), color-mix(in srgb, #19c6ff 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #1170f5 32%, var(--color-line))',
+  },
+  ok: {
+    bg: 'linear-gradient(135deg, #10b981, #14b8a6)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #10b981 18%, var(--color-panel)), color-mix(in srgb, #14b8a6 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #10b981 32%, var(--color-line))',
+  },
+  warn: {
+    bg: 'linear-gradient(135deg, #f59e0b, #f97316)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #f59e0b 18%, var(--color-panel)), color-mix(in srgb, #f97316 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #f59e0b 32%, var(--color-line))',
+  },
+  danger: {
+    bg: 'linear-gradient(135deg, #f43f5e, #ef4444)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #f43f5e 18%, var(--color-panel)), color-mix(in srgb, #ef4444 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #f43f5e 32%, var(--color-line))',
+  },
+  info: {
+    bg: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #0ea5e9 18%, var(--color-panel)), color-mix(in srgb, #6366f1 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #0ea5e9 32%, var(--color-line))',
+  },
+  neutral: {
+    bg: 'linear-gradient(135deg, #64748b, #475569)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #64748b 16%, var(--color-panel)), color-mix(in srgb, #334155 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #64748b 28%, var(--color-line))',
+  },
+  locked: {
+    bg: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #6366f1 18%, var(--color-panel)), color-mix(in srgb, #8b5cf6 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #6366f1 32%, var(--color-line))',
+  },
 };
 
 type Props = {
@@ -72,20 +117,28 @@ export function StatCard({ label, value, hint, icon, tone = 'accent', ...rest }:
   );
 
   const base = cn(
-    'bg-panel hairline flex items-start gap-3 rounded-xl px-4 py-3.5 text-left',
-    onClick && 'focus-ring hover:border-line-2 cursor-pointer transition-colors',
-    active && 'ring-accent/40 border-accent/40 ring-1',
+    'flex items-start gap-3 rounded-xl border px-4 py-3.5 text-left shadow-xs transition-[transform,box-shadow,border-color]',
+    onClick && 'focus-ring cursor-pointer hover:-translate-y-0.5 hover:shadow-md',
+    active && 'shadow-[0_10px_28px_-6px_rgba(56,189,248,0.28)]',
     className,
   );
+  const style: React.CSSProperties = {
+    background: t.cardGradient,
+    borderColor: t.cardBorder,
+  };
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} aria-pressed={active} className={base}>
+      <button type="button" onClick={onClick} aria-pressed={active} className={base} style={style}>
         {body}
       </button>
     );
   }
-  return <div className={base}>{body}</div>;
+  return (
+    <div className={base} style={style}>
+      {body}
+    </div>
+  );
 }
 
 /**

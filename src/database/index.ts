@@ -32,5 +32,10 @@ export { DEFAULT_SETTINGS, type Settings, SettingsModel } from './models/setting
 export { type ImageAsset } from './models/shared';
 export { type StockMovement, StockMovementModel } from './models/stock-movement';
 export { type Supplier, SupplierModel } from './models/supplier';
+export {
+  type SupplierOrder,
+  type SupplierOrderEvent,
+  SupplierOrderModel,
+} from './models/supplier-order';
 export { type Tag, TagModel } from './models/tag';
 export { type User, type UserDocument, UserModel } from './models/user';

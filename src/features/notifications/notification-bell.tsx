@@ -8,7 +8,6 @@ import {
   getNotificationsAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
-  markNotificationsSeenAction,
 } from '@/actions/notifications';
 import type { NotificationDTO, NotificationFeedDTO } from '@/types';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
@@ -43,7 +42,29 @@ const TYPE_ICON: Record<NotificationType, IconRegistryKey> = {
   order_placed: 'bag',
   order_cancelled: 'cancelCircle',
   order_status: 'shipping',
+  new_review: 'star',
+  new_question: 'question',
+  question_answered: 'question',
 };
+
+function showDesktopNotification(n: NotificationDTO, onOpen: (link: string) => void) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    const notif = new Notification(n.title, {
+      body: n.body,
+      icon: '/icon.png',
+      tag: n.id,
+    });
+    notif.onclick = () => {
+      window.focus();
+      onOpen(n.link);
+      notif.close();
+    };
+  } catch {
+    // Some mobile browsers require ServiceWorkerRegistration.showNotification
+  }
+}
 
 /**
  * Plays the notification sound. Browsers only allow audio after the visitor
@@ -106,10 +127,6 @@ export function NotificationBell({
   const [items, setItems] = React.useState<NotificationDTO[]>(initial.items);
   const [unseen, setUnseen] = React.useState(initial.unseen);
   const [open, setOpen] = React.useState(false);
-  const openRef = React.useRef(open);
-  React.useEffect(() => {
-    openRef.current = open;
-  }, [open]);
   const playSound = useNotificationSound();
   // Ids already shown, so a refresh only chimes for genuinely new ones.
   const knownIds = React.useRef(new Set(initial.items.map((n) => n.id)));
@@ -117,12 +134,18 @@ export function NotificationBell({
   const refresh = React.useCallback(async () => {
     const res = await getNotificationsAction();
     if (!res.ok) return;
-    const fresh = res.data.items.filter((n) => !knownIds.current.has(n.id) && !n.seen);
+    const fresh = res.data.items.filter((n) => !knownIds.current.has(n.id) && !n.read);
     res.data.items.forEach((n) => knownIds.current.add(n.id));
-    if (fresh.length > 0) playSound();
+    if (fresh.length > 0) {
+      playSound();
+      fresh.forEach((n) => {
+        showDesktopNotification(n, (link) => router.push(link));
+        toast.info(n.title, { description: n.body });
+      });
+    }
     setItems(res.data.items);
-    setUnseen(openRef.current ? 0 : res.data.unseen);
-  }, [playSound]);
+    setUnseen(res.data.unseen);
+  }, [playSound, router]);
 
   // Live push over Pusher.
   React.useEffect(() => {
@@ -146,11 +169,11 @@ export function NotificationBell({
       channel.bind(NOTIFICATION_EVENT, (n: NotificationDTO) => {
         knownIds.current.add(n.id);
         playSound();
+        showDesktopNotification(n, (link) => router.push(link));
         setItems((prev) =>
           [n, ...prev.filter((p) => p.id !== n.id)].slice(0, NOTIFICATION_LIST_LIMIT),
         );
-        if (openRef.current) void markNotificationsSeenAction();
-        else setUnseen((c) => c + 1);
+        setUnseen((c) => c + 1);
         toast.info(n.title, { description: n.body });
         router.refresh();
       });
@@ -166,13 +189,13 @@ export function NotificationBell({
     };
   }, [realtime, userId, router, playSound]);
 
-  // Without realtime, poll; either way, catch up when the tab regains focus.
+  // Without realtime, poll even when in another browser tab; catch up when tab regains focus.
   React.useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
     document.addEventListener('visibilitychange', onVisible);
-    const timer = realtime ? null : window.setInterval(onVisible, NOTIFICATION_POLL_MS);
+    const timer = realtime ? null : window.setInterval(() => void refresh(), NOTIFICATION_POLL_MS);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       if (timer) window.clearInterval(timer);
@@ -181,16 +204,12 @@ export function NotificationBell({
 
   const onOpenChange = (next: boolean) => {
     setOpen(next);
-    if (next && unseen > 0) {
-      setUnseen(0);
-      setItems((prev) => prev.map((n) => ({ ...n, seen: true })));
-      void markNotificationsSeenAction();
-    }
   };
 
   const onSelect = (n: NotificationDTO) => {
     setOpen(false);
     if (!n.read) {
+      setUnseen((c) => Math.max(0, c - 1));
       setItems((prev) => prev.map((p) => (p.id === n.id ? { ...p, read: true, seen: true } : p)));
       void markNotificationReadAction(n.id);
     }
@@ -198,6 +217,7 @@ export function NotificationBell({
   };
 
   const onReadAll = () => {
+    setUnseen(0);
     setItems((prev) => prev.map((n) => ({ ...n, read: true, seen: true })));
     void markAllNotificationsReadAction();
   };

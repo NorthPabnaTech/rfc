@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { ProductModel } from '@/database';
 import {
   OrderItemsList,
   OrderProgress,
@@ -13,6 +14,7 @@ import {
 import { Taka } from '@/features/products/price';
 import { getBusinessBySlug } from '@/services/businesses';
 import { getAdminOrder } from '@/services/orders';
+import { listSupplierOrdersForOrder } from '@/services/supplier-orders';
 import { Callout, PageHeader } from '@components/shared';
 import { ORDER_PLATFORM_LABELS, PAYMENT_METHOD_LABELS } from '@lib/constants';
 import { param, type SearchParams } from '@lib/search-params';
@@ -21,6 +23,10 @@ import { objectId } from '@lib/validators/common';
 
 import { OrderActions } from './components/order-actions';
 import { OrderToolbar } from './components/order-toolbar';
+import {
+  SupplierFulfillmentCard,
+  type SupplierOrderProductMeta,
+} from './components/supplier-fulfillment-card';
 
 export const metadata: Metadata = { title: 'Order' };
 
@@ -33,9 +39,35 @@ export default async function AdminOrderPage({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   if (!objectId.safeParse(id).success) notFound();
-  const order = await getAdminOrder(id);
+  const [order, supplierOrders] = await Promise.all([
+    getAdminOrder(id),
+    listSupplierOrdersForOrder(id),
+  ]);
   if (!order) notFound();
-  const business = await getBusinessBySlug(order.business);
+  const [business, productDocs] = await Promise.all([
+    getBusinessBySlug(order.business),
+    supplierOrders.length
+      ? ProductModel.find(
+          { _id: { $in: supplierOrders.map((s) => s.productId) } },
+          'supplierMinSellingPrice supplierVariants',
+        ).lean()
+      : Promise.resolve([]),
+  ]);
+  const productMeta: Record<string, SupplierOrderProductMeta> = Object.fromEntries(
+    productDocs.map((p) => [
+      String(p._id),
+      {
+        supplierMinSellingPrice: p.supplierMinSellingPrice,
+        supplierVariants: p.supplierVariants?.map((v) => ({
+          externalVariantId: v.externalVariantId,
+          color: v.color ?? null,
+          size: v.size ?? null,
+          stockQuantity: v.stockQuantity,
+          inStock: v.inStock,
+        })),
+      },
+    ]),
+  );
   const justCreated = param(sp, 'created') === '1';
 
   return (
@@ -73,6 +105,7 @@ export default async function AdminOrderPage({
               <OrderTotals order={order} admin />
             </div>
           </Card>
+          <SupplierFulfillmentCard supplierOrders={supplierOrders} productMeta={productMeta} />
           {order.returnedItems && order.returnedItems.length > 0 && (
             <Card title="Returned items">
               <ul className="divide-line divide-y text-sm">

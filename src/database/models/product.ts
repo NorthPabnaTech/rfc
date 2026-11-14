@@ -55,6 +55,24 @@ export interface Product {
   /** Required for single products; a combo's suppliers come from its items. */
   supplier?: Types.ObjectId | null;
   supplierProductUrl?: string;
+  /** External product ID when imported from an API-connected supplier (admin-only). */
+  supplierProductId?: string;
+  supplierPackagingCost?: number;
+  supplierMinSellingPrice?: {
+    customerPaysDelivery: number;
+    resellerPaysDeliveryInsideDhaka: number;
+    resellerPaysDeliveryOutsideDhaka: number;
+  };
+  supplierDeliveryCharges?: { insideDhaka: number; outsideDhaka: number };
+  supplierInStock?: boolean;
+  supplierLastSyncedAt?: Date;
+  supplierVariants?: {
+    externalVariantId: string;
+    color?: string | null;
+    size?: string | null;
+    stockQuantity: number;
+    inStock: boolean;
+  }[];
   /** What we pay the supplier (for combos: the items' total) — admin-only. */
   supplierPrice: number;
   /** Regular selling price. */
@@ -125,6 +143,34 @@ const productSchema = new Schema<Product>(
 
     supplier: { type: Schema.Types.ObjectId, ref: 'Supplier', default: null, index: true },
     supplierProductUrl: { type: String, trim: true, maxlength: 1000 },
+    supplierProductId: { type: String, trim: true, maxlength: 120, index: true, sparse: true },
+    supplierPackagingCost: { type: Number, min: 0 },
+    supplierMinSellingPrice: {
+      customerPaysDelivery: { type: Number, min: 0 },
+      resellerPaysDeliveryInsideDhaka: { type: Number, min: 0 },
+      resellerPaysDeliveryOutsideDhaka: { type: Number, min: 0 },
+    },
+    supplierDeliveryCharges: {
+      insideDhaka: { type: Number, min: 0 },
+      outsideDhaka: { type: Number, min: 0 },
+    },
+    supplierInStock: { type: Boolean },
+    supplierLastSyncedAt: Date,
+    supplierVariants: {
+      type: [
+        new Schema(
+          {
+            externalVariantId: { type: String, required: true, trim: true },
+            color: { type: String, trim: true, default: null },
+            size: { type: String, trim: true, default: null },
+            stockQuantity: { type: Number, default: 0, min: 0 },
+            inStock: { type: Boolean, default: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
     supplierPrice: { type: Number, required: true, min: 0 },
     price: { type: Number, required: true, min: 0 },
     salePrice: { type: Number, min: 0, default: null },

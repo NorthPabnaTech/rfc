@@ -101,21 +101,15 @@ export function SettingsForm({ settings }: { settings: SettingsDTO }) {
             <FormInput name="social.whatsapp" label="WhatsApp number" placeholder="01XXXXXXXXX" />
           </div>
         </FormSection>
+      </Panel>
 
-        <FormSection
-          title="Website WhatsApp & Live Chat"
-          description="Control the floating WhatsApp chat button and product-specific prefilled messages on your public store. Uses the WhatsApp number above (or Support phone if empty)."
-        >
+      <Panel>
+        <FormSection title="Website WhatsApp & Live Chat" icon="whatsapp">
           <div className="space-y-4">
-            <FormSwitch
-              name="whatsappEnabled"
-              label="Enable website WhatsApp chat"
-              hint="Show the floating WhatsApp contact button across public website pages."
-            />
+            <FormSwitch name="whatsappEnabled" label="Enable website WhatsApp chat" />
             <FormSwitch
               name="whatsappProductEnabled"
               label="Enable product-specific WhatsApp messaging"
-              hint="Automatically include the product name and link when customers message from a product page."
             />
             <FormTextarea
               name="whatsappDefaultMessage"

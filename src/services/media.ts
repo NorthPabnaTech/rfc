@@ -64,6 +64,7 @@ export async function uploadAndRecordMedia(
   files: File[],
   purpose: UploadPurpose,
   uploadedBy: string,
+  nameHint?: string,
 ): Promise<ImageAsset[]> {
   await connectDB();
   files.forEach(assertValidImage);
@@ -85,7 +86,7 @@ export async function uploadAndRecordMedia(
       continue;
     }
 
-    const uploaded = await uploadImageWithMeta(file, purpose);
+    const uploaded = await uploadImageWithMeta(file, purpose, nameHint);
     await MediaAssetModel.updateOne(
       { publicId: uploaded.asset.publicId! },
       {
@@ -235,6 +236,27 @@ export async function deleteMediaAsset(id: string): Promise<void> {
   // Delete from Cloudinary storage first; only remove DB record if storage deletion succeeds.
   await destroyCloudinaryResource(asset.publicId);
   await MediaAssetModel.deleteOne({ _id: id });
+}
+
+/**
+ * Deletes an uploaded Cloudinary asset immediately by `publicId` (used when
+ * removing an image directly from a form uploader). Non-admins may only delete
+ * assets they uploaded themselves.
+ */
+export async function deleteMediaByPublicId(
+  publicId: string,
+  restrictToUserId?: string,
+): Promise<void> {
+  await connectDB();
+  if (restrictToUserId) {
+    const owned = await MediaAssetModel.findOne({
+      publicId,
+      uploadedBy: restrictToUserId,
+    }).lean();
+    if (!owned) throw new AppError('Not allowed to delete this image.', 403);
+  }
+  await destroyCloudinaryResource(publicId);
+  await MediaAssetModel.deleteMany({ publicId });
 }
 
 /** Imports any pre-existing Cloudinary files under RFC-Gadget folders into MediaAssetModel. */

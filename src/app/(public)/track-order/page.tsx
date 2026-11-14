@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 
+import { trackOrder } from '@/services/orders';
+import type { OrderDTO } from '@/types';
 import { param, type SearchParams } from '@lib/search-params';
+import { trackOrderSchema } from '@lib/validators/order';
 
 import { TrackOrderForm } from './components/track-order-form';
 
@@ -15,8 +18,26 @@ export default async function TrackOrderPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const initialOrderNumber = param(sp, 'orderNumber') ?? param(sp, 'order') ?? '';
-  const initialPhone = param(sp, 'phone') ?? '';
+  const initialOrderNumber = (param(sp, 'orderNumber') ?? param(sp, 'order') ?? '').trim();
+  const initialPhone = (param(sp, 'phone') ?? '').trim();
+
+  let initialOrder: OrderDTO | null = null;
+  let initialError: string | null = null;
+
+  if (initialOrderNumber && initialPhone) {
+    const parsed = trackOrderSchema.safeParse({
+      orderNumber: initialOrderNumber,
+      phone: initialPhone,
+    });
+    if (!parsed.success) {
+      initialError = parsed.error.issues[0]?.message ?? 'Invalid tracking link parameters.';
+    } else {
+      initialOrder = await trackOrder(parsed.data.orderNumber, parsed.data.phone);
+      if (!initialOrder) {
+        initialError = 'No order found with that number and phone.';
+      }
+    }
+  }
 
   return (
     <div className="container-page max-w-3xl py-14">
@@ -32,6 +53,8 @@ export default async function TrackOrderPage({
       <TrackOrderForm
         initialOrderNumber={initialOrderNumber}
         initialPhone={initialPhone}
+        initialOrder={initialOrder}
+        initialError={initialError}
       />
     </div>
   );

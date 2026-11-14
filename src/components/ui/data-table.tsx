@@ -442,7 +442,7 @@ export function FooterBar({
   return (
     <div
       className={cn(
-        'border-line rounded-b-xl2 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border border-t bg-white px-4 py-2.5',
+        'border-line rounded-b-xl2 bg-panel flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border border-t px-4 py-2.5',
         className,
       )}
     >
@@ -573,7 +573,7 @@ function PageButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="hairline text-ink hover:bg-well grid h-7 w-7 cursor-pointer place-items-center rounded-md bg-white transition-colors disabled:pointer-events-none disabled:opacity-40"
+      className="hairline text-ink hover:bg-well bg-panel grid h-7 w-7 cursor-pointer place-items-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-40"
     >
       <Icon name={icon} size={14} className={cn(flip && 'rotate-180')} />
     </button>

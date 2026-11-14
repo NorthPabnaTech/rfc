@@ -113,6 +113,33 @@ export async function notifyAdminsOrderCancelled(order: OrderRef): Promise<void>
   });
 }
 
+export async function notifyAdminsNewReview(input: {
+  productName: string;
+  userName: string;
+  rating: number;
+  comment: string;
+}): Promise<void> {
+  await notify(await adminIds(), {
+    type: 'new_review',
+    title: `New ${input.rating}★ review on ${input.productName}`,
+    body: `${input.userName}: ${input.comment.slice(0, 120)}`,
+    link: '/admin/reviews',
+  });
+}
+
+export async function notifyAdminsNewQuestion(input: {
+  productName: string;
+  userName: string;
+  question: string;
+}): Promise<void> {
+  await notify(await adminIds(), {
+    type: 'new_question',
+    title: `New question on ${input.productName}`,
+    body: `${input.userName}: ${input.question.slice(0, 120)}`,
+    link: '/admin/questions',
+  });
+}
+
 const STATUS_MESSAGES: Partial<Record<OrderStatus, string>> = {
   confirmed: 'Your order has been confirmed and will be prepared soon.',
   processing: 'Your order is being packed.',
@@ -135,6 +162,21 @@ export async function notifyCustomerOrderStatus(
     body: STATUS_MESSAGES[status] ?? `Your order is now ${ORDER_STATUS_LABELS[status]}.`,
     link: `/account/orders/${order._id}`,
     orderId: String(order._id),
+  });
+}
+
+/** Tells the customer who asked a question when an admin replies. */
+export async function notifyCustomerQuestionAnswered(input: {
+  userId: string;
+  productName: string;
+  productSlug: string;
+  answer: string;
+}): Promise<void> {
+  await notify([input.userId], {
+    type: 'question_answered',
+    title: `Your question on ${input.productName} was answered`,
+    body: input.answer.slice(0, 120),
+    link: `/products/${input.productSlug}`,
   });
 }
 
@@ -164,14 +206,14 @@ export async function deletePushSubscription(id: string): Promise<void> {
 
 export async function getNotificationFeed(userId: string): Promise<NotificationFeedDTO> {
   await connectDB();
-  const [items, unseen] = await Promise.all([
+  const [items, unread] = await Promise.all([
     NotificationModel.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(NOTIFICATION_LIST_LIMIT)
       .lean(),
-    NotificationModel.countDocuments({ user: userId, seenAt: null }),
+    NotificationModel.countDocuments({ user: userId, readAt: null }),
   ]);
-  return { items: items.map(toNotification), unseen };
+  return { items: items.map(toNotification), unseen: unread };
 }
 
 /** Opening the bell marks everything as seen (clears the badge). */

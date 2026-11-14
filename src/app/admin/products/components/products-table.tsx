@@ -4,7 +4,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'nextjs-toploader/app';
 
-import { deleteProductAction } from '@/actions/admin';
+import {
+  deleteProductAction,
+  setProductFeaturedAction,
+  setProductStockStatusAction,
+} from '@/actions/admin';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
 import type { AdminProductRowDTO, BusinessDTO, Paginated } from '@/types';
@@ -18,7 +22,6 @@ import { DEFAULT_BUSINESS_SLUG, STOCK_STATUS_LABELS } from '@lib/constants';
 import { formatStoreDate } from '@lib/utils';
 
 import { useUrlPagination } from '../../components/list-toolbar';
-import { StockAdjustDialog } from '../../components/stock-adjust-dialog';
 
 export function ProductsTable({
   data,
@@ -30,10 +33,6 @@ export function ProductsTable({
   const router = useRouter();
   const { onPaginate } = useUrlPagination();
   const [deleting, setDeleting] = React.useState<AdminProductRowDTO | null>(null);
-  const [stockModal, setStockModal] = React.useState<{
-    product: AdminProductRowDTO;
-    type: 'stock_in' | 'stock_out';
-  } | null>(null);
 
   const bizMap = React.useMemo(
     () => new Map(businesses.map((b) => [b.slug, b.name])),
@@ -48,8 +47,19 @@ export function ProductsTable({
       header: 'Product',
       cell: (p) => (
         <div className="flex items-center gap-3">
-          <span className="bg-well relative size-11 shrink-0 overflow-hidden rounded-lg">
-            <ProductImage src={p.image?.url} alt="" fill sizes="44px" />
+          <span className="relative size-11 shrink-0">
+            <span className="bg-well relative block size-full overflow-hidden rounded-lg">
+              <ProductImage src={p.image?.url} alt="" fill sizes="44px" />
+            </span>
+            {p.isFeatured && (
+              <span
+                title="Featured product"
+                aria-label="Featured product"
+                className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-amber-400 text-white shadow-xs ring-2 ring-white"
+              >
+                <Icon name="star" size={10} />
+              </span>
+            )}
           </span>
           <div className="min-w-0">
             <Link
@@ -96,17 +106,12 @@ export function ProductsTable({
       key: 'stock',
       header: 'Stock',
       cell: (p) => (
-        <div className="space-y-1">
-          <StatusBadge
-            status={
-              p.stockStatus === 'in_stock' ? 'ok' : p.stockStatus === 'pre_order' ? 'info' : 'danger'
-            }
-            label={STOCK_STATUS_LABELS[p.stockStatus]}
-          />
-          {p.trackInventory && (
-            <p className="text-subtle text-[11px] tabular-nums">{p.stockQuantity} units</p>
-          )}
-        </div>
+        <StatusBadge
+          status={
+            p.stockStatus === 'in_stock' ? 'ok' : p.stockStatus === 'pre_order' ? 'info' : 'danger'
+          }
+          label={STOCK_STATUS_LABELS[p.stockStatus]}
+        />
       ),
     },
     {
@@ -119,9 +124,6 @@ export function ProductsTable({
             label={p.status === 'published' ? 'Published' : 'Draft'}
           />
           {p.visibility === 'private' && <StatusBadge status="warn" label="Private" />}
-          {p.isFeatured && (
-            <Icon name="star" size={14} className="text-brand-500" aria-label="Featured" />
-          )}
         </div>
       ),
     },
@@ -143,15 +145,37 @@ export function ProductsTable({
               icon: 'pencil',
               onClick: () => router.push(`/admin/products/${p.id}/edit`),
             },
+            ...(p.stockStatus !== 'in_stock'
+              ? [
+                  {
+                    label: 'Stock In',
+                    icon: 'plus' as const,
+                    onClick: async () => {
+                      const res = await setProductStockStatusAction(p.id, 'in_stock');
+                      if (handleActionResult(res)) router.refresh();
+                    },
+                  },
+                ]
+              : []),
+            ...(p.stockStatus !== 'out_of_stock'
+              ? [
+                  {
+                    label: 'Stock Out',
+                    icon: 'minus' as const,
+                    onClick: async () => {
+                      const res = await setProductStockStatusAction(p.id, 'out_of_stock');
+                      if (handleActionResult(res)) router.refresh();
+                    },
+                  },
+                ]
+              : []),
             {
-              label: 'Stock In (+)',
-              icon: 'plus',
-              onClick: () => setStockModal({ product: p, type: 'stock_in' }),
-            },
-            {
-              label: 'Stock Out (-)',
-              icon: 'minus',
-              onClick: () => setStockModal({ product: p, type: 'stock_out' }),
+              label: p.isFeatured ? 'Remove from Featured' : 'Add to Featured',
+              icon: 'star',
+              onClick: async () => {
+                const res = await setProductFeaturedAction(p.id, !p.isFeatured);
+                if (handleActionResult(res)) router.refresh();
+              },
             },
             ...(p.status === 'published' &&
             p.visibility !== 'private' &&
@@ -211,17 +235,6 @@ export function ProductsTable({
           if (handleActionResult(res)) router.refresh();
         }}
       />
-      {stockModal && (
-        <StockAdjustDialog
-          product={{
-            id: stockModal.product.id,
-            name: stockModal.product.name,
-            stockQuantity: stockModal.product.stockQuantity,
-          }}
-          initialType={stockModal.type}
-          onClose={() => setStockModal(null)}
-        />
-      )}
     </>
   );
 }

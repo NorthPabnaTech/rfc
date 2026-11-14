@@ -224,6 +224,7 @@ function CategoryDialog({
               {(field) => (
                 <ImageUploader
                   purpose="categories"
+                  nameHint={form.watch('name')}
                   max={1}
                   value={field.value ? [field.value as ImageDTO] : []}
                   onChange={(imgs) => field.onChange(imgs[0] ?? null)}

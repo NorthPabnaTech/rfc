@@ -2,7 +2,14 @@ import 'server-only';
 
 import { Types } from 'mongoose';
 
-import { connectDB, OrderModel, ProductModel, QuestionModel, ReviewModel } from '@/database';
+import {
+  connectDB,
+  OrderModel,
+  ProductModel,
+  QuestionModel,
+  ReviewModel,
+  UserModel,
+} from '@/database';
 import type { Paginated, QuestionDTO, ReviewDTO } from '@/types';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
 import { ADMIN_PAGE_SIZE } from '@lib/constants';
@@ -10,6 +17,11 @@ import { AppError } from '@lib/errors';
 import type { ImageAssetInput } from '@lib/validators/common';
 
 import { toQuestion, toReview } from './mappers';
+import {
+  notifyAdminsNewQuestion,
+  notifyAdminsNewReview,
+  notifyCustomerQuestionAnswered,
+} from './notifications';
 import { PUBLIC_PRODUCT_FILTER } from './products';
 
 function paged<T>(items: T[], total: number, page: number): Paginated<T> {
@@ -82,6 +94,16 @@ export async function createReview(
     images: input.images,
   });
   await recomputeRating(input.productId);
+  const [product, user] = await Promise.all([
+    ProductModel.findById(input.productId, { name: 1 }).lean(),
+    UserModel.findById(userId, { name: 1 }).lean(),
+  ]);
+  await notifyAdminsNewReview({
+    productName: product?.name ?? 'a product',
+    userName: user?.name ?? 'Customer',
+    rating: input.rating,
+    comment: input.comment,
+  });
 }
 
 export async function listProductReviews(productId: string, limit = 20) {
@@ -165,6 +187,15 @@ export async function askQuestion(userId: string, productId: string, question: s
   if (recent >= 10)
     throw new AppError('You have asked a lot of questions recently. Please try later.');
   await QuestionModel.create({ product: productId, user: userId, question });
+  const [product, user] = await Promise.all([
+    ProductModel.findById(productId, { name: 1 }).lean(),
+    UserModel.findById(userId, { name: 1 }).lean(),
+  ]);
+  await notifyAdminsNewQuestion({
+    productName: product?.name ?? 'a product',
+    userName: user?.name ?? 'Customer',
+    question,
+  });
 }
 
 /** Answered, visible questions — plus the viewer's own pending ones. */
@@ -215,11 +246,22 @@ export async function listAdminQuestions(f: {
 
 export async function answerQuestion(id: string, answer: string, by: string) {
   await connectDB();
-  const res = await QuestionModel.updateOne(
-    { _id: id },
+  const doc = await QuestionModel.findByIdAndUpdate(
+    id,
     { $set: { answer, answeredAt: new Date(), answeredBy: by } },
-  );
-  if (!res.matchedCount) throw new AppError('Question not found.', 404);
+    { returnDocument: 'after' },
+  )
+    .populate<{ product: { name?: string; slug?: string } | null }>('product', 'name slug')
+    .lean();
+  if (!doc) throw new AppError('Question not found.', 404);
+  if (doc.user && doc.product?.slug) {
+    await notifyCustomerQuestionAnswered({
+      userId: String(doc.user),
+      productName: doc.product.name ?? 'a product',
+      productSlug: doc.product.slug,
+      answer,
+    });
+  }
 }
 
 export async function setQuestionHidden(id: string, isHidden: boolean) {

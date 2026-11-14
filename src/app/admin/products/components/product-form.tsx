@@ -48,6 +48,7 @@ const RichTextEditor = dynamic(
 
 type Props = {
   product?: AdminProductDTO;
+  initialDraft?: Partial<AdminProductDTO>;
   categories: CategoryDTO[];
   tags: TagDTO[];
   suppliers: SupplierDTO[];
@@ -82,29 +83,37 @@ const EMPTY: ProductInput = {
   isComboOffer: false,
 };
 
-function toFormValues(p: AdminProductDTO): ProductInput {
+function toFormValues(p: Partial<AdminProductDTO>): ProductInput {
   return {
     ...EMPTY,
     ...p,
-    slug: p.slug,
+    slug: p.slug ?? '',
     shortDescription: p.shortDescription ?? '',
     description: p.description ?? '',
     subCategory: p.subCategory ?? '',
     supplierProductUrl: p.supplierProductUrl ?? '',
     sku: p.sku ?? '',
     seo: {
-      metaTitle: p.seo.metaTitle ?? '',
-      metaDescription: p.seo.metaDescription ?? '',
-      keywords: p.seo.keywords,
+      metaTitle: p.seo?.metaTitle ?? '',
+      metaDescription: p.seo?.metaDescription ?? '',
+      keywords: p.seo?.keywords ?? [],
     },
   };
 }
 
-export function ProductForm({ product, categories, tags, suppliers, businesses }: Props) {
+export function ProductForm({
+  product,
+  initialDraft,
+  categories,
+  tags,
+  suppliers,
+  businesses,
+}: Props) {
   const router = useRouter();
+  const source = product ?? initialDraft;
   const form = Form.useForm<ProductInput>({
     schema: productSchema,
-    defaultValues: product ? toFormValues(product) : EMPTY,
+    defaultValues: source ? toFormValues(source) : EMPTY,
   });
   const { isSubmitting } = form.formState;
 
@@ -194,6 +203,7 @@ export function ProductForm({ product, categories, tags, suppliers, businesses }
                 {(field) => (
                   <ImageUploader
                     purpose="products"
+                    nameHint={form.watch('name')}
                     max={15}
                     allowUrl
                     sortable
@@ -487,7 +497,7 @@ export function ProductForm({ product, categories, tags, suppliers, businesses }
         </div>
       </div>
 
-      <div className="border-line sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2.5 border-t bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="border-line bg-panel/90 sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2.5 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <Button type="button" variant="secondary" asChild>
           <Link href="/admin/products">Cancel</Link>
         </Button>

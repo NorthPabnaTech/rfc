@@ -49,7 +49,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   confirmed: ['processing', 'cancelled'],
   processing: ['shipped', 'cancelled'],
   shipped: ['delivered'],
-  delivered: ['completed'],
+  delivered: [],
   completed: [],
   cancelled: [],
   returned: [],
@@ -61,14 +61,14 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
  * processing, shipped, or delivered orders.
  */
 export const ADMIN_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'],
-  confirmed: ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'],
-  processing: ['confirmed', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'],
-  shipped: ['processing', 'delivered', 'completed', 'cancelled', 'returned'],
-  delivered: ['shipped', 'completed', 'cancelled', 'returned'],
+  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
+  confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+  processing: ['confirmed', 'shipped', 'delivered', 'cancelled', 'returned'],
+  shipped: ['processing', 'delivered', 'cancelled', 'returned'],
+  delivered: ['shipped', 'cancelled', 'returned'],
   completed: ['delivered', 'cancelled', 'returned'],
   cancelled: [],
-  returned: ['completed'],
+  returned: [],
 };
 
 /** Customers may cancel only before the order is confirmed. */
@@ -270,13 +270,20 @@ export const BANNER_POSITION_HINTS: Record<BannerPosition, string> = {
  * `order_placed` / `order_cancelled` go to every admin; `order_status` goes to
  * the customer who owns the order (guest orders have nobody to notify).
  */
-export const NOTIFICATION_TYPES = ['order_placed', 'order_cancelled', 'order_status'] as const;
+export const NOTIFICATION_TYPES = [
+  'order_placed',
+  'order_cancelled',
+  'order_status',
+  'new_review',
+  'new_question',
+  'question_answered',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** How many recent notifications the bell loads. */
 export const NOTIFICATION_LIST_LIMIT = 20;
 /** Without realtime (no Pusher keys) the bell re-checks this often. */
-export const NOTIFICATION_POLL_MS = 30_000;
+export const NOTIFICATION_POLL_MS = 10_000;
 /** Pusher event name for a new notification on a user's private channel. */
 export const NOTIFICATION_EVENT = 'notification:new';
 /** Played when a new notification arrives (file in /public). */
@@ -303,6 +310,43 @@ export const UPLOAD_FOLDERS = {
   expenses: 'RFC-Gadget/expenses',
 } as const;
 export type UploadPurpose = keyof typeof UPLOAD_FOLDERS;
+
+/* ─── Supplier Integrations & Dropshipping ──────────────────────────────── */
+
+export const SUPPLIER_TYPES = ['manual', 'api'] as const;
+export type SupplierType = (typeof SUPPLIER_TYPES)[number];
+export const SUPPLIER_TYPE_LABELS: Record<SupplierType, string> = {
+  manual: 'Manual',
+  api: 'API-connected',
+};
+
+export const SUPPLIER_PROVIDERS = ['business_koro'] as const;
+export type SupplierProvider = (typeof SUPPLIER_PROVIDERS)[number];
+export const SUPPLIER_PROVIDER_LABELS: Record<SupplierProvider, string> = {
+  business_koro: 'Business Koro',
+};
+
+export const SUPPLIER_ORDER_STATUSES = [
+  'awaiting_confirmation',
+  'submitted',
+  'pending_payment',
+  'processing',
+  'shipped',
+  'delivered',
+  'failed',
+  'cancelled',
+] as const;
+export type SupplierOrderStatus = (typeof SUPPLIER_ORDER_STATUSES)[number];
+export const SUPPLIER_ORDER_STATUS_LABELS: Record<SupplierOrderStatus, string> = {
+  awaiting_confirmation: 'Awaiting Admin Confirmation',
+  submitted: 'Submitted to Supplier',
+  pending_payment: 'Pending Payment',
+  processing: 'Processing',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];

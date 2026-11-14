@@ -15,11 +15,25 @@ export default async function CustomersPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const data = await listCustomers({ q: param(sp, 'q'), page: pageParam(sp) });
+  const rawStatus = param(sp, 'status');
+  const status = rawStatus === 'active' || rawStatus === 'disabled' ? rawStatus : undefined;
+  const data = await listCustomers({ q: param(sp, 'q'), status, page: pageParam(sp) });
   return (
     <>
       <PageHeader title="Customers" description={`${data.total} registered customers`} />
-      <ListToolbar searchPlaceholder="Name, email or phone…" />
+      <ListToolbar
+        searchPlaceholder="Name, email or phone…"
+        filters={[
+          {
+            name: 'status',
+            label: 'Statuses',
+            options: [
+              { value: 'active', label: 'Active' },
+              { value: 'disabled', label: 'Disabled' },
+            ],
+          },
+        ]}
+      />
       <CustomersTable data={data} />
     </>
   );

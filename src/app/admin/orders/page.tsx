@@ -6,7 +6,12 @@ import { countOrdersByStatus, listAdminOrders } from '@/services/orders';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { ORDER_PLATFORM_LABELS, ORDER_PLATFORMS, ORDER_STATUSES } from '@lib/constants';
+import {
+  ORDER_PLATFORM_LABELS,
+  ORDER_PLATFORMS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+} from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
@@ -43,17 +48,32 @@ export default async function AdminOrdersPage({
         title="Orders"
         description="Website orders and manual orders from social channels."
         actions={
-          <Button variant="primary" asChild>
-            <Link href="/admin/orders/new">
-              <Icon name="plus" size={15} /> Create order
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" asChild>
+              <Link href="/admin/suppliers/orders">
+                <Icon name="store" size={15} /> Supplier Orders
+              </Link>
+            </Button>
+            <Button variant="primary" asChild>
+              <Link href="/admin/orders/new">
+                <Icon name="plus" size={15} /> Create order
+              </Link>
+            </Button>
+          </div>
         }
       />
       <StatusTabs counts={counts} />
       <ListToolbar
         searchPlaceholder="Order #, customer name or phone…"
         filters={[
+          {
+            name: 'status',
+            label: 'Statuses',
+            options: ORDER_STATUSES.filter((s) => s !== 'completed').map((s) => ({
+              value: s,
+              label: ORDER_STATUS_LABELS[s],
+            })),
+          },
           {
             name: 'business',
             label: 'Businesses',
@@ -62,7 +82,10 @@ export default async function AdminOrdersPage({
           {
             name: 'platform',
             label: 'Platforms',
-            options: ORDER_PLATFORMS.map((p) => ({ value: p, label: ORDER_PLATFORM_LABELS[p] })),
+            options: ORDER_PLATFORMS.filter((p) => p !== 'messenger').map((p) => ({
+              value: p,
+              label: ORDER_PLATFORM_LABELS[p],
+            })),
           },
         ]}
       />

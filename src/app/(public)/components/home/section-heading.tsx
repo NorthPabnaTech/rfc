@@ -9,12 +9,14 @@ export function SectionHeading({
   icon,
   href,
   linkLabel = 'View all',
+  rightExtra,
 }: {
   title: string;
   subtitle?: string;
   icon?: IconRegistryKey;
   href?: string;
   linkLabel?: string;
+  rightExtra?: React.ReactNode;
 }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
@@ -31,18 +33,23 @@ export function SectionHeading({
           {subtitle && <p className="text-muted mt-0.5 text-[13px]">{subtitle}</p>}
         </div>
       </div>
-      {href && (
-        <Link
-          href={href}
-          className="group text-ink hover:border-ink border-line-2/70 flex shrink-0 items-center gap-1 rounded-lg border bg-white px-3 py-1.5 text-[13px] font-semibold transition"
-        >
-          {linkLabel}
-          <Icon
-            name="chevRight"
-            size={14}
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
+      {(rightExtra || href) && (
+        <div className="flex shrink-0 items-center gap-2">
+          {rightExtra}
+          {href && (
+            <Link
+              href={href}
+              className="group text-ink hover:border-ink border-line-2/70 flex shrink-0 items-center gap-1 rounded-lg border bg-white px-3 py-1.5 text-[13px] font-semibold transition"
+            >
+              {linkLabel}
+              <Icon
+                name="chevRight"
+                size={14}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+          )}
+        </div>
       )}
     </div>
   );

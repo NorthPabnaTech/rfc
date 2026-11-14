@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { uploadAndRecordMedia } from '@/services/media';
+import { deleteMediaByPublicId, uploadAndRecordMedia } from '@/services/media';
 import { getCurrentUser } from '@lib/auth/current-user';
 import { UPLOAD_FOLDERS, type UploadPurpose } from '@lib/constants';
 import { AppError } from '@lib/errors';
@@ -40,7 +40,10 @@ export async function POST(request: Request) {
     if (files.length > rule.maxFiles)
       throw new AppError(`Upload at most ${rule.maxFiles} image(s) at a time.`);
 
-    const images = await uploadAndRecordMedia(files, purpose, user.id);
+    const rawHint = form.get('nameHint');
+    const nameHint = typeof rawHint === 'string' ? rawHint.trim() || undefined : undefined;
+
+    const images = await uploadAndRecordMedia(files, purpose, user.id, nameHint);
     return NextResponse.json({ images });
   } catch (error) {
     if (error instanceof AppError) {
@@ -51,5 +54,34 @@ export async function POST(request: Request) {
     }
     console.error('[upload]', error);
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 });
+  }
+}
+
+const deleteSchema = z.object({
+  publicId: z.string().min(1),
+  purpose: purposeSchema,
+});
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new AppError('Please sign in to manage images.', 401);
+
+    const body = await request.json().catch(() => null);
+    const parsed = deleteSchema.safeParse(body);
+    if (!parsed.success) throw new AppError('Invalid image delete request.');
+
+    const { publicId, purpose } = parsed.data;
+    const rule = RULES[purpose];
+    if (rule.adminOnly && user.role !== 'admin') throw new AppError('Not allowed.', 403);
+
+    await deleteMediaByPublicId(publicId, user.role === 'admin' ? undefined : user.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error('[upload:delete]', error);
+    return NextResponse.json({ error: 'Failed to delete image.' }, { status: 500 });
   }
 }

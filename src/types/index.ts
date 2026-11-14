@@ -18,7 +18,10 @@ import type {
   ShippingZone,
   StockMovementType,
   StockStatus,
+  SupplierOrderStatus,
+  SupplierProvider,
   SupplierStatus,
+  SupplierType,
   UploadPurpose,
   UserRole,
 } from '@lib/constants';
@@ -65,9 +68,60 @@ export type SupplierDTO = {
   slug: string;
   websiteUrl: string;
   status: SupplierStatus;
+  type: SupplierType;
+  provider?: SupplierProvider;
+  apiBaseUrl?: string;
+  apiKeyEnvVar?: string;
+  apiDomain?: string;
+  apiKeyConfigured?: boolean;
+  syncEnabled?: boolean;
+  syncIntervalMinutes?: number;
+  lastSyncAt?: string;
+  lastSyncStatus?: 'ok' | 'error';
+  lastSyncError?: string;
+  lastSyncUpdatedCount?: number;
+  deliveryCharges?: { insideDhaka: number; outsideDhaka: number };
   notes?: string;
   productCount?: number;
+  linkedProductCount?: number;
+  pendingOrderCount?: number;
+  submittedOrderCount?: number;
+  failedOrderCount?: number;
   createdAt: string;
+};
+
+export type SupplierCatalogVariantDTO = {
+  id: string;
+  color: string | null;
+  size: string | null;
+  stockQuantity: number;
+  inStock: boolean;
+};
+
+export type SupplierCatalogProductDTO = {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  images: string[];
+  suggestedPrice: number;
+  suggestedPriceMin?: number;
+  suggestedPriceMax?: number;
+  costPrice: number;
+  packagingCost: number;
+  minimumSellingPrice: {
+    customerPaysDelivery: number;
+    resellerPaysDeliveryInsideDhaka: number;
+    resellerPaysDeliveryOutsideDhaka: number;
+  };
+  deliveryCharges: {
+    insideDhaka: number;
+    outsideDhaka: number;
+  };
+  stockQuantity: number;
+  inStock: boolean;
+  variants: SupplierCatalogVariantDTO[];
 };
 
 export type ProductCardDTO = {
@@ -146,6 +200,22 @@ export type AdminProductDTO = {
   tags: string[];
   supplier: string;
   supplierProductUrl?: string;
+  supplierProductId?: string;
+  supplierPackagingCost?: number;
+  supplierMinSellingPrice?: {
+    customerPaysDelivery: number;
+    resellerPaysDeliveryInsideDhaka: number;
+    resellerPaysDeliveryOutsideDhaka: number;
+  };
+  supplierInStock?: boolean;
+  supplierLastSyncedAt?: string;
+  supplierVariants?: {
+    externalVariantId: string;
+    color?: string | null;
+    size?: string | null;
+    stockQuantity: number;
+    inStock: boolean;
+  }[];
   supplierPrice: number;
   price: number;
   salePrice: number | null;
@@ -492,7 +562,7 @@ export type ExpenseDTO = {
   createdAt: string;
 };
 
-export type AnalysisPeriod = 'today' | 'week' | 'month' | 'year' | 'date' | 'custom';
+export type AnalysisPeriod = 'all' | 'today' | 'week' | 'month' | 'year' | 'date' | 'custom';
 
 export type AnalysisDashboardDTO = {
   range: { from: string; to: string; granularity: 'day' | 'month' };
@@ -540,6 +610,12 @@ export type AnalysisDashboardDTO = {
     netProfit: number;
     orders: number;
   }[];
+  platformBreakdown?: {
+    platform: string;
+    label: string;
+    orders: number;
+    revenue: number;
+  }[];
 };
 
 export type MediaAssetDTO = {
@@ -561,4 +637,58 @@ export type MediaReferenceDTO = {
   kind: 'Product' | 'Category' | 'Banner' | 'Expense' | 'User' | 'Review' | 'Return';
   id: string;
   label: string;
+};
+
+export type SupplierOrderEventDTO = {
+  status: SupplierOrderStatus;
+  note?: string;
+  at: string;
+  byName?: string;
+};
+
+export type SupplierOrderDTO = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  supplierId: string;
+  supplierName: string;
+  supplierProvider?: SupplierProvider;
+  externalProductId: string;
+  externalVariantId?: string;
+  variantLabel?: string;
+  quantity: number;
+  customer: {
+    name: string;
+    phone: string;
+    address: string;
+    division: string;
+    district: string;
+    area: string;
+  };
+  customerNote?: string;
+  sellingPrice: number;
+  costPrice: number;
+  packagingCost: number;
+  deliveryCharge: number;
+  deliveryChargePaidByCustomer: boolean;
+  deliveryChargePaidUpfront: boolean;
+  expectedProfit: number;
+  status: SupplierOrderStatus;
+  externalOrderId?: string;
+  externalStatus?: string;
+  paymentStatus?: string;
+  isDuplicate?: boolean;
+  allowDuplicate?: boolean;
+  confirmedByName?: string;
+  confirmedAt?: string;
+  submittedAt?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  lastResponseSummary?: Record<string, unknown>;
+  statusHistory: SupplierOrderEventDTO[];
+  createdAt: string;
+  updatedAt: string;
 };

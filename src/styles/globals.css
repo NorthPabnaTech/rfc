@@ -200,6 +200,69 @@
   }
 }
 
+/* Admin-only dark mode scope (outside @layer so it overrides utility classes like bg-white,
+ * and using html:has(.admin-dark) so :root shadcn aliases & Radix portals inherit dark tokens). */
+.admin-dark,
+html:has(.admin-dark) {
+  color-scheme: dark;
+  --color-surface: #070d1f;
+  --color-panel: #0f172e;
+  --color-well: #16203d;
+  --color-ink: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-subtle: #64748b;
+  --color-line: rgba(148, 163, 184, 0.16);
+  --color-line-2: rgba(148, 163, 184, 0.28);
+  --color-brand-soft: rgba(17, 112, 245, 0.2);
+  --color-brand-ink: #60a5fa;
+  --color-accent: #38bdf8;
+  --color-accent-hover: #7dd3fc;
+  --color-accent-soft: rgba(56, 189, 248, 0.16);
+  --status-ok-bg: rgba(16, 185, 129, 0.18);
+  --status-ok-fg: #34d399;
+  --status-warn-bg: rgba(245, 158, 11, 0.18);
+  --status-warn-fg: #fbbf24;
+  --status-danger-bg: rgba(244, 63, 94, 0.18);
+  --status-danger-fg: #fb7185;
+  --status-info-bg: rgba(56, 189, 248, 0.18);
+  --status-info-fg: #38bdf8;
+
+  /* Re-bind shadcn aliases so Command / Popover / Dialog portals use dark tokens */
+  --background: var(--color-surface);
+  --foreground: var(--color-ink);
+  --card: var(--color-panel);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-panel);
+  --popover-foreground: var(--color-ink);
+  --secondary: var(--color-well);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-well);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-well);
+  --accent-foreground: var(--color-ink);
+  --border: var(--color-line);
+  --input: var(--color-line);
+
+  color: var(--color-ink);
+}
+.admin-dark .input-flat,
+.admin-dark .kbd,
+html:has(.admin-dark) .input-flat,
+html:has(.admin-dark) .kbd {
+  background: var(--color-panel);
+}
+.admin-dark .bg-white,
+html:has(.admin-dark) .bg-white {
+  background-color: var(--color-panel);
+}
+.admin-dark .bg-surface,
+html:has(.admin-dark) .bg-surface {
+  background-color: var(--color-surface);
+}
+
+@layer components {
+}
+
 @layer utilities {
   .focus-ring:focus-visible {
     outline: none;
@@ -395,6 +458,91 @@ html .ql-snow .ql-picker-item,
 html .ql-snow .ql-tooltip,
 html .ql-snow .ql-tooltip input[type='text'] {
   font-family: var(--font-sans);
+}
+
+html .ql-toolbar.ql-snow,
+html .ql-container.ql-snow {
+  border-color: var(--color-line);
+}
+
+html .ql-container.ql-snow {
+  color: var(--color-ink);
+}
+
+html .ql-editor.ql-blank::before {
+  color: var(--color-subtle);
+  font-style: normal;
+}
+
+html .ql-snow .ql-stroke {
+  stroke: var(--color-subtle);
+}
+
+html .ql-snow .ql-fill,
+html .ql-snow .ql-stroke.ql-fill {
+  fill: var(--color-subtle);
+}
+
+html .ql-snow .ql-picker {
+  color: var(--color-subtle);
+}
+
+html .ql-snow.ql-toolbar button:hover .ql-stroke,
+html .ql-snow .ql-toolbar button:hover .ql-stroke,
+html .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke,
+html .ql-snow .ql-picker-label:hover .ql-stroke {
+  stroke: var(--color-ink);
+}
+
+html .ql-snow.ql-toolbar button:hover .ql-fill,
+html .ql-snow .ql-toolbar button:hover .ql-fill,
+html .ql-snow.ql-toolbar .ql-picker-label:hover .ql-fill,
+html .ql-snow .ql-picker-label:hover .ql-fill {
+  fill: var(--color-ink);
+}
+
+html .ql-snow.ql-toolbar .ql-picker-label:hover,
+html .ql-snow .ql-picker-label:hover {
+  color: var(--color-ink);
+}
+
+html .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+html .ql-snow .ql-toolbar button.ql-active .ql-stroke,
+html .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke,
+html .ql-snow .ql-picker-label.ql-active .ql-stroke {
+  stroke: var(--color-accent);
+}
+
+html .ql-snow.ql-toolbar button.ql-active .ql-fill,
+html .ql-snow .ql-toolbar button.ql-active .ql-fill,
+html .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-fill,
+html .ql-snow .ql-picker-label.ql-active .ql-fill {
+  fill: var(--color-accent);
+}
+
+html .ql-snow.ql-toolbar .ql-picker-label.ql-active,
+html .ql-snow .ql-picker-label.ql-active,
+html .ql-snow .ql-picker-item.ql-selected {
+  color: var(--color-accent);
+}
+
+html .ql-snow .ql-picker-options {
+  background-color: var(--color-panel);
+  border-color: var(--color-line);
+  color: var(--color-ink);
+}
+
+html .ql-snow .ql-tooltip {
+  background-color: var(--color-panel);
+  border-color: var(--color-line);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-pop);
+}
+
+html .ql-snow .ql-tooltip input[type='text'] {
+  background-color: var(--color-surface);
+  border-color: var(--color-line);
+  color: var(--color-ink);
 }
 
 /* ═══ RFC Gadget storefront ═══════════════════════════════════════════════ */

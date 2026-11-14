@@ -25,10 +25,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const shellUser = { name: user.name, email: user.email ?? user.phone };
 
   return (
-    <div className="bg-surface flex min-h-dvh">
+    <div className="admin-dark bg-surface flex min-h-dvh">
       <AdminSidebar badges={badges} user={shellUser} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-line sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-white/85 px-4 backdrop-blur sm:px-6">
+        <header className="border-line bg-panel/85 sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 backdrop-blur sm:px-6">
           <AdminMobileNav badges={badges} user={shellUser} />
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell

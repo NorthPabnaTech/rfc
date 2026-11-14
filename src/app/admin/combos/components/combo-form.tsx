@@ -196,6 +196,7 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
                 {(field) => (
                   <ImageUploader
                     purpose="products"
+                    nameHint={form.watch('name')}
                     max={15}
                     allowUrl
                     sortable
@@ -262,7 +263,7 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
         </div>
       </div>
 
-      <div className="border-line sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2.5 border-t bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="border-line bg-panel/90 sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2.5 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <Button type="button" variant="secondary" asChild>
           <Link href="/admin/combos">Cancel</Link>
         </Button>

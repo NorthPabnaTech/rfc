@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; icon: IconRegistryKey }[] = [
   { href: '/account', label: 'Profile', icon: 'userCircle' },
   { href: '/account/orders', label: 'My orders', icon: 'box' },
   { href: '/account/addresses', label: 'Addresses', icon: 'location' },
+  { href: '/account/password', label: 'Change password', icon: 'lock' },
 ];
 
 export function AccountNav() {

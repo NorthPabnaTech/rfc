@@ -49,7 +49,7 @@ export function usePushNotifications(vapidKey: string | null) {
     readPermission,
     () => 'unsupported' as const,
   );
-  const state: PushState = vapidKey ? permission : 'unsupported';
+  const state: PushState = permission;
 
   React.useEffect(() => {
     if (vapidKey && state === 'granted') {
@@ -58,19 +58,20 @@ export function usePushNotifications(vapidKey: string | null) {
   }, [vapidKey, state]);
 
   const enable = React.useCallback(async () => {
-    if (!vapidKey) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
     const result = await Notification.requestPermission();
     setPrompted((n) => n + 1);
-    if (result === 'granted') await subscribe(vapidKey);
+    if (result === 'granted' && vapidKey && 'serviceWorker' in navigator && 'PushManager' in window) {
+      await subscribe(vapidKey);
+    }
   }, [vapidKey]);
 
   return { state, enable };
 }
 
 function readPermission(): PushState {
-  const supported =
-    'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-  return supported ? Notification.permission : 'unsupported';
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+  return Notification.permission;
 }
 
 /** Re-render when the user changes the site's permission in browser settings. */

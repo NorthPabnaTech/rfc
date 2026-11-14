@@ -13,7 +13,7 @@ import {
 import type { OrderDTO } from '@/types';
 import { Form, FormInput } from '@components/form';
 import { Icon } from '@components/icon/icon';
-import { Callout, Spinner } from '@components/shared';
+import { Callout } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
 import { formatStoreDate } from '@lib/utils';
@@ -24,53 +24,22 @@ type Values = z.input<typeof trackOrderSchema>;
 export function TrackOrderForm({
   initialOrderNumber,
   initialPhone = '',
+  initialOrder = null,
+  initialError = null,
 }: {
   initialOrderNumber: string;
   initialPhone?: string;
+  initialOrder?: OrderDTO | null;
+  initialError?: string | null;
 }) {
-  const initialParsed = React.useMemo(() => {
-    const num = initialOrderNumber.trim();
-    const ph = initialPhone.trim();
-    if (!num || !ph) return null;
-    return trackOrderSchema.safeParse({ orderNumber: num, phone: ph });
-  }, [initialOrderNumber, initialPhone]);
-
-  const [order, setOrder] = React.useState<OrderDTO | null>(null);
-  const [autoLoading, setAutoLoading] = React.useState(Boolean(initialParsed?.success));
-  const [lookupError, setLookupError] = React.useState<string | null>(
-    initialParsed && !initialParsed.success
-      ? (initialParsed.error.issues[0]?.message ?? 'Invalid tracking link parameters.')
-      : null,
-  );
-  const autoFetchedKey = React.useRef<string | null>(null);
+  const [order, setOrder] = React.useState<OrderDTO | null>(initialOrder);
+  const [lookupError, setLookupError] = React.useState<string | null>(initialError);
 
   const form = Form.useForm<Values>({
     schema: trackOrderSchema,
     defaultValues: { orderNumber: initialOrderNumber, phone: initialPhone },
   });
   const { isSubmitting } = form.formState;
-
-  React.useEffect(() => {
-    if (!initialParsed?.success) return;
-    const key = `${initialParsed.data.orderNumber}|${initialParsed.data.phone}`;
-    if (autoFetchedKey.current === key) return;
-    autoFetchedKey.current = key;
-
-    let cancelled = false;
-    trackOrderAction(initialParsed.data).then((res) => {
-      if (cancelled) return;
-      setAutoLoading(false);
-      if (res.ok) {
-        setOrder(res.data);
-      } else {
-        setOrder(null);
-        setLookupError(res.error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [initialParsed]);
 
   return (
     <div className="mt-10 space-y-10">
@@ -102,20 +71,13 @@ export function TrackOrderForm({
           <span aria-hidden className="type-label invisible hidden sm:block">
             Track
           </span>
-          <Button type="submit" variant="noir" size="lg" disabled={isSubmitting || autoLoading}>
+          <Button type="submit" variant="noir" size="lg" disabled={isSubmitting}>
             <Icon name="search" size={16} /> {isSubmitting ? 'Searching…' : 'Track'}
           </Button>
         </div>
       </Form>
 
-      {autoLoading && (
-        <div className="flex items-center justify-center gap-2 py-8 text-sm">
-          <Spinner size="sm" />
-          <span className="text-muted">Loading your order tracking details…</span>
-        </div>
-      )}
-
-      {lookupError && !autoLoading && !order && (
+      {lookupError && !order && (
         <Callout
           tone="warn"
           title="Order not found"

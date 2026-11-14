@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { updateProfileAction } from '@/actions/account';
 import { ProductImage } from '@/features/products/product-image';
+import { ImageCropDialog } from '@/features/uploads/image-crop-dialog';
 import { uploadFiles } from '@/features/uploads/image-uploader';
 import type { ProfileDTO } from '@/types';
 import { Form, FormInput } from '@components/form';
@@ -21,6 +22,7 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
   const router = useRouter();
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [pendingAvatar, setPendingAvatar] = React.useState<File[]>([]);
   const form = Form.useForm<ProfileInput>({
     schema: profileSchema,
     defaultValues: {
@@ -33,12 +35,24 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
   const avatar = form.watch('avatar');
   const { isSubmitting, isDirty } = form.formState;
 
-  const onPick = async (files: FileList | null) => {
+  const onPick = (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP or AVIF.' });
+      return;
+    }
+    setPendingAvatar([file]);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const uploadCroppedAvatar = async (optimizedFiles: File[]) => {
+    const file = optimizedFiles[0];
+    if (!file) return;
+    setPendingAvatar([]);
     setUploading(true);
     try {
-      const [img] = await uploadFiles([file], 'users');
+      const [img] = await uploadFiles([file], 'users', form.getValues('name'));
       form.setValue('avatar', img ?? null, { shouldDirty: true });
     } catch (e) {
       toast.error('Upload failed', { description: e instanceof Error ? e.message : undefined });
@@ -133,6 +147,13 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
           {isSubmitting ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
+      <ImageCropDialog
+        open={pendingAvatar.length > 0}
+        files={pendingAvatar}
+        purpose="users"
+        onCancel={() => setPendingAvatar([])}
+        onConfirm={uploadCroppedAvatar}
+      />
     </Form>
   );
 }

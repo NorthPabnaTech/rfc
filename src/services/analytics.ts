@@ -10,7 +10,13 @@ import {
   OrderModel,
 } from '@/database';
 import type { AnalysisDashboardDTO, AnalysisPeriod } from '@/types';
-import { DEFAULT_BUSINESS_SLUG, ORDER_STATUSES, type OrderStatus } from '@lib/constants';
+import {
+  DEFAULT_BUSINESS_SLUG,
+  ORDER_PLATFORM_LABELS,
+  ORDER_STATUSES,
+  type OrderPlatform,
+  type OrderStatus,
+} from '@lib/constants';
 import { dayjs } from '@lib/utils';
 
 import { listBusinesses } from './businesses';
@@ -33,7 +39,16 @@ export function resolveDateRange(opts: {
   to?: string;
 }): { fromDate: Date; toDate: Date; fromStr: string; toStr: string; granularity: 'day' | 'month' } {
   const now = dayjs().tz(TZ);
-  const period = opts.period ?? 'month';
+  const period = opts.period ?? 'all';
+  if (period === 'all') {
+    return {
+      fromDate: new Date(0),
+      toDate: now.endOf('day').toDate(),
+      fromStr: now.startOf('month').format('YYYY-MM-DD'),
+      toStr: now.format('YYYY-MM-DD'),
+      granularity: 'day',
+    };
+  }
 
   let start = now.startOf('month');
   let end = now.endOf('day');
@@ -92,25 +107,25 @@ export async function getAnalysisDashboard(opts: {
 }): Promise<AnalysisDashboardDTO> {
   await connectDB();
   const business = opts.business || 'all';
-  const { fromDate, toDate, fromStr, toStr, granularity } = resolveDateRange(opts);
+  const period = opts.business ? opts.period ?? 'all' : opts.period ?? 'all';
+  const isAllTime = period === 'all';
+  const resolved = resolveDateRange({ ...opts, period });
   const bFilter = businessMatch(business);
 
   const orderQuery: QueryFilter<Order> = {
-    createdAt: { $gte: fromDate, $lte: toDate },
+    ...(isAllTime ? {} : { createdAt: { $gte: resolved.fromDate, $lte: resolved.toDate } }),
     ...(bFilter ? { business: bFilter } : {}),
   };
 
   const expenseQuery: QueryFilter<Expense> = {
-    expenseDate: { $gte: fromDate, $lte: toDate },
+    ...(isAllTime ? {} : { expenseDate: { $gte: resolved.fromDate, $lte: resolved.toDate } }),
     ...(bFilter ? { business: bFilter } : {}),
   };
-
-  const dateFormat = granularity === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
   const [orders, expenses, businesses] = await Promise.all([
     OrderModel.find(
       orderQuery,
-      'business status total subtotal shippingFee discount supplierCost refundedAmount returnedItems createdAt',
+      'business platform status total subtotal shippingFee discount supplierCost refundedAmount returnedItems createdAt',
     ).lean(),
     ExpenseModel.find(
       expenseQuery,
@@ -118,6 +133,26 @@ export async function getAnalysisDashboard(opts: {
     ).lean(),
     listBusinesses(),
   ]);
+
+  let fromStr = resolved.fromStr;
+  let toStr = resolved.toStr;
+  let granularity = resolved.granularity;
+
+  if (isAllTime) {
+    const allTimestamps = [
+      ...orders.map((o) => new Date(o.createdAt).getTime()),
+      ...expenses.map((e) => new Date(e.expenseDate).getTime()),
+    ].filter((t) => Number.isFinite(t));
+
+    if (allTimestamps.length > 0) {
+      const minD = dayjs(Math.min(...allTimestamps)).tz(TZ);
+      const maxD = dayjs(Math.max(...allTimestamps)).tz(TZ);
+      fromStr = minD.format('YYYY-MM-DD');
+      toStr = maxD.format('YYYY-MM-DD');
+      granularity = maxD.diff(minD, 'day') + 1 > 62 ? 'month' : 'day';
+    }
+  }
+  const dateFormat = granularity === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
   // Compute order financial metrics accurately, accounting for partial & full returns.
   let grossRevenue = 0;
@@ -133,6 +168,7 @@ export async function getAnalysisDashboard(opts: {
 
   const statusMap = new Map<OrderStatus, { count: number; revenue: number }>();
   for (const s of ORDER_STATUSES) statusMap.set(s, { count: 0, revenue: 0 });
+  const platformMap = new Map<OrderPlatform, { orders: number; revenue: number }>();
 
   const timelineMap = new Map<
     string,
@@ -185,7 +221,7 @@ export async function getAnalysisDashboard(opts: {
         : o.status === 'returned'
           ? returnedTotal > 0
             ? returnedTotal
-            : Math.max(0, o.total - o.shippingFee)
+            : o.total
           : 0;
 
     const netOrderRev = Math.max(0, o.total - orderRefund);
@@ -198,6 +234,12 @@ export async function getAnalysisDashboard(opts: {
     cogs += netOrderCogs;
 
     stEntry.revenue += netOrderRev;
+    const rawPlat = (o.platform ?? 'website') as OrderPlatform;
+    const plat: OrderPlatform = rawPlat === 'messenger' ? 'facebook' : rawPlat;
+    const pStat = platformMap.get(plat) ?? { orders: 0, revenue: 0 };
+    pStat.orders += 1;
+    pStat.revenue += netOrderRev;
+    platformMap.set(plat, pStat);
 
     bStat.revenue += netOrderRev;
     bStat.cogs += netOrderCogs;
@@ -210,6 +252,10 @@ export async function getAnalysisDashboard(opts: {
     const slot = ensureSlot(key);
     slot.revenue += netOrderRev;
     slot.cogs += netOrderCogs;
+    // Delivery charge on a returned order is deducted from us and counts as a loss.
+    if (o.status === 'returned') {
+      slot.expenses += o.shippingFee ?? 0;
+    }
     slot.orders += 1;
   }
 
@@ -241,13 +287,13 @@ export async function getAnalysisDashboard(opts: {
       const bSlug = e.business || DEFAULT_BUSINESS_SLUG;
       const bStat = bizMap.get(bSlug);
       if (bStat) bStat.expenses += e.amount;
-
-      const key = dayjs(e.expenseDate)
-        .tz(TZ)
-        .format(granularity === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD');
-      const slot = ensureSlot(key);
-      slot.expenses += e.amount;
     }
+
+    const key = dayjs(e.expenseDate)
+      .tz(TZ)
+      .format(granularity === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD');
+    const slot = ensureSlot(key);
+    slot.expenses += e.amount;
   }
 
   const netRevenue = Math.max(0, grossRevenue - refunds);
@@ -324,5 +370,18 @@ export async function getAnalysisDashboard(opts: {
         orders: s.orders,
       };
     }),
+    platformBreakdown: (
+      ['website', 'facebook', 'instagram', 'tiktok', 'whatsapp', 'other'] as const
+    )
+      .map((platform) => {
+        const stat = platformMap.get(platform) ?? { orders: 0, revenue: 0 };
+        return {
+          platform,
+          label: ORDER_PLATFORM_LABELS[platform] ?? platform,
+          orders: stat.orders,
+          revenue: stat.revenue,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue || b.orders - a.orders),
   };
 }

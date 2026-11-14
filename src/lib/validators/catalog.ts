@@ -5,7 +5,9 @@ import {
   PRODUCT_STATUSES,
   PRODUCT_VISIBILITIES,
   STOCK_STATUSES,
+  SUPPLIER_PROVIDERS,
   SUPPLIER_STATUSES,
+  SUPPLIER_TYPES,
 } from '@lib/constants';
 
 import {
@@ -22,6 +24,17 @@ export const supplierSchema = z.object({
   name: requiredText('Supplier name', 80),
   websiteUrl: httpUrl,
   status: z.enum(SUPPLIER_STATUSES).default('active'),
+  type: z.enum(SUPPLIER_TYPES).default('manual'),
+  provider: z
+    .enum(SUPPLIER_PROVIDERS)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
+  apiBaseUrl: optionalUrl,
+  apiKeyEnvVar: optionalText(100),
+  apiDomain: optionalText(200),
+  syncEnabled: z.boolean().default(true),
+  syncIntervalMinutes: z.coerce.number().int().min(5).max(1440).default(30),
   notes: optionalText(2000),
 });
 export type SupplierInput = z.input<typeof supplierSchema>;
@@ -64,6 +77,27 @@ export const productSchema = z
 
     supplier: objectId.or(z.literal('')).refine((v) => v !== '', 'Choose a supplier'),
     supplierProductUrl: optionalUrl,
+    supplierProductId: optionalText(120),
+    supplierPackagingCost: z.coerce.number().min(0).optional(),
+    supplierMinSellingPrice: z
+      .object({
+        customerPaysDelivery: z.coerce.number().min(0),
+        resellerPaysDeliveryInsideDhaka: z.coerce.number().min(0),
+        resellerPaysDeliveryOutsideDhaka: z.coerce.number().min(0),
+      })
+      .optional(),
+    supplierInStock: z.boolean().optional(),
+    supplierVariants: z
+      .array(
+        z.object({
+          externalVariantId: z.string().trim().min(1),
+          color: z.string().trim().nullable().optional(),
+          size: z.string().trim().nullable().optional(),
+          stockQuantity: z.coerce.number().int().min(0).default(0),
+          inStock: z.boolean().default(true),
+        }),
+      )
+      .optional(),
     supplierPrice: money('Supplier price'),
     price: money('Selling price').refine((v) => v > 0, 'Selling price must be above 0'),
     salePrice: z

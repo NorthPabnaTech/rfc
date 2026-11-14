@@ -8,6 +8,7 @@ import type { BannerDTO, ProductCardDTO } from '@/types';
 import type { IconRegistryKey } from '@components/icon/icon';
 
 import { CategoryRail } from './components/home/category-rail';
+import { FeaturedProductsRail } from './components/home/featured-products-rail';
 import { HeroBanners } from './components/home/hero-banners';
 import { ReviewsSection } from './components/home/reviews-section';
 import { SectionHeading } from './components/home/section-heading';
@@ -23,7 +24,7 @@ export default async function HomePage() {
     [
       getActiveBanners(),
       getCategoryTree(),
-      listProductCards('featured', 10),
+      listProductCards('featured', 20),
       listProductCards('new', 10),
       listProductCards('deals', 10),
       listProductCards('combos', 5),
@@ -39,14 +40,7 @@ export default async function HomePage() {
       <ServiceStrip />
       <CategoryRail categories={categories} />
 
-      <ProductSection
-        title="Featured products"
-        subtitle="Hand-picked by our team"
-        icon="sparkles"
-        href="/products"
-        products={featured}
-        priority
-      />
+      <FeaturedProductsRail products={featured} />
       <ProductSection
         title="New arrivals"
         subtitle="Fresh products just added"

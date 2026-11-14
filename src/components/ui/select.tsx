@@ -134,7 +134,7 @@ export function Select({
           aria-describedby={ariaDescribedBy}
           disabled={disabled}
           className={cn(
-            'border-line text-ink group inline-flex w-full items-center justify-between gap-2 rounded-md border bg-white px-3 shadow-2xs transition-[border-color,box-shadow] outline-none',
+            'border-line text-ink bg-panel group inline-flex w-full items-center justify-between gap-2 rounded-md border px-3 shadow-2xs transition-[border-color,box-shadow] outline-none',
             FIELD_HEIGHT[size],
             FIELD_TEXT[size],
             'focus:border-accent focus:ring-accent focus:ring-1 focus:outline-none',

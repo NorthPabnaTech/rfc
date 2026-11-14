@@ -43,7 +43,7 @@ export function PasswordForm() {
         required
       />
       <div>
-        <Button type="submit" variant="secondary" size="lg" disabled={isSubmitting}>
+        <Button type="submit" variant="noir" size="lg" disabled={isSubmitting}>
           {isSubmitting ? 'Updating…' : 'Update password'}
         </Button>
       </div>

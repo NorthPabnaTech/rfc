@@ -44,7 +44,7 @@ export function SearchInput({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="text-subtle hover:text-ink shrink-0 rounded opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+          className="text-subtle hover:text-ink hover:bg-well shrink-0 cursor-pointer rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
         >
           <Icon name="x" size={13} />
         </button>

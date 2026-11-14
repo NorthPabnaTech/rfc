@@ -69,7 +69,6 @@ export function WhatsAppWidget({ settings }: { settings: SettingsDTO }) {
 
   const phone = settings.social.whatsapp?.trim() || settings.supportPhone;
   const isProductPage = Boolean(product && pathname?.startsWith('/products/'));
-  const currentUrl = origin ? `${origin}${pathname || '/'}` : pathname || '/';
 
   const message =
     isProductPage && product && settings.whatsappProductEnabled
@@ -77,7 +76,7 @@ export function WhatsAppWidget({ settings }: { settings: SettingsDTO }) {
           product.name,
           origin ? `${origin}/products/${product.slug}` : `/products/${product.slug}`,
         )
-      : buildGeneralWhatsAppMessage(settings.whatsappDefaultMessage, currentUrl);
+      : buildGeneralWhatsAppMessage(settings.whatsappDefaultMessage);
 
   const href = buildWhatsAppUrl(phone, message);
   if (!href) return null;
@@ -92,11 +91,24 @@ export function WhatsAppWidget({ settings }: { settings: SettingsDTO }) {
           ? `Chat on WhatsApp about ${product.name}`
           : 'Chat with us on WhatsApp'
       }
-      className="focus-ring fixed right-4 bottom-5 z-40 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:brightness-95 sm:right-6 sm:bottom-6"
+      title={
+        isProductPage && product
+          ? `Chat on WhatsApp about ${product.name}`
+          : 'Chat with us on WhatsApp'
+      }
+      className="focus-ring group fixed right-5 bottom-6 z-40 grid size-14 place-items-center rounded-full sm:right-7 sm:bottom-7"
     >
-      <Icon name="whatsapp" size={20} className="shrink-0" />
-      <span className="hidden sm:inline">
-        {isProductPage && settings.whatsappProductEnabled ? 'Ask on WhatsApp' : 'WhatsApp'}
+      {/* Continuous waterfall / ripple rings */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[#25D366]/55 [animation-duration:2s]"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full bg-[#25D366]/30 [animation-delay:0.65s] [animation-duration:2s]"
+      />
+      <span className="relative grid size-14 place-items-center rounded-full bg-[#25D366] text-white shadow-xl transition duration-300 group-hover:scale-110 group-hover:brightness-95">
+        <Icon name="whatsapp" size={30} className="shrink-0" />
       </span>
     </a>
   );

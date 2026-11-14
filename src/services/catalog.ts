@@ -2,7 +2,14 @@ import 'server-only';
 
 import { cache } from 'react';
 
-import { CategoryModel, connectDB, ProductModel, SupplierModel, TagModel } from '@/database';
+import {
+  CategoryModel,
+  connectDB,
+  ProductModel,
+  SupplierModel,
+  SupplierOrderModel,
+  TagModel,
+} from '@/database';
 import type { CategoryDTO, CategoryTreeDTO, SupplierDTO, TagDTO } from '@/types';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
 import { AppError } from '@lib/errors';
@@ -138,15 +145,97 @@ export async function deleteTag(id: string): Promise<void> {
 
 /* ─── Suppliers ──────────────────────────────────────────────────────────── */
 
+export async function ensureBusinessKoroSupplier(): Promise<void> {
+  if (!process.env.BUSINESS_KORO_API_KEY?.trim()) return;
+  const exists = await SupplierModel.exists({ provider: 'business_koro' });
+  if (exists) return;
+  await SupplierModel.updateOne(
+    { slug: 'business-koro' },
+    {
+      $setOnInsert: {
+        name: 'Business Koro',
+        slug: 'business-koro',
+        websiteUrl: 'https://businesskoro.com',
+        status: 'active',
+        type: 'api',
+        provider: 'business_koro',
+        apiBaseUrl: 'https://api.businesskoro.com/api/v1/storefront',
+        apiKeyEnvVar: 'BUSINESS_KORO_API_KEY',
+        apiDomain: process.env.BUSINESS_KORO_DOMAIN?.trim() || 'rfcgadget.vercel.app',
+        syncEnabled: true,
+        syncIntervalMinutes: 30,
+        notes: 'API-connected dropshipping supplier (Business Koro).',
+      },
+    },
+    { upsert: true },
+  );
+}
+
+async function supplierStats() {
+  const [linkedRows, orderRows] = await Promise.all([
+    ProductModel.aggregate<{ _id: unknown; count: number }>([
+      { $match: { supplierProductId: { $exists: true, $ne: null } } },
+      { $group: { _id: '$supplier', count: { $sum: 1 } } },
+    ]),
+    SupplierOrderModel.aggregate<{ _id: { supplier: unknown; status: string }; count: number }>([
+      { $group: { _id: { supplier: '$supplier', status: '$status' }, count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const linkedMap = new Map(linkedRows.map((r) => [String(r._id), r.count]));
+  const orderMap = new Map<string, { pending: number; submitted: number; failed: number }>();
+
+  for (const r of orderRows) {
+    const sid = String(r._id.supplier);
+    const cur = orderMap.get(sid) ?? { pending: 0, submitted: 0, failed: 0 };
+    if (r._id.status === 'awaiting_confirmation') cur.pending += r.count;
+    else if (r._id.status === 'failed') cur.failed += r.count;
+    else if (r._id.status !== 'cancelled') cur.submitted += r.count;
+    orderMap.set(sid, cur);
+  }
+
+  return { linkedMap, orderMap };
+}
+
 export async function listSuppliers(opts: { activeOnly?: boolean } = {}): Promise<SupplierDTO[]> {
   await connectDB();
-  const [docs, counts] = await Promise.all([
+  await ensureBusinessKoroSupplier();
+  const [docs, counts, stats] = await Promise.all([
     SupplierModel.find(opts.activeOnly ? { status: 'active' } : {})
       .sort({ name: 1 })
       .lean(),
     productCounts('supplier'),
+    supplierStats(),
   ]);
-  return docs.map((s) => toSupplier({ ...s, productCount: counts.get(String(s._id)) ?? 0 }));
+  return docs.map((s) => {
+    const sid = String(s._id);
+    const o = stats.orderMap.get(sid);
+    return toSupplier({
+      ...s,
+      productCount: counts.get(sid) ?? 0,
+      linkedProductCount: stats.linkedMap.get(sid) ?? 0,
+      pendingOrderCount: o?.pending ?? 0,
+      submittedOrderCount: o?.submitted ?? 0,
+      failedOrderCount: o?.failed ?? 0,
+    });
+  });
+}
+
+export async function getSupplierById(id: string): Promise<SupplierDTO | null> {
+  await connectDB();
+  const doc = await SupplierModel.findById(id).lean();
+  if (!doc) return null;
+  const [counts, stats] = await Promise.all([productCounts('supplier'), supplierStats()]);
+  const sid = String(doc._id);
+  const o = stats.orderMap.get(sid);
+  return toSupplier({
+    ...doc,
+    productCount: counts.get(sid) ?? 0,
+    linkedProductCount: stats.linkedMap.get(sid) ?? 0,
+    pendingOrderCount: o?.pending ?? 0,
+    submittedOrderCount: o?.submitted ?? 0,
+    failedOrderCount: o?.failed ?? 0,
+  });
 }
 
 export async function saveSupplier(input: SupplierOutput, id?: string): Promise<SupplierDTO> {

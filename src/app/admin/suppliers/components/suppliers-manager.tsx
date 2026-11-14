@@ -1,13 +1,16 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useWatch } from 'react-hook-form';
 
 import { deleteSupplierAction, saveSupplierAction } from '@/actions/admin';
 import type { SupplierDTO } from '@/types';
-import { Form, FormInput, FormSelect, FormTextarea } from '@components/form';
+import { Form, FormInput, FormSelect, FormSwitch, FormTextarea } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, StatusBadge } from '@components/shared';
+import { Badge } from '@components/ui/badge';
 import { Button } from '@components/ui/button';
 import { type Column, DataTable } from '@components/ui/data-table';
 import {
@@ -21,6 +24,13 @@ import {
 import { useClientPagination } from '@hooks/use-client-pagination';
 import { useModal } from '@hooks/use-modal';
 import { handleActionResult } from '@lib/action-client';
+import {
+  SUPPLIER_PROVIDER_LABELS,
+  SUPPLIER_PROVIDERS,
+  SUPPLIER_TYPE_LABELS,
+  SUPPLIER_TYPES,
+} from '@lib/constants';
+import { formatStoreDateTime } from '@lib/utils';
 import { type SupplierInput, supplierSchema } from '@lib/validators/catalog';
 
 export function SuppliersManager({ suppliers }: { suppliers: SupplierDTO[] }) {
@@ -50,6 +60,29 @@ export function SuppliersManager({ suppliers }: { suppliers: SupplierDTO[] }) {
       ),
     },
     {
+      key: 'type',
+      header: 'Integration',
+      cell: (s) =>
+        s.type === 'api' ? (
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge tone="brand">API</Badge>
+              <StatusBadge
+                status={s.apiKeyConfigured ? 'ok' : 'danger'}
+                label={s.apiKeyConfigured ? 'Connected' : 'Missing key'}
+              />
+            </div>
+            <p className="text-subtle text-[11px]">
+              {s.lastSyncAt
+                ? `Synced ${formatStoreDateTime(s.lastSyncAt)}`
+                : 'Not synced yet'}
+            </p>
+          </div>
+        ) : (
+          <Badge tone="neutral">{SUPPLIER_TYPE_LABELS.manual}</Badge>
+        ),
+    },
+    {
       key: 'status',
       header: 'Status',
       cell: (s) => (
@@ -59,22 +92,49 @@ export function SuppliersManager({ suppliers }: { suppliers: SupplierDTO[] }) {
         />
       ),
     },
-    { key: 'products', header: 'Products', align: 'right', cell: (s) => s.productCount ?? 0 },
     {
-      key: 'notes',
-      wrap: true,
-      minWidth: 220,
-      header: 'Notes',
+      key: 'products',
+      header: 'Products',
+      align: 'right',
       cell: (s) => (
-        <span className="text-muted line-clamp-2 max-w-sm text-[12.5px]">{s.notes ?? '—'}</span>
+        <div className="text-right">
+          <span className="font-medium">{s.productCount ?? 0}</span>
+          {s.type === 'api' && (s.linkedProductCount ?? 0) > 0 && (
+            <p className="text-subtle text-[11px]">{s.linkedProductCount} linked</p>
+          )}
+        </div>
       ),
+    },
+    {
+      key: 'orders',
+      header: 'Supplier Orders',
+      align: 'right',
+      cell: (s) =>
+        s.type === 'api' ? (
+          <div className="text-right text-xs">
+            <span className="text-ink font-medium">{s.submittedOrderCount ?? 0} sent</span>
+            {(s.pendingOrderCount ?? 0) > 0 && (
+              <p className="text-amber-700">{s.pendingOrderCount} awaiting</p>
+            )}
+            {(s.failedOrderCount ?? 0) > 0 && (
+              <p className="text-danger">{s.failedOrderCount} failed</p>
+            )}
+          </div>
+        ) : (
+          <span className="text-subtle">—</span>
+        ),
     },
     {
       key: 'actions',
       align: 'right',
-      width: 96,
+      width: 170,
       cell: (s) => (
         <div className="flex justify-end gap-1">
+          {s.type === 'api' && (
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`/admin/suppliers/${s.id}`}>Browse & Sync</Link>
+            </Button>
+          )}
           <Button
             size="icon-sm"
             variant="ghost"
@@ -104,9 +164,16 @@ export function SuppliersManager({ suppliers }: { suppliers: SupplierDTO[] }) {
         rowKey="id"
         title={`${suppliers.length} suppliers`}
         toolbar={
-          <Button variant="primary" size="sm" onClick={() => modal.openModal('create')}>
-            <Icon name="plus" size={14} /> Add supplier
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/admin/suppliers/orders">
+                <Icon name="box" size={14} /> Supplier Orders
+              </Link>
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => modal.openModal('create')}>
+              <Icon name="plus" size={14} /> Add supplier
+            </Button>
+          </div>
         }
         empty={{ title: 'No suppliers', description: 'Add the websites you source products from.' }}
       />
@@ -156,9 +223,17 @@ function SupplierDialog({
       name: supplier?.name ?? '',
       websiteUrl: supplier?.websiteUrl ?? 'https://',
       status: supplier?.status ?? 'active',
+      type: supplier?.type ?? 'manual',
+      provider: supplier?.provider ?? undefined,
+      apiBaseUrl: supplier?.apiBaseUrl ?? 'https://api.businesskoro.com/api/v1/storefront',
+      apiKeyEnvVar: supplier?.apiKeyEnvVar ?? 'BUSINESS_KORO_API_KEY',
+      apiDomain: supplier?.apiDomain ?? '',
+      syncEnabled: supplier?.syncEnabled ?? true,
+      syncIntervalMinutes: supplier?.syncIntervalMinutes ?? 30,
       notes: supplier?.notes ?? '',
     },
   });
+  const supplierType = useWatch({ control: form.control, name: 'type' });
   const { isSubmitting } = form.formState;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,17 +249,72 @@ function SupplierDialog({
           <DialogHeader>
             <DialogTitle>{supplier ? 'Edit supplier' : 'New supplier'}</DialogTitle>
           </DialogHeader>
-          <DialogBody className="grid gap-x-4 gap-y-5">
+          <DialogBody className="grid max-h-[70vh] gap-x-4 gap-y-4 overflow-y-auto">
             <FormInput name="name" label="Supplier name" required />
             <FormInput name="websiteUrl" label="Website URL" required />
-            <FormSelect
-              name="status"
-              label="Status"
-              items={[
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' },
-              ]}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormSelect
+                name="type"
+                label="Supplier type"
+                items={SUPPLIER_TYPES.map((t) => ({
+                  value: t,
+                  label: SUPPLIER_TYPE_LABELS[t],
+                }))}
+              />
+              <FormSelect
+                name="status"
+                label="Status"
+                items={[
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+              />
+            </div>
+
+            {supplierType === 'api' && (
+              <div className="bg-well space-y-3 rounded-xl p-3.5">
+                <p className="text-ink text-xs font-semibold">API Integration Configuration</p>
+                <FormSelect
+                  name="provider"
+                  label="API Provider Adapter"
+                  items={SUPPLIER_PROVIDERS.map((p) => ({
+                    value: p,
+                    label: SUPPLIER_PROVIDER_LABELS[p],
+                  }))}
+                />
+                <FormInput
+                  name="apiBaseUrl"
+                  label="API Base URL"
+                  placeholder="https://api.businesskoro.com/api/v1/storefront"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormInput
+                    name="apiKeyEnvVar"
+                    label="API Key Env Variable"
+                    placeholder="BUSINESS_KORO_API_KEY"
+                    hint="Server env var name only — never paste secret keys here."
+                  />
+                  <FormInput
+                    name="apiDomain"
+                    label="x-domain Header (optional)"
+                    placeholder="rfcgadget.vercel.app"
+                  />
+                </div>
+                <div className="grid grid-cols-2 items-center gap-3">
+                  <FormSwitch
+                    name="syncEnabled"
+                    label="Auto stock sync"
+                    hint="Sync via scheduled job"
+                  />
+                  <FormInput
+                    name="syncIntervalMinutes"
+                    label="Sync interval (min)"
+                    type="number"
+                  />
+                </div>
+              </div>
+            )}
+
             <FormTextarea
               name="notes"
               label="Notes"

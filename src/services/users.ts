@@ -245,11 +245,14 @@ export async function deleteAddress(userId: string, id: string) {
 
 export async function listCustomers(f: {
   q?: string;
+  status?: 'active' | 'disabled';
   page?: number;
 }): Promise<Paginated<CustomerRowDTO>> {
   await connectDB();
   const page = Math.max(1, f.page ?? 1);
   const query: Record<string, unknown> = { role: 'customer' };
+  if (f.status === 'active') query.isActive = true;
+  if (f.status === 'disabled') query.isActive = false;
   if (f.q) {
     const rx = new RegExp(
       f.q

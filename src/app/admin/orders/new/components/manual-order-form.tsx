@@ -137,10 +137,10 @@ export function ManualOrderForm({
                 </div>
               )}
             </FormItem>
-            <FormItem name="platform" label="Channel">
+            <FormItem name="platform" label="Platform">
               {(field) => (
                 <div className="flex flex-wrap gap-2">
-                  {ORDER_PLATFORMS.map((p) => (
+                  {ORDER_PLATFORMS.filter((p) => p !== 'messenger').map((p) => (
                     <button
                       key={p}
                       type="button"

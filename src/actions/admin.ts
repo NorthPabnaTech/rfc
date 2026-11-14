@@ -38,6 +38,11 @@ import { createManualOrder, updateOrderMeta, updateOrderStatus } from '@/service
 import { deleteProduct, pickerSearch, saveProduct } from '@/services/products';
 import { updateReturn } from '@/services/returns';
 import { updateSettings } from '@/services/settings';
+import {
+  confirmAndSendSupplierOrder,
+  refreshSupplierOrderStatus,
+} from '@/services/supplier-orders';
+import { fetchSupplierCatalog, syncSupplierProducts } from '@/services/supplier-sync';
 import { searchCustomers, setCustomerActive } from '@/services/users';
 import { requireAdmin } from '@lib/auth/current-user';
 import { type ActionResult, runAction } from '@lib/errors';
@@ -374,6 +379,52 @@ export async function saveSettingsAction(input: unknown): Promise<ActionResult> 
 
 /* ─── Inventory, Expenses & Businesses ───────────────────────────────────── */
 
+export async function setProductStockStatusAction(
+  id: string,
+  stockStatus: 'in_stock' | 'out_of_stock',
+): Promise<ActionResult> {
+  return runAction(
+    async () => {
+      await requireAdmin();
+      const { ProductModel, connectDB } = await import('@/database');
+      await connectDB();
+      const doc = await ProductModel.findByIdAndUpdate(
+        objectId.parse(id),
+        { $set: { stockStatus, trackInventory: false } },
+        { returnDocument: 'after' },
+      ).lean();
+      if (!doc) throw new Error('Product not found.');
+      revalidateStorefront();
+      revalidatePath('/admin', 'layout');
+      return undefined;
+    },
+    stockStatus === 'in_stock' ? 'Marked as In stock' : 'Marked as Out of stock',
+  );
+}
+
+export async function setProductFeaturedAction(
+  id: string,
+  isFeatured: boolean,
+): Promise<ActionResult> {
+  return runAction(
+    async () => {
+      await requireAdmin();
+      const { ProductModel, connectDB } = await import('@/database');
+      await connectDB();
+      const doc = await ProductModel.findByIdAndUpdate(
+        objectId.parse(id),
+        { $set: { isFeatured } },
+        { returnDocument: 'after' },
+      ).lean();
+      if (!doc) throw new Error('Product not found.');
+      revalidateStorefront();
+      revalidatePath('/admin', 'layout');
+      return undefined;
+    },
+    isFeatured ? 'Added to Featured products' : 'Removed from Featured products',
+  );
+}
+
 export async function adjustStockAction(
   input: unknown,
 ): Promise<ActionResult<{ stockQuantity: number; stockStatus: string }>> {
@@ -482,4 +533,67 @@ export async function syncCloudinaryMediaAction(): Promise<ActionResult<{ import
     revalidatePath('/admin/media');
     return { imported };
   }, 'Media library synced');
+}
+
+/* ─── Supplier Integration & Dropshipping ────────────────────────────────── */
+
+const confirmSupplierOrderSchema = z.object({
+  supplierOrderId: objectId,
+  sellingPrice: z.coerce.number().positive('Selling price must be above 0'),
+  externalVariantId: z.string().trim().optional(),
+  deliveryChargePaidByCustomer: z.boolean(),
+  deliveryChargePaidUpfront: z.boolean().optional(),
+  customerNote: z.string().trim().max(1000).optional(),
+  allowDuplicate: z.boolean().optional(),
+});
+
+export async function fetchSupplierCatalogAction(input: {
+  supplierId: string;
+  search?: string;
+  page?: number;
+}) {
+  return runAction(async () => {
+    await requireAdmin();
+    return fetchSupplierCatalog(objectId.parse(input.supplierId), {
+      search: input.search,
+      page: input.page ?? 1,
+      limit: 20,
+    });
+  });
+}
+
+export async function syncSupplierProductsAction(
+  supplierId: string,
+): Promise<ActionResult<{ updated: number; totalFetched: number }>> {
+  return runAction(async () => {
+    await requireAdmin();
+    const res = await syncSupplierProducts(objectId.parse(supplierId));
+    revalidateStorefront();
+    revalidatePath('/admin', 'layout');
+    return res;
+  }, 'Supplier stock synchronized');
+}
+
+export async function confirmAndSendSupplierOrderAction(input: unknown) {
+  return runAction(async () => {
+    const admin = await requireAdmin();
+    const parsed = confirmSupplierOrderSchema.parse(input);
+    const res = await confirmAndSendSupplierOrder({
+      ...parsed,
+      adminId: admin.id,
+    });
+    revalidatePath(`/admin/orders/${res.orderId}`);
+    revalidatePath('/admin/suppliers', 'layout');
+    return res;
+  }, 'Order confirmed and sent to supplier');
+}
+
+export async function refreshSupplierOrderStatusAction(supplierOrderId: string) {
+  return runAction(async () => {
+    const admin = await requireAdmin();
+    const res = await refreshSupplierOrderStatus(objectId.parse(supplierOrderId), admin.id);
+    revalidatePath(`/admin/orders/${res.orderId}`);
+    revalidatePath('/admin/suppliers', 'layout');
+    return res;
+  }, 'Supplier order status refreshed');
 }

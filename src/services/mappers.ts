@@ -17,6 +17,7 @@ import type {
   Review,
   StockMovement,
   Supplier,
+  SupplierOrder,
   Tag,
 } from '@/database';
 import type {
@@ -36,9 +37,12 @@ import type {
   ReviewDTO,
   StockMovementDTO,
   SupplierDTO,
+  SupplierOrderDTO,
   TagDTO,
 } from '@/types';
 import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
+
+import { isSupplierApiConfigured } from './suppliers/registry';
 
 type Id = Types.ObjectId | string;
 const id = (v: Id | null | undefined): string => (v ? String(v) : '');
@@ -83,15 +87,45 @@ export function toTag(t: Tag & { productCount?: number }): TagDTO {
   return { id: id(t._id), name: t.name, slug: t.slug, productCount: t.productCount };
 }
 
-export function toSupplier(s: Supplier & { productCount?: number }): SupplierDTO {
+export function toSupplier(
+  s: Supplier & {
+    productCount?: number;
+    linkedProductCount?: number;
+    pendingOrderCount?: number;
+    submittedOrderCount?: number;
+    failedOrderCount?: number;
+  },
+): SupplierDTO {
   return {
     id: id(s._id),
     name: s.name,
     slug: s.slug,
     websiteUrl: s.websiteUrl,
     status: s.status,
+    type: s.type ?? 'manual',
+    provider: s.provider,
+    apiBaseUrl: s.apiBaseUrl,
+    apiKeyEnvVar: s.apiKeyEnvVar,
+    apiDomain: s.apiDomain,
+    apiKeyConfigured: isSupplierApiConfigured(s),
+    syncEnabled: s.syncEnabled ?? true,
+    syncIntervalMinutes: s.syncIntervalMinutes ?? 30,
+    lastSyncAt: s.lastSyncAt ? iso(s.lastSyncAt) : undefined,
+    lastSyncStatus: s.lastSyncStatus,
+    lastSyncError: s.lastSyncError,
+    lastSyncUpdatedCount: s.lastSyncUpdatedCount,
+    deliveryCharges: s.deliveryCharges
+      ? {
+          insideDhaka: s.deliveryCharges.insideDhaka ?? 70,
+          outsideDhaka: s.deliveryCharges.outsideDhaka ?? 130,
+        }
+      : undefined,
     notes: s.notes,
     productCount: s.productCount,
+    linkedProductCount: s.linkedProductCount,
+    pendingOrderCount: s.pendingOrderCount,
+    submittedOrderCount: s.submittedOrderCount,
+    failedOrderCount: s.failedOrderCount,
     createdAt: iso(s.createdAt),
   };
 }
@@ -160,6 +194,25 @@ export function toAdminProduct(p: Product): AdminProductDTO {
     tags: p.tags.map(id),
     supplier: p.supplier ? id(p.supplier) : '',
     supplierProductUrl: p.supplierProductUrl,
+    supplierProductId: p.supplierProductId,
+    supplierPackagingCost: p.supplierPackagingCost,
+    supplierMinSellingPrice: p.supplierMinSellingPrice
+      ? {
+          customerPaysDelivery: p.supplierMinSellingPrice.customerPaysDelivery,
+          resellerPaysDeliveryInsideDhaka: p.supplierMinSellingPrice.resellerPaysDeliveryInsideDhaka,
+          resellerPaysDeliveryOutsideDhaka:
+            p.supplierMinSellingPrice.resellerPaysDeliveryOutsideDhaka,
+        }
+      : undefined,
+    supplierInStock: p.supplierInStock,
+    supplierLastSyncedAt: p.supplierLastSyncedAt ? iso(p.supplierLastSyncedAt) : undefined,
+    supplierVariants: p.supplierVariants?.map((v) => ({
+      externalVariantId: v.externalVariantId,
+      color: v.color ?? null,
+      size: v.size ?? null,
+      stockQuantity: v.stockQuantity,
+      inStock: v.inStock,
+    })),
     supplierPrice: p.supplierPrice,
     price: p.price,
     salePrice: p.salePrice ?? null,
@@ -180,6 +233,54 @@ export function toAdminProduct(p: Product): AdminProductDTO {
     status: p.status,
     isFeatured: p.isFeatured,
     isComboOffer: p.isComboOffer ?? false,
+  };
+}
+
+export function toSupplierOrder(
+  o: SupplierOrder & { confirmedBy?: MaybePopulated<{ name: string }> },
+): SupplierOrderDTO {
+  return {
+    id: id(o._id),
+    orderId: id(o.order),
+    orderNumber: o.orderNumber,
+    orderItemId: id(o.orderItemId),
+    productId: id(o.product),
+    productName: o.productName,
+    supplierId: id(o.supplier),
+    supplierName: o.supplierName,
+    supplierProvider: o.supplierProvider,
+    externalProductId: o.externalProductId,
+    externalVariantId: o.externalVariantId,
+    variantLabel: o.variantLabel,
+    quantity: o.quantity,
+    customer: { ...o.customer },
+    customerNote: o.customerNote,
+    sellingPrice: o.sellingPrice,
+    costPrice: o.costPrice,
+    packagingCost: o.packagingCost,
+    deliveryCharge: o.deliveryCharge,
+    deliveryChargePaidByCustomer: o.deliveryChargePaidByCustomer,
+    deliveryChargePaidUpfront: o.deliveryChargePaidUpfront,
+    expectedProfit: o.expectedProfit,
+    status: o.status,
+    externalOrderId: o.externalOrderId,
+    externalStatus: o.externalStatus,
+    paymentStatus: o.paymentStatus,
+    isDuplicate: o.isDuplicate,
+    allowDuplicate: o.allowDuplicate,
+    confirmedByName: populated(o.confirmedBy)?.name,
+    confirmedAt: o.confirmedAt ? iso(o.confirmedAt) : undefined,
+    submittedAt: o.submittedAt ? iso(o.submittedAt) : undefined,
+    lastSyncedAt: o.lastSyncedAt ? iso(o.lastSyncedAt) : undefined,
+    lastError: o.lastError,
+    lastResponseSummary: o.lastResponseSummary,
+    statusHistory: o.statusHistory.map((e) => ({
+      status: e.status,
+      note: e.note,
+      at: iso(e.at),
+    })),
+    createdAt: iso(o.createdAt),
+    updatedAt: iso(o.updatedAt),
   };
 }
 

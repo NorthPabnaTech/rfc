@@ -18,10 +18,10 @@ type Props = SelectProps & {
   width?: string;
 };
 
-export function FilterSelect({ width = 'w-44', ...props }: Props) {
+export function FilterSelect({ width = 'w-44', clearable = true, ...props }: Props) {
   return (
     <div className={cn('shrink-0', width)}>
-      <Select {...props} />
+      <Select clearable={clearable} {...props} />
     </div>
   );
 }

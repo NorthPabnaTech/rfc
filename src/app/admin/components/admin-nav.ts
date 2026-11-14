@@ -20,8 +20,6 @@ export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
     title: 'Sales',
     items: [
       { href: '/admin/orders', label: 'Orders', icon: 'cart', badge: 'pendingOrders' },
-      { href: '/admin/orders/new', label: 'Manual order', icon: 'plus' },
-      { href: '/admin/returns', label: 'Returns', icon: 'refresh', badge: 'openReturns' },
       { href: '/admin/customers', label: 'Customers', icon: 'users' },
     ],
   },
@@ -29,7 +27,6 @@ export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
     title: 'Catalog',
     items: [
       { href: '/admin/products', label: 'Products', icon: 'box' },
-      { href: '/admin/inventory', label: 'Inventory', icon: 'layers' },
       { href: '/admin/categories', label: 'Categories', icon: 'folder' },
       { href: '/admin/tags', label: 'Tags', icon: 'tag' },
       { href: '/admin/suppliers', label: 'Suppliers', icon: 'store' },

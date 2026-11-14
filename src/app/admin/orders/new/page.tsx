@@ -17,7 +17,7 @@ export default async function NewOrderPage() {
     <>
       <PageHeader
         title="Create manual order"
-        description="For orders received on Facebook, Messenger, Instagram, TikTok, WhatsApp or by phone."
+        description="For orders received on Facebook, Instagram, TikTok, WhatsApp or by phone."
         backHref="/admin/orders"
         backLabel="Orders"
       />

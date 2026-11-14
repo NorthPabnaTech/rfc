@@ -40,6 +40,7 @@ import {
   notifyCustomerOrderStatus,
 } from './notifications';
 import { getSettings } from './settings';
+import { createSupplierOrdersForOrder } from './supplier-orders';
 
 /* ─── Pricing ────────────────────────────────────────────────────────────── */
 
@@ -243,7 +244,7 @@ async function createOrder(
   const bizDoc = await BusinessModel.findOne({ slug: business }, 'invoicePrefix').lean();
   const invPrefix = bizDoc?.invoicePrefix || 'RFC';
 
-  return withTransaction(async (session) => {
+  const created = await withTransaction(async (session) => {
     const seq = await nextSequence('order');
     const orderNumber = `RFC-${seq}`;
     const invoiceNumber = `INV-${invPrefix}-${seq}`;
@@ -304,6 +305,12 @@ async function createOrder(
 
     return { id: String(order._id), orderNumber, invoiceNumber, total: order.total };
   });
+
+  const savedOrder = await OrderModel.findById(created.id).lean();
+  if (savedOrder) {
+    await createSupplierOrdersForOrder(savedOrder);
+  }
+  return created;
 }
 
 export async function placeWebsiteOrder(input: {

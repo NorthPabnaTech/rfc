@@ -3,18 +3,32 @@
 import * as React from 'react';
 
 import { ProductImage } from '@/features/products/product-image';
+import { ImageCropDialog } from '@/features/uploads/image-crop-dialog';
 import { MediaPickerDialog } from '@/features/uploads/media-picker-dialog';
 import type { ImageDTO } from '@/types';
 import { Icon } from '@components/icon/icon';
 import { Spinner } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { ACCEPTED_IMAGE_TYPES, MAX_UPLOAD_BYTES, type UploadPurpose } from '@lib/constants';
+import {
+  ACCEPTED_IMAGE_TYPES,
+  type BannerPosition,
+  MAX_UPLOAD_BYTES,
+  type UploadPurpose,
+} from '@lib/constants';
 import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
 
-export async function uploadFiles(files: File[], purpose: UploadPurpose): Promise<ImageDTO[]> {
+const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+
+export async function uploadFiles(
+  files: File[],
+  purpose: UploadPurpose,
+  nameHint?: string,
+): Promise<ImageDTO[]> {
   const body = new FormData();
   body.set('purpose', purpose);
+  const trimmed = nameHint?.trim();
+  if (trimmed) body.set('nameHint', trimmed);
   files.forEach((f) => body.append('files', f));
   const res = await fetch('/api/upload', { method: 'POST', body });
   const json = (await res.json().catch(() => ({}))) as { images?: ImageDTO[]; error?: string };
@@ -26,6 +40,10 @@ type Props = {
   value: ImageDTO[];
   onChange: (images: ImageDTO[]) => void;
   purpose: UploadPurpose;
+  /** Optional entity name (e.g. product, category, or user name) used to name uploaded files. */
+  nameHint?: string;
+  /** Banner display position so crop dimensions match the slot. */
+  bannerPosition?: BannerPosition;
   max?: number;
   /** Allow pasting external image URLs (admin: supplier product photos). */
   allowUrl?: boolean;
@@ -43,6 +61,8 @@ export function ImageUploader({
   value,
   onChange,
   purpose,
+  nameHint,
+  bannerPosition,
   max = 10,
   allowUrl = false,
   sortable = false,
@@ -55,6 +75,8 @@ export function ImageUploader({
   const [url, setUrl] = React.useState('');
   const [dragIndex, setDragIndex] = React.useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+  const [removingIndex, setRemovingIndex] = React.useState<number | null>(null);
   const remaining = max - value.length;
   const canPickFromLibrary =
     purpose === 'products' ||
@@ -62,14 +84,14 @@ export function ImageUploader({
     purpose === 'banners' ||
     purpose === 'expenses';
 
-  const handleFiles = async (list: FileList | null) => {
+  const handleFiles = (list: FileList | null) => {
     if (!list?.length) return;
     let files = Array.from(list);
     const bad = files.find(
-      (f) => !ACCEPTED_IMAGE_TYPES.includes(f.type) || f.size > MAX_UPLOAD_BYTES,
+      (f) => !ACCEPTED_IMAGE_TYPES.includes(f.type) || f.size > MAX_SOURCE_BYTES,
     );
     if (bad) {
-      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP or AVIF under 5 MB.' });
+      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP or AVIF under 25 MB.' });
       files = files.filter((f) => f !== bad);
     }
     if (files.length > remaining) {
@@ -78,15 +100,27 @@ export function ImageUploader({
     }
     if (!files.length) return;
 
-    setUploading(files.length);
+    setPendingFiles(files);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const uploadOptimizedFiles = async (optimizedFiles: File[]) => {
+    const oversized = optimizedFiles.find((f) => f.size > MAX_UPLOAD_BYTES);
+    if (oversized) {
+      toast.error('Image still too large', {
+        description: 'Please crop tighter or choose a smaller image (max 5 MB after optimization).',
+      });
+      return;
+    }
+    setPendingFiles([]);
+    setUploading(optimizedFiles.length);
     try {
-      const uploaded = await uploadFiles(files, purpose);
+      const uploaded = await uploadFiles(optimizedFiles, purpose, nameHint);
       onChange([...value, ...uploaded]);
     } catch (e) {
       toast.error('Upload failed', { description: e instanceof Error ? e.message : undefined });
     } finally {
       setUploading(0);
-      if (inputRef.current) inputRef.current.value = '';
     }
   };
 
@@ -107,6 +141,29 @@ export function ImageUploader({
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item!);
     onChange(next);
+  };
+
+  const removeImage = async (idx: number) => {
+    const img = value[idx];
+    if (!img || removingIndex !== null) return;
+    if (img.type === 'cloudinary' && img.publicId) {
+      setRemovingIndex(idx);
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicId: img.publicId, purpose }),
+        });
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) throw new Error(json.error ?? 'Failed to delete image from Cloudinary.');
+      } catch (e) {
+        toast.error('Delete failed', { description: e instanceof Error ? e.message : undefined });
+        setRemovingIndex(null);
+        return;
+      }
+      setRemovingIndex(null);
+    }
+    onChange(value.filter((_, j) => j !== idx));
   };
 
   return (
@@ -136,7 +193,7 @@ export function ImageUploader({
                     Cover
                   </span>
                 )}
-                <span className="text-ink rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium">
+                <span className="rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-xs">
                   {img.type === 'cloudinary' ? 'Uploaded' : 'URL'}
                 </span>
               </span>
@@ -148,18 +205,19 @@ export function ImageUploader({
                       onClick={() => move(i, 0)}
                       aria-label="Make cover image"
                       title="Make cover"
-                      className="bg-ink/70 grid size-7 place-items-center rounded-full text-white"
+                      className="grid size-7 place-items-center rounded-full bg-black/65 text-white hover:bg-black/85"
                     >
                       <Icon name="star" size={13} />
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() => onChange(value.filter((_, j) => j !== i))}
+                    disabled={removingIndex !== null}
+                    onClick={() => void removeImage(i)}
                     aria-label="Remove image"
-                    className="bg-ink/70 grid size-7 place-items-center rounded-full text-white"
+                    className="grid size-7 place-items-center rounded-full bg-black/65 text-white hover:bg-black/85 disabled:opacity-60"
                   >
-                    <Icon name="x" size={13} />
+                    {removingIndex === i ? <Spinner size="sm" /> : <Icon name="x" size={13} />}
                   </button>
                 </div>
               )}
@@ -209,7 +267,7 @@ export function ImageUploader({
             {uploading ? 'Uploading…' : 'Click or drop images to upload'}
           </p>
           <p className="text-subtle text-[11.5px]">
-            JPG, PNG, WebP · max 5 MB · {remaining} more allowed
+            JPG, PNG, WebP, AVIF · auto-optimized before upload · {remaining} more allowed
           </p>
           <input
             ref={inputRef}
@@ -263,6 +321,15 @@ export function ImageUploader({
           </Button>
         </div>
       )}
+
+      <ImageCropDialog
+        open={pendingFiles.length > 0}
+        files={pendingFiles}
+        purpose={purpose}
+        bannerPosition={bannerPosition}
+        onCancel={() => setPendingFiles([])}
+        onConfirm={uploadOptimizedFiles}
+      />
     </div>
   );
 }
