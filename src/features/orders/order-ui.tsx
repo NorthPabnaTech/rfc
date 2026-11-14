@@ -76,11 +76,12 @@ export function OrderProgress({ order }: { order: Pick<OrderDTO, 'status' | 'sta
     );
   }
 
-  const currentIdx = ORDER_FLOW.indexOf(order.status);
+  const currentIdx =
+    order.status === 'completed' ? ORDER_FLOW.length - 1 : ORDER_FLOW.indexOf(order.status);
   const reachedAt = (s: OrderStatus) => order.statusHistory.find((e) => e.status === s)?.at;
 
   return (
-    <ol className="flex flex-col sm:grid sm:grid-cols-6 sm:gap-1">
+    <ol className="flex flex-col sm:grid sm:grid-cols-5 sm:gap-1">
       {ORDER_FLOW.map((s, i) => {
         const done = i <= currentIdx;
         const at = reachedAt(s);

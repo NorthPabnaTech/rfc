@@ -13,7 +13,7 @@ export function CustomerStatusToggle({ id, active }: { id: string; active: boole
   const [open, setOpen] = React.useState(false);
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant={active ? 'danger' : 'secondary'} onClick={() => setOpen(true)}>
         {active ? 'Disable account' : 'Re-activate account'}
       </Button>
       <ConfirmDialog

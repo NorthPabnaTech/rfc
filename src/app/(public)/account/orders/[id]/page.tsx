@@ -18,7 +18,6 @@ import { formatStoreDate, formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
 
 import { CancelOrderButton } from './components/cancel-order-button';
-import { ReturnRequestDialog } from './components/return-request-dialog';
 
 export const metadata: Metadata = { title: 'Order details' };
 
@@ -47,7 +46,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <div className="flex flex-wrap items-center gap-2">
             <OrderStatusBadge status={order.status} />
             {order.canCancel && <CancelOrderButton orderId={order.id} />}
-            {order.canRequestReturn && <ReturnRequestDialog orderId={order.id} />}
           </div>
         </div>
         <div className="mt-8">

@@ -27,12 +27,21 @@ import {
   ORDER_STATUS_LABELS,
   type OrderStatus,
   PAYMENT_STATUSES,
+  RETURN_WINDOW_HOURS,
 } from '@lib/constants';
 
 /** Moves the order along its workflow (including flexible cancel/return), plus payment & notes. */
 export function OrderActions({ order }: { order: OrderDTO }) {
   const router = useRouter();
-  const next = ADMIN_ORDER_TRANSITIONS[order.status];
+  const isPostDelivery = order.status === 'delivered' || order.status === 'completed';
+  const [now] = React.useState(() => Date.now());
+  const withinReturnWindow =
+    !isPostDelivery ||
+    (!!order.deliveredAt &&
+      now - new Date(order.deliveredAt).getTime() <= RETURN_WINDOW_HOURS * 3600 * 1000);
+  const next = ADMIN_ORDER_TRANSITIONS[order.status].filter(
+    (s) => s !== 'returned' || withinReturnWindow,
+  );
   const [selectedStatus, setSelectedStatus] = React.useState<OrderStatus | ''>(next[0] ?? '');
   const effectiveStatus: OrderStatus | '' =
     selectedStatus && next.includes(selectedStatus) ? selectedStatus : (next[0] ?? '');

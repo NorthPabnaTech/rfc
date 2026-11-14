@@ -137,7 +137,23 @@ export function NotificationBell({
   const router = useRouter();
   const push = usePushNotifications(pushKey);
   const [enabling, setEnabling] = React.useState(false);
-  const [promptDismissed, setPromptDismissed] = React.useState(false);
+  const [dismissedInSession, setDismissedInSession] = React.useState(false);
+  const promptStorageKey = `rfc_push_prompt_seen:${userId}`;
+  const promptSeen = React.useSyncExternalStore(
+    (onStoreChange) => {
+      window.addEventListener('storage', onStoreChange);
+      return () => window.removeEventListener('storage', onStoreChange);
+    },
+    () => {
+      try {
+        return window.localStorage.getItem(promptStorageKey) === '1';
+      } catch {
+        return false;
+      }
+    },
+    () => true,
+  );
+  const promptDismissed = dismissedInSession || promptSeen;
   const [items, setItems] = React.useState<NotificationDTO[]>(initial.items);
   const [unseen, setUnseen] = React.useState(initial.unseen);
   const [open, setOpen] = React.useState(false);
@@ -236,11 +252,21 @@ export function NotificationBell({
     void markAllNotificationsReadAction();
   };
 
+  const markPromptSeen = React.useCallback(() => {
+    setDismissedInSession(true);
+    try {
+      window.localStorage.setItem(promptStorageKey, '1');
+    } catch {
+      // Ignore storage errors (e.g. private mode)
+    }
+  }, [promptStorageKey]);
+
   const dismissPrompt = () => {
-    setPromptDismissed(true);
+    markPromptSeen();
   };
 
   const onEnablePush = async () => {
+    markPromptSeen();
     setEnabling(true);
     try {
       await push.enable();

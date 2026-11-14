@@ -471,7 +471,7 @@ export async function getCustomerOrder(userId: string, id: string): Promise<Orde
   return {
     ...toOrder(doc, { admin: false }),
     canCancel: CUSTOMER_CANCELLABLE_STATUSES.includes(doc.status),
-    canRequestReturn: !ret && withinReturnWindow(doc),
+    canRequestReturn: false,
     returnRequest: ret ? toReturn({ ...ret, user: ret.user, order: ret.order }) : null,
   };
 }
@@ -536,6 +536,15 @@ export async function updateOrderStatus(
         `Can't move an order from ${ORDER_STATUS_LABELS[order.status]} to ${ORDER_STATUS_LABELS[next]}.`,
       );
     }
+    if (
+      next === 'returned' &&
+      (order.status === 'delivered' || order.status === 'completed') &&
+      !withinReturnWindow(order)
+    ) {
+      throw new AppError(
+        `Returns can only be processed within ${Math.round(RETURN_WINDOW_HOURS / 24)} days of delivery.`,
+      );
+    }
 
     const prevStatus = order.status;
     const now = new Date();
@@ -544,7 +553,7 @@ export async function updateOrderStatus(
 
     if (next === 'confirmed' && !order.confirmedAt) order.confirmedAt = now;
     if (next === 'shipped' && !order.shippedAt) order.shippedAt = now;
-    if (next === 'delivered') {
+    if (next === 'delivered' || next === 'completed') {
       if (!order.deliveredAt) order.deliveredAt = now;
       if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
         order.paymentStatus = 'paid';

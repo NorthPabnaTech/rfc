@@ -320,20 +320,12 @@ function computeOrderProfit(o: {
   refundedAmount?: number;
   returnedItems?: Array<{ supplierPrice: number; quantity: number; lineTotal: number }>;
 }): number {
-  if (o.status === 'cancelled') return 0;
+  if (o.status !== 'delivered' && o.status !== 'completed') return 0;
   const returnedCost = (o.returnedItems ?? []).reduce(
     (s, ri) => s + ri.supplierPrice * ri.quantity,
     0,
   );
-  const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
-  const orderRefund =
-    o.refundedAmount && o.refundedAmount > 0
-      ? o.refundedAmount
-      : o.status === 'returned'
-        ? returnedTotal > 0
-          ? returnedTotal
-          : o.total
-        : 0;
+  const orderRefund = o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : 0;
   const netOrderRev = Math.max(0, o.total - orderRefund);
   const netOrderCogs = Math.max(0, (o.supplierCost ?? 0) - returnedCost);
   return netOrderRev - (o.shippingFee ?? 0) - netOrderCogs;

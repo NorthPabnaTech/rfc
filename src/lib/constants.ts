@@ -36,7 +36,6 @@ export const ORDER_FLOW: OrderStatus[] = [
   'processing',
   'shipped',
   'delivered',
-  'completed',
 ];
 
 /**
