@@ -28,8 +28,10 @@ function getTransporter(): Transporter | null {
 export async function sendMail(mail: Mail): Promise<void> {
   const smtp = getTransporter();
   if (!smtp) {
-    const log = serverEnv.IS_PROD ? console.error : console.info;
-    log(`[mail] SMTP not configured — not sent to ${mail.to}: ${mail.subject}\n${mail.text}`);
+    if (serverEnv.IS_PROD) {
+      throw new Error('SMTP is not configured (missing SMTP_USER or SMTP_PASS).');
+    }
+    console.info(`[mail] SMTP not configured — not sent to ${mail.to}: ${mail.subject}\n${mail.text}`);
     return;
   }
   try {
