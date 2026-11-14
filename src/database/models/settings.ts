@@ -19,6 +19,9 @@ export interface Settings {
   /** Order subtotal at or above which shipping is free; 0 disables. */
   freeShippingThreshold: number;
   announcement?: string;
+  whatsappEnabled: boolean;
+  whatsappProductEnabled: boolean;
+  whatsappDefaultMessage: string;
   social: {
     facebook?: string;
     instagram?: string;
@@ -38,6 +41,10 @@ export const DEFAULT_SETTINGS = {
   shippingFeeInsideDhaka: 70,
   shippingFeeOutsideDhaka: 130,
   freeShippingThreshold: 0,
+  whatsappEnabled: true,
+  whatsappProductEnabled: true,
+  whatsappDefaultMessage:
+    'Hello, I visited your website and would like to know more about your products and services.',
 } as const;
 
 const settingsSchema = new Schema<Settings>(
@@ -64,6 +71,14 @@ const settingsSchema = new Schema<Settings>(
       min: 0,
     },
     announcement: { type: String, trim: true, maxlength: 200 },
+    whatsappEnabled: { type: Boolean, default: DEFAULT_SETTINGS.whatsappEnabled },
+    whatsappProductEnabled: { type: Boolean, default: DEFAULT_SETTINGS.whatsappProductEnabled },
+    whatsappDefaultMessage: {
+      type: String,
+      default: DEFAULT_SETTINGS.whatsappDefaultMessage,
+      trim: true,
+      maxlength: 500,
+    },
     social: {
       facebook: { type: String, trim: true },
       instagram: { type: String, trim: true },

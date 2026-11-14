@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { uploadAndRecordMedia } from '@/services/media';
 import { getCurrentUser } from '@lib/auth/current-user';
-import { uploadImages } from '@lib/cloudinary';
 import { UPLOAD_FOLDERS, type UploadPurpose } from '@lib/constants';
 import { AppError } from '@lib/errors';
 
@@ -11,6 +11,7 @@ const RULES: Record<UploadPurpose, { adminOnly: boolean; maxFiles: number }> = {
   products: { adminOnly: true, maxFiles: 10 },
   categories: { adminOnly: true, maxFiles: 1 },
   banners: { adminOnly: true, maxFiles: 6 },
+  expenses: { adminOnly: true, maxFiles: 3 },
   users: { adminOnly: false, maxFiles: 1 },
   reviews: { adminOnly: false, maxFiles: 5 },
   returns: { adminOnly: false, maxFiles: 5 },
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     if (files.length > rule.maxFiles)
       throw new AppError(`Upload at most ${rule.maxFiles} image(s) at a time.`);
 
-    const images = await uploadImages(files, purpose);
+    const images = await uploadAndRecordMedia(files, purpose, user.id);
     return NextResponse.json({ images });
   } catch (error) {
     if (error instanceof AppError) {

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'nextjs-toploader/app';
 
 import { QuantityStepper } from '@/features/cart/quantity-stepper';
+import { useRegisterProductChat } from '@/features/chat/whatsapp-widget';
 import { WishlistButton } from '@/features/wishlist/wishlist-button';
 import { useCart } from '@/stores/cart-store';
 import type { ProductDetailDTO } from '@/types';
@@ -13,14 +14,34 @@ import { Button } from '@components/ui/button';
 import { STOCK_STATUS_LABELS } from '@lib/constants';
 import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
+import { buildProductWhatsAppMessage, buildWhatsAppUrl } from '@lib/whatsapp';
+
+const emptySubscribe = () => () => {};
 
 export function PurchasePanel({
   product,
   supportPhone,
+  whatsappNumber,
+  whatsappEnabled,
 }: {
   product: ProductDetailDTO;
   supportPhone: string;
+  whatsappNumber?: string;
+  whatsappEnabled?: boolean;
 }) {
+  useRegisterProductChat({ name: product.name, slug: product.slug });
+  const origin = React.useSyncExternalStore(
+    emptySubscribe,
+    () => window.location.origin,
+    () => '',
+  );
+  const productUrl = origin ? `${origin}/products/${product.slug}` : `/products/${product.slug}`;
+  const whatsappUrl = whatsappEnabled
+    ? buildWhatsAppUrl(
+        whatsappNumber ?? supportPhone,
+        buildProductWhatsAppMessage(product.name, productUrl),
+      )
+    : null;
   const router = useRouter();
   const add = useCart((s) => s.add);
   const setOpen = useCart((s) => s.setOpen);
@@ -136,6 +157,17 @@ export function PurchasePanel({
             Call to order: {supportPhone}
           </IconText>
         </a>
+        {whatsappUrl && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink inline-flex items-center gap-2 font-medium hover:underline sm:col-span-2"
+          >
+            <Icon name="whatsapp" size={16} className="shrink-0 text-[#25D366]" />
+            <span>Chat on WhatsApp about this product</span>
+          </a>
+        )}
       </div>
 
       <p className="text-muted text-xs">

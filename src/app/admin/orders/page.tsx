@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { listBusinesses } from '@/services/businesses';
 import { countOrdersByStatus, listAdminOrders } from '@/services/orders';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
@@ -22,16 +23,18 @@ export default async function AdminOrdersPage({
   const sp = await searchParams;
   const status = ORDER_STATUSES.find((s) => s === param(sp, 'status'));
   const platform = ORDER_PLATFORMS.find((p) => p === param(sp, 'platform'));
-  const [data, counts] = await Promise.all([
+  const [data, counts, businesses] = await Promise.all([
     listAdminOrders({
       q: param(sp, 'q'),
       status,
       platform,
+      business: param(sp, 'business'),
       from: param(sp, 'from'),
       to: param(sp, 'to'),
       page: pageParam(sp),
     }),
     countOrdersByStatus(),
+    listBusinesses(),
   ]);
 
   return (
@@ -51,6 +54,11 @@ export default async function AdminOrdersPage({
       <ListToolbar
         searchPlaceholder="Order #, customer name or phone…"
         filters={[
+          {
+            name: 'business',
+            label: 'Businesses',
+            options: businesses.map((b) => ({ value: b.slug, label: b.name })),
+          },
           {
             name: 'platform',
             label: 'Platforms',

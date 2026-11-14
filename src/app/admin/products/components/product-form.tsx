@@ -8,7 +8,14 @@ import { useWatch } from 'react-hook-form';
 
 import { saveProductAction } from '@/actions/admin';
 import { ImageUploader } from '@/features/uploads/image-uploader';
-import type { AdminProductDTO, CategoryDTO, ImageDTO, SupplierDTO, TagDTO } from '@/types';
+import type {
+  AdminProductDTO,
+  BusinessDTO,
+  CategoryDTO,
+  ImageDTO,
+  SupplierDTO,
+  TagDTO,
+} from '@/types';
 import { ChipInput, ChipMultiSelect } from '@components/common/chip-input';
 import {
   Form,
@@ -23,7 +30,13 @@ import { Icon } from '@components/icon/icon';
 import { Callout, FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
-import { STOCK_STATUS_LABELS, STOCK_STATUSES } from '@lib/constants';
+import {
+  DEFAULT_BUSINESS_SLUG,
+  PRODUCT_VISIBILITIES,
+  PRODUCT_VISIBILITY_LABELS,
+  STOCK_STATUS_LABELS,
+  STOCK_STATUSES,
+} from '@lib/constants';
 import { formatNumber } from '@lib/utils';
 import { type ProductInput, productSchema } from '@lib/validators/catalog';
 
@@ -38,6 +51,7 @@ type Props = {
   categories: CategoryDTO[];
   tags: TagDTO[];
   suppliers: SupplierDTO[];
+  businesses: BusinessDTO[];
 };
 
 const EMPTY: ProductInput = {
@@ -54,6 +68,10 @@ const EMPTY: ProductInput = {
   price: 0,
   salePrice: null,
   stockStatus: 'in_stock',
+  stockQuantity: 0,
+  trackInventory: false,
+  business: DEFAULT_BUSINESS_SLUG,
+  visibility: 'public',
   sku: '',
   images: [],
   variations: [],
@@ -82,7 +100,7 @@ function toFormValues(p: AdminProductDTO): ProductInput {
   };
 }
 
-export function ProductForm({ product, categories, tags, suppliers }: Props) {
+export function ProductForm({ product, categories, tags, suppliers, businesses }: Props) {
   const router = useRouter();
   const form = Form.useForm<ProductInput>({
     schema: productSchema,
@@ -90,10 +108,27 @@ export function ProductForm({ product, categories, tags, suppliers }: Props) {
   });
   const { isSubmitting } = form.formState;
 
-  const [categoryId, supplierUrl, supplierPrice, price, salePrice] = useWatch({
-    control: form.control,
-    name: ['category', 'supplierProductUrl', 'supplierPrice', 'price', 'salePrice'],
-  });
+  const [categoryId, supplierUrl, supplierPrice, price, salePrice, selectedBusiness, trackInventory] =
+    useWatch({
+      control: form.control,
+      name: [
+        'category',
+        'supplierProductUrl',
+        'supplierPrice',
+        'price',
+        'salePrice',
+        'business',
+        'trackInventory',
+      ],
+    });
+  const selectedBizObj = businesses.find((b) => b.slug === selectedBusiness);
+  const isInternalBusiness = selectedBizObj ? !selectedBizObj.isPublicStorefront : false;
+
+  React.useEffect(() => {
+    if (isInternalBusiness && form.getValues('visibility') !== 'private') {
+      form.setValue('visibility', 'private');
+    }
+  }, [isInternalBusiness, form]);
   const parents = categories.filter((c) => !c.parentId);
   const children = categories.filter((c) => c.parentId && c.parentId === categoryId);
 
@@ -328,12 +363,34 @@ export function ProductForm({ product, categories, tags, suppliers }: Props) {
 
         <div className="space-y-6">
           <Panel>
-            <FormSection title="Visibility" icon="eye">
+            <FormSection title="Store & Visibility" icon="eye">
+              <FormSelect
+                name="business"
+                label="Business / Store"
+                items={businesses.map((b) => ({
+                  value: b.slug,
+                  label: b.isPublicStorefront ? `${b.name} (Public)` : `${b.name} (Internal)`,
+                }))}
+              />
+              <FormSelect
+                name="visibility"
+                label="Visibility"
+                disabled={isInternalBusiness}
+                items={PRODUCT_VISIBILITIES.map((v) => ({
+                  value: v,
+                  label: PRODUCT_VISIBILITY_LABELS[v],
+                }))}
+                hint={
+                  isInternalBusiness
+                    ? 'Internal store products are always private.'
+                    : 'Private products never appear on the public RFC Gadget website.'
+                }
+              />
               <FormSelect
                 name="status"
                 label="Status"
                 items={[
-                  { value: 'published', label: 'Published — visible in store' },
+                  { value: 'published', label: 'Published' },
                   { value: 'draft', label: 'Draft — hidden' },
                 ]}
               />
@@ -342,11 +399,23 @@ export function ProductForm({ product, categories, tags, suppliers }: Props) {
                 label="Stock status"
                 items={STOCK_STATUSES.map((s) => ({ value: s, label: STOCK_STATUS_LABELS[s] }))}
               />
+              <FormSwitch
+                name="trackInventory"
+                label="Track numeric stock quantity"
+                hint="Automatically deduct & restore stock on orders."
+              />
+              {trackInventory && (
+                <FormInput
+                  name="stockQuantity"
+                  type="number"
+                  min={0}
+                  label="Stock quantity"
+                />
+              )}
               <FormSwitch name="isFeatured" label="Feature on homepage" />
               <FormSwitch
                 name="isComboOffer"
                 label="Show in Combo offers"
-                // hint="For a deal sold as one product, e.g. 5 pcs T-shirt combo."
               />
             </FormSection>
           </Panel>

@@ -5,13 +5,17 @@ import { Types } from 'mongoose';
 import type {
   Address,
   Banner,
+  Business,
   Category,
+  Expense,
+  ExpenseCategory,
   ImageAsset,
   Order,
   Product,
   Question,
   ReturnRequest,
   Review,
+  StockMovement,
   Supplier,
   Tag,
 } from '@/database';
@@ -20,16 +24,21 @@ import type {
   AdminProductDTO,
   AdminProductRowDTO,
   BannerDTO,
+  BusinessDTO,
   CategoryDTO,
+  ExpenseCategoryDTO,
+  ExpenseDTO,
   ImageDTO,
   OrderDTO,
   ProductCardDTO,
   QuestionDTO,
   ReturnDTO,
   ReviewDTO,
+  StockMovementDTO,
   SupplierDTO,
   TagDTO,
 } from '@/types';
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 
 type Id = Types.ObjectId | string;
 const id = (v: Id | null | undefined): string => (v ? String(v) : '');
@@ -128,6 +137,10 @@ export function toAdminProductRow(p: ProductWithRefs): AdminProductRowDTO {
     salePrice: p.salePrice ?? null,
     effectivePrice: p.effectivePrice,
     stockStatus: p.stockStatus,
+    stockQuantity: p.stockQuantity ?? 0,
+    trackInventory: p.trackInventory ?? false,
+    business: p.business || DEFAULT_BUSINESS_SLUG,
+    visibility: p.visibility || 'public',
     status: p.status,
     isFeatured: p.isFeatured,
     soldCount: p.soldCount,
@@ -151,6 +164,10 @@ export function toAdminProduct(p: Product): AdminProductDTO {
     price: p.price,
     salePrice: p.salePrice ?? null,
     stockStatus: p.stockStatus,
+    stockQuantity: p.stockQuantity ?? 0,
+    trackInventory: p.trackInventory ?? false,
+    business: p.business || DEFAULT_BUSINESS_SLUG,
+    visibility: p.visibility || 'public',
     sku: p.sku,
     images: p.images.map(toImage).filter((i): i is ImageDTO => !!i),
     variations: p.variations.map((v) => ({ name: v.name, values: [...v.values] })),
@@ -210,6 +227,8 @@ export function toOrder(o: Order, { admin }: { admin: boolean }): OrderDTO {
   return {
     id: id(o._id),
     orderNumber: o.orderNumber,
+    invoiceNumber: o.invoiceNumber || `INV-${o.orderNumber}`,
+    business: o.business || DEFAULT_BUSINESS_SLUG,
     userId: o.user ? id(o.user) : null,
     customer: { name: o.customer.name, phone: o.customer.phone, email: o.customer.email },
     shippingAddress: {
@@ -250,15 +269,37 @@ export function toOrder(o: Order, { admin }: { admin: boolean }): OrderDTO {
     shippingFee: o.shippingFee,
     discount: o.discount,
     total: o.total,
-    ...(admin ? { supplierCost: o.supplierCost, adminNote: o.adminNote } : {}),
+    ...(admin
+      ? {
+          supplierCost: o.supplierCost,
+          adminNote: o.adminNote,
+          refundedAmount: o.refundedAmount ?? 0,
+          returnedItems: (o.returnedItems ?? []).map((ri) => ({
+            orderItemId: id(ri.orderItemId),
+            productId: id(ri.product),
+            name: ri.name,
+            quantity: ri.quantity,
+            unitPrice: ri.unitPrice,
+            supplierPrice: ri.supplierPrice,
+            lineTotal: ri.lineTotal,
+            restocked: ri.restocked,
+          })),
+        }
+      : {}),
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
     platform: o.platform,
     status: o.status,
-    statusHistory: o.statusHistory.map((e) => ({ status: e.status, note: e.note, at: iso(e.at) })),
+    statusHistory: o.statusHistory.map((e) => ({
+      status: e.status,
+      note: e.note,
+      at: iso(e.at),
+      ...(admin ? { byName: populated(e.by as MaybePopulated<{ name: string }>)?.name } : {}),
+    })),
     customerNote: o.customerNote,
     cancelReason: o.cancelReason,
     deliveredAt: o.deliveredAt ? iso(o.deliveredAt) : undefined,
+    returnedAt: o.returnedAt ? iso(o.returnedAt) : undefined,
     createdAt: iso(o.createdAt),
     updatedAt: iso(o.updatedAt),
   };
@@ -328,6 +369,79 @@ export function toReturn(
     orderTotal: order?.total,
     createdAt: iso(r.createdAt),
     resolvedAt: r.resolvedAt ? iso(r.resolvedAt) : undefined,
+  };
+}
+
+export function toBusiness(
+  b: Business & { productCount?: number; orderCount?: number },
+): BusinessDTO {
+  return {
+    id: id(b._id),
+    name: b.name,
+    slug: b.slug,
+    description: b.description,
+    invoicePrefix: b.invoicePrefix,
+    phone: b.phone,
+    address: b.address,
+    isPublicStorefront: b.isPublicStorefront,
+    isActive: b.isActive,
+    productCount: b.productCount,
+    orderCount: b.orderCount,
+    createdAt: iso(b.createdAt),
+  };
+}
+
+export function toStockMovement(
+  m: StockMovement & { performedBy?: MaybePopulated<{ name: string }> },
+): StockMovementDTO {
+  return {
+    id: id(m._id),
+    productId: id(m.product),
+    productName: m.productName,
+    business: m.business || DEFAULT_BUSINESS_SLUG,
+    type: m.type,
+    quantity: m.quantity,
+    previousQuantity: m.previousQuantity,
+    newQuantity: m.newQuantity,
+    reason: m.reason,
+    notes: m.notes,
+    orderId: m.orderId ? id(m.orderId) : null,
+    orderNumber: m.orderNumber,
+    date: iso(m.date),
+    performedByName: populated(m.performedBy)?.name,
+  };
+}
+
+export function toExpenseCategory(
+  c: ExpenseCategory & { expenseCount?: number },
+): ExpenseCategoryDTO {
+  return {
+    id: id(c._id),
+    name: c.name,
+    slug: c.slug,
+    isSystem: c.isSystem,
+    isCostOfGoods: c.isCostOfGoods,
+    expenseCount: c.expenseCount,
+  };
+}
+
+export function toExpense(
+  e: Expense & { createdBy?: MaybePopulated<{ name: string }> },
+): ExpenseDTO {
+  return {
+    id: id(e._id),
+    title: e.title,
+    categoryId: id(e.category),
+    categoryName: e.categoryName,
+    isCostOfGoods: e.isCostOfGoods,
+    amount: e.amount,
+    expenseDate: iso(e.expenseDate),
+    paymentMethod: e.paymentMethod,
+    description: e.description,
+    attachment: e.attachment ? toImage(e.attachment) : null,
+    business: e.business || DEFAULT_BUSINESS_SLUG,
+    createdByName: populated(e.createdBy)?.name,
+    createdAt: iso(e.createdAt),
   };
 }
 

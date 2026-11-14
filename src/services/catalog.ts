@@ -9,12 +9,17 @@ import { AppError } from '@lib/errors';
 import type { CategoryOutput, SupplierOutput, TagOutput } from '@lib/validators/catalog';
 
 import { toCategory, toSupplier, toTag } from './mappers';
+import { PUBLIC_PRODUCT_FILTER } from './products';
 import { uniqueSlug } from './slug';
 
 /* ─── Categories ─────────────────────────────────────────────────────────── */
 
-async function productCounts(field: 'category' | 'subCategory' | 'tags' | 'supplier') {
+async function productCounts(
+  field: 'category' | 'subCategory' | 'tags' | 'supplier',
+  publicOnly = false,
+) {
   const rows = await ProductModel.aggregate<{ _id: unknown; count: number }>([
+    ...(publicOnly ? [{ $match: PUBLIC_PRODUCT_FILTER }] : []),
     ...(field === 'tags' ? [{ $unwind: '$tags' }] : []),
     { $group: { _id: `$${field}`, count: { $sum: 1 } } },
   ]);
@@ -27,8 +32,8 @@ export async function listCategories(opts: { activeOnly?: boolean } = {}): Promi
     CategoryModel.find(opts.activeOnly ? { isActive: true } : {})
       .sort({ sortOrder: 1, name: 1 })
       .lean(),
-    productCounts('category'),
-    productCounts('subCategory'),
+    productCounts('category', opts.activeOnly),
+    productCounts('subCategory', opts.activeOnly),
   ]);
   return docs.map((c) =>
     toCategory({

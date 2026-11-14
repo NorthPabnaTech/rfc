@@ -7,22 +7,38 @@ import { useRouter } from 'nextjs-toploader/app';
 import { deleteProductAction } from '@/actions/admin';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
-import type { AdminProductRowDTO, Paginated } from '@/types';
+import type { AdminProductRowDTO, BusinessDTO, Paginated } from '@/types';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, StatusBadge } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { type Column, DataTable } from '@components/ui/data-table';
 import { Dropdown } from '@components/ui/dropdown';
 import { handleActionResult } from '@lib/action-client';
-import { STOCK_STATUS_LABELS } from '@lib/constants';
+import { DEFAULT_BUSINESS_SLUG, STOCK_STATUS_LABELS } from '@lib/constants';
 import { formatStoreDate } from '@lib/utils';
 
 import { useUrlPagination } from '../../components/list-toolbar';
+import { StockAdjustDialog } from '../../components/stock-adjust-dialog';
 
-export function ProductsTable({ data }: { data: Paginated<AdminProductRowDTO> }) {
+export function ProductsTable({
+  data,
+  businesses,
+}: {
+  data: Paginated<AdminProductRowDTO>;
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const { onPaginate } = useUrlPagination();
   const [deleting, setDeleting] = React.useState<AdminProductRowDTO | null>(null);
+  const [stockModal, setStockModal] = React.useState<{
+    product: AdminProductRowDTO;
+    type: 'stock_in' | 'stock_out';
+  } | null>(null);
+
+  const bizMap = React.useMemo(
+    () => new Map(businesses.map((b) => [b.slug, b.name])),
+    [businesses],
+  );
 
   const columns: Column<AdminProductRowDTO>[] = [
     {
@@ -45,6 +61,8 @@ export function ProductsTable({ data }: { data: Paginated<AdminProductRowDTO> })
             <p className="text-subtle text-[11.5px]">
               {p.sku ? `SKU ${p.sku} · ` : ''}
               {p.categoryName ?? 'Uncategorized'}
+              {' · '}
+              {bizMap.get(p.business) ?? p.business}
             </p>
           </div>
         </div>
@@ -78,23 +96,29 @@ export function ProductsTable({ data }: { data: Paginated<AdminProductRowDTO> })
       key: 'stock',
       header: 'Stock',
       cell: (p) => (
-        <StatusBadge
-          status={
-            p.stockStatus === 'in_stock' ? 'ok' : p.stockStatus === 'pre_order' ? 'info' : 'danger'
-          }
-          label={STOCK_STATUS_LABELS[p.stockStatus]}
-        />
+        <div className="space-y-1">
+          <StatusBadge
+            status={
+              p.stockStatus === 'in_stock' ? 'ok' : p.stockStatus === 'pre_order' ? 'info' : 'danger'
+            }
+            label={STOCK_STATUS_LABELS[p.stockStatus]}
+          />
+          {p.trackInventory && (
+            <p className="text-subtle text-[11px] tabular-nums">{p.stockQuantity} units</p>
+          )}
+        </div>
       ),
     },
     {
       key: 'status',
       header: 'Status',
       cell: (p) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <StatusBadge
             status={p.status === 'published' ? 'ok' : 'neutral'}
             label={p.status === 'published' ? 'Published' : 'Draft'}
           />
+          {p.visibility === 'private' && <StatusBadge status="warn" label="Private" />}
           {p.isFeatured && (
             <Icon name="star" size={14} className="text-brand-500" aria-label="Featured" />
           )}
@@ -119,7 +143,19 @@ export function ProductsTable({ data }: { data: Paginated<AdminProductRowDTO> })
               icon: 'pencil',
               onClick: () => router.push(`/admin/products/${p.id}/edit`),
             },
-            ...(p.status === 'published'
+            {
+              label: 'Stock In (+)',
+              icon: 'plus',
+              onClick: () => setStockModal({ product: p, type: 'stock_in' }),
+            },
+            {
+              label: 'Stock Out (-)',
+              icon: 'minus',
+              onClick: () => setStockModal({ product: p, type: 'stock_out' }),
+            },
+            ...(p.status === 'published' &&
+            p.visibility !== 'private' &&
+            p.business === DEFAULT_BUSINESS_SLUG
               ? [
                   {
                     label: 'View in store',
@@ -175,6 +211,17 @@ export function ProductsTable({ data }: { data: Paginated<AdminProductRowDTO> })
           if (handleActionResult(res)) router.refresh();
         }}
       />
+      {stockModal && (
+        <StockAdjustDialog
+          product={{
+            id: stockModal.product.id,
+            name: stockModal.product.name,
+            stockQuantity: stockModal.product.stockQuantity,
+          }}
+          initialType={stockModal.type}
+          onClose={() => setStockModal(null)}
+        />
+      )}
     </>
   );
 }

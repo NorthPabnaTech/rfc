@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { listBusinesses } from '@/services/businesses';
 import { listCategories, listSuppliers, listTags } from '@/services/catalog';
 import { Callout, PageHeader } from '@components/shared';
 
@@ -8,10 +9,11 @@ import { ProductForm } from '../components/product-form';
 export const metadata: Metadata = { title: 'Add product' };
 
 export default async function NewProductPage() {
-  const [categories, tags, suppliers] = await Promise.all([
+  const [categories, tags, suppliers, businesses] = await Promise.all([
     listCategories(),
     listTags(),
     listSuppliers(),
+    listBusinesses({ activeOnly: true }),
   ]);
   const missing = categories.length === 0 || suppliers.length === 0;
 
@@ -31,7 +33,12 @@ export default async function NewProductPage() {
           description="You need at least one category and one supplier before adding products."
         />
       )}
-      <ProductForm categories={categories} tags={tags} suppliers={suppliers} />
+      <ProductForm
+        categories={categories}
+        tags={tags}
+        suppliers={suppliers}
+        businesses={businesses}
+      />
     </>
   );
 }

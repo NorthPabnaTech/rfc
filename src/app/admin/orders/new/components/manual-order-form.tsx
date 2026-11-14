@@ -9,7 +9,7 @@ import { DeliveryZoneNote, LocationFields } from '@/features/address/location-fi
 import { QuantityStepper } from '@/features/cart/quantity-stepper';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
-import type { AddressDTO } from '@/types';
+import type { AddressDTO, BusinessDTO } from '@/types';
 import {
   Form,
   FormCurrency,
@@ -23,7 +23,12 @@ import { FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { useDebouncedValue } from '@hooks/use-debounced-value';
 import { handleActionResult } from '@lib/action-client';
-import { ORDER_PLATFORM_LABELS, ORDER_PLATFORMS, type ShippingZone } from '@lib/constants';
+import {
+  DEFAULT_BUSINESS_SLUG,
+  ORDER_PLATFORM_LABELS,
+  ORDER_PLATFORMS,
+  type ShippingZone,
+} from '@lib/constants';
 import { cn } from '@lib/utils';
 import { type ManualOrderInput, manualOrderSchema } from '@lib/validators/order';
 
@@ -37,12 +42,19 @@ type FoundCustomer = {
   defaultAddress: AddressDTO | null;
 };
 
-export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }) {
+export function ManualOrderForm({
+  fees,
+  businesses,
+}: {
+  fees: Record<ShippingZone, number>;
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const [lines, setLines] = React.useState<PickedLine[]>([]);
   const form = Form.useForm<ManualOrderInput>({
     schema: manualOrderSchema,
     defaultValues: {
+      business: DEFAULT_BUSINESS_SLUG,
       platform: 'facebook',
       userId: '',
       customerName: '',
@@ -63,9 +75,9 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
     },
   });
   const { isSubmitting } = form.formState;
-  const [zone, shippingOverride, discount, userId] = useWatch({
+  const [zone, shippingOverride, discount, userId, selectedBusiness] = useWatch({
     control: form.control,
-    name: ['zone', 'shippingFee', 'discount', 'userId'],
+    name: ['zone', 'shippingFee', 'discount', 'userId', 'business'],
   });
 
   // Keep the form's `items` in sync with the picked lines (validated by the schema).
@@ -91,15 +103,41 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
       onFinish={async (values) => {
         const res = await createManualOrderAction(values);
         if (handleActionResult(res, form)) {
-          router.push(`/admin/orders/${res.data.id}`);
+          router.push(`/admin/orders/${res.data.id}?created=1`);
           router.refresh();
         }
       }}
     >
       <div className="space-y-6">
         <Panel>
-          <FormSection title="Order source" icon="megaphone">
-            <FormItem name="platform">
+          <FormSection title="Business & Order source" icon="megaphone">
+            <FormItem name="business" label="Business / Store">
+              {(field) => (
+                <div className="flex flex-wrap gap-2">
+                  {businesses.map((b) => (
+                    <button
+                      key={b.slug}
+                      type="button"
+                      onClick={() => {
+                        if (field.value !== b.slug) {
+                          field.onChange(b.slug);
+                          setLines([]);
+                        }
+                      }}
+                      className={cn(
+                        'rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition',
+                        field.value === b.slug
+                          ? 'bg-brand-500 border-brand-500 text-white'
+                          : 'border-line-2/70 text-ink hover:border-ink bg-white',
+                      )}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </FormItem>
+            <FormItem name="platform" label="Channel">
               {(field) => (
                 <div className="flex flex-wrap gap-2">
                   {ORDER_PLATFORMS.map((p) => (
@@ -127,7 +165,12 @@ export function ManualOrderForm({ fees }: { fees: Record<ShippingZone, number> }
           <FormSection
             title="Products"
             icon="box"
-            action={<ProductPicker onPick={(l) => setLines((prev) => [...prev, l])} />}
+            action={
+              <ProductPicker
+                business={selectedBusiness}
+                onPick={(l) => setLines((prev) => [...prev, l])}
+              />
+            }
           >
             {lines.length === 0 ? (
               <p className="text-muted text-sm">No products added yet.</p>

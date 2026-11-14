@@ -1,3 +1,4 @@
+import { ProductChatProvider, WhatsAppWidget } from '@/features/chat/whatsapp-widget';
 import { getCategoryTree } from '@/services/catalog';
 import { getNotificationFeed } from '@/services/notifications';
 import { getSettings } from '@/services/settings';
@@ -17,7 +18,8 @@ export default async function PublicLayout({ children }: { children: React.React
   const notifications = user ? await getNotificationFeed(user.id) : null;
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <ProductChatProvider>
+      <div className="flex min-h-dvh flex-col">
       <a
         href="#main"
         className="focus:bg-brand focus:text-brand-contrast sr-only z-50 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:rounded-lg focus:px-4 focus:py-2"
@@ -45,6 +47,8 @@ export default async function PublicLayout({ children }: { children: React.React
       </main>
       <SiteFooter settings={settings} categories={categories} />
       <CartDrawer />
+      <WhatsAppWidget settings={settings} />
     </div>
+    </ProductChatProvider>
   );
 }

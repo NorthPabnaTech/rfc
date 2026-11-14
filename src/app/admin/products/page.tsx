@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { listBusinesses } from '@/services/businesses';
 import { listCategories, listSuppliers } from '@/services/catalog';
 import { listAdminProducts } from '@/services/products';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { PRODUCT_STATUSES, STOCK_STATUS_LABELS, STOCK_STATUSES } from '@lib/constants';
+import {
+  PRODUCT_STATUSES,
+  PRODUCT_VISIBILITIES,
+  STOCK_STATUS_LABELS,
+  STOCK_STATUSES,
+} from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
@@ -22,17 +28,21 @@ export default async function AdminProductsPage({
   const sp = await searchParams;
   const status = param(sp, 'status');
   const stock = param(sp, 'stock');
-  const [data, categories, suppliers] = await Promise.all([
+  const visibility = param(sp, 'visibility');
+  const [data, categories, suppliers, businesses] = await Promise.all([
     listAdminProducts({
       q: param(sp, 'q'),
       category: param(sp, 'category'),
       supplier: param(sp, 'supplier'),
+      business: param(sp, 'business'),
+      visibility: PRODUCT_VISIBILITIES.find((v) => v === visibility),
       status: PRODUCT_STATUSES.find((s) => s === status),
       stockStatus: STOCK_STATUSES.find((s) => s === stock),
       page: pageParam(sp),
     }),
     listCategories(),
     listSuppliers(),
+    listBusinesses(),
   ]);
 
   return (
@@ -74,6 +84,20 @@ export default async function AdminProductsPage({
             ],
           },
           {
+            name: 'business',
+            label: 'Businesses',
+            options: businesses.map((b) => ({ value: b.slug, label: b.name })),
+          },
+          {
+            name: 'visibility',
+            label: 'Visibility',
+            width: 'w-40',
+            options: PRODUCT_VISIBILITIES.map((v) => ({
+              value: v,
+              label: v === 'public' ? 'Public' : 'Private',
+            })),
+          },
+          {
             name: 'stock',
             label: 'Stock',
             width: 'w-36',
@@ -81,7 +105,7 @@ export default async function AdminProductsPage({
           },
         ]}
       />
-      <ProductsTable data={data} />
+      <ProductsTable data={data} businesses={businesses} />
     </>
   );
 }

@@ -67,3 +67,35 @@ export async function connectDB(): Promise<typeof mongoose> {
   cache.conn = await cache.promise;
   return cache.conn;
 }
+
+/**
+ * Runs `fn` inside a MongoDB transaction when supported (replica set / Atlas).
+ * Falls back cleanly to running without a session on standalone MongoDB servers.
+ */
+export async function withTransaction<T>(
+  fn: (session: mongoose.ClientSession | undefined) => Promise<T>,
+): Promise<T> {
+  const conn = await connectDB();
+  const session = await conn.startSession();
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await fn(session);
+    });
+    return result;
+  } catch (err) {
+    const msg = (err as { message?: string })?.message ?? '';
+    const code = (err as { code?: number })?.code;
+    // Code 20 (IllegalOperation) or standalone replica-set error → fallback
+    if (
+      code === 20 ||
+      msg.includes('Transaction numbers are only allowed on a replica set') ||
+      msg.includes('sessions are not supported')
+    ) {
+      return fn(undefined);
+    }
+    throw err;
+  } finally {
+    await session.endSession();
+  }
+}

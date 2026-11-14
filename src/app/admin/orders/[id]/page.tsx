@@ -10,31 +10,57 @@ import {
   ReturnStatusBadge,
   ShippingAddressBlock,
 } from '@/features/orders/order-ui';
+import { Taka } from '@/features/products/price';
+import { getBusinessBySlug } from '@/services/businesses';
 import { getAdminOrder } from '@/services/orders';
-import { PageHeader } from '@components/shared';
+import { Callout, PageHeader } from '@components/shared';
 import { ORDER_PLATFORM_LABELS, PAYMENT_METHOD_LABELS } from '@lib/constants';
+import { param, type SearchParams } from '@lib/search-params';
 import { formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
 
 import { OrderActions } from './components/order-actions';
+import { OrderToolbar } from './components/order-toolbar';
 
 export const metadata: Metadata = { title: 'Order' };
 
-export default async function AdminOrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function AdminOrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   if (!objectId.safeParse(id).success) notFound();
   const order = await getAdminOrder(id);
   if (!order) notFound();
+  const business = await getBusinessBySlug(order.business);
+  const justCreated = param(sp, 'created') === '1';
 
   return (
     <>
       <PageHeader
         title={order.orderNumber}
-        subtitle={`${ORDER_PLATFORM_LABELS[order.platform]} order · ${formatStoreDateTime(order.createdAt)}`}
+        subtitle={`${business?.name ?? order.business} · ${order.invoiceNumber} · ${ORDER_PLATFORM_LABELS[order.platform]} order · ${formatStoreDateTime(order.createdAt)}`}
         backHref="/admin/orders"
         backLabel="Orders"
-        actions={<OrderStatusBadge status={order.status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <OrderToolbar order={order} business={business} />
+            <OrderStatusBadge status={order.status} />
+          </div>
+        }
       />
+
+      {justCreated && (
+        <Callout
+          tone="success"
+          className="mb-5"
+          title="Order submitted successfully"
+          description={`Invoice ${order.invoiceNumber} is ready. You can download the PDF invoice or copy the customer tracking link above.`}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
@@ -47,6 +73,30 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
               <OrderTotals order={order} admin />
             </div>
           </Card>
+          {order.returnedItems && order.returnedItems.length > 0 && (
+            <Card title="Returned items">
+              <ul className="divide-line divide-y text-sm">
+                {order.returnedItems.map((ri, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 py-2">
+                    <div>
+                      <p className="text-ink font-medium">
+                        {ri.name} × {ri.quantity}
+                      </p>
+                      <p className="text-subtle text-xs">
+                        {ri.restocked ? 'Restocked to inventory' : 'Not restocked'}
+                      </p>
+                    </div>
+                    <Taka amount={ri.lineTotal} className="font-semibold" />
+                  </li>
+                ))}
+              </ul>
+              {order.refundedAmount != null && order.refundedAmount > 0 && (
+                <p className="text-muted mt-2 text-right text-xs">
+                  Total refunded: <Taka amount={order.refundedAmount} className="text-ink font-semibold" />
+                </p>
+              )}
+            </Card>
+          )}
           <Card title="History">
             <ol className="space-y-3">
               {[...order.statusHistory].reverse().map((e, i) => (
@@ -57,7 +107,10 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
                       <OrderStatusBadge status={e.status} />
                       {e.note && <span className="text-muted ml-2">{e.note}</span>}
                     </p>
-                    <p className="text-subtle mt-0.5 text-xs">{formatStoreDateTime(e.at)}</p>
+                    <p className="text-subtle mt-0.5 text-xs">
+                      {formatStoreDateTime(e.at)}
+                      {e.byName ? ` · by ${e.byName}` : ''}
+                    </p>
                   </div>
                 </li>
               ))}

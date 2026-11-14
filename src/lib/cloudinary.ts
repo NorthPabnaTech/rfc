@@ -1,5 +1,7 @@
 import 'server-only';
 
+import crypto from 'node:crypto';
+
 import { type UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 
 import type { ImageAsset } from '@/database';
@@ -32,6 +34,7 @@ const MAX_EDGE: Record<UploadPurpose, number> = {
   returns: 1600,
   categories: 1200,
   banners: 2400,
+  expenses: 1800,
 };
 
 export function assertValidImage(file: File): void {
@@ -43,9 +46,22 @@ export function assertValidImage(file: File): void {
   }
 }
 
-export async function uploadImage(file: File, purpose: UploadPurpose): Promise<ImageAsset> {
+export type UploadedMediaMeta = {
+  asset: ImageAsset;
+  filename: string;
+  mimeType: string;
+  format?: string;
+  bytes: number;
+  sha256: string;
+};
+
+export async function uploadImageWithMeta(
+  file: File,
+  purpose: UploadPurpose,
+): Promise<UploadedMediaMeta> {
   assertValidImage(file);
   const buffer = Buffer.from(await file.arrayBuffer());
+  const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
   const edge = MAX_EDGE[purpose];
 
   const result = await new Promise<UploadApiResponse>((resolve, reject) => {
@@ -61,12 +77,24 @@ export async function uploadImage(file: File, purpose: UploadPurpose): Promise<I
   });
 
   return {
-    type: 'cloudinary',
-    url: result.secure_url,
-    publicId: result.public_id,
-    width: result.width,
-    height: result.height,
+    asset: {
+      type: 'cloudinary',
+      url: result.secure_url,
+      publicId: result.public_id,
+      width: result.width,
+      height: result.height,
+    },
+    filename: file.name || `${purpose}-${Date.now()}`,
+    mimeType: file.type,
+    format: result.format,
+    bytes: result.bytes ?? buffer.length,
+    sha256,
   };
+}
+
+export async function uploadImage(file: File, purpose: UploadPurpose): Promise<ImageAsset> {
+  const { asset } = await uploadImageWithMeta(file, purpose);
+  return asset;
 }
 
 export async function uploadImages(files: File[], purpose: UploadPurpose): Promise<ImageAsset[]> {
@@ -85,6 +113,37 @@ export async function deleteImages(images: (ImageAsset | undefined | null)[]): P
   } catch (error) {
     console.error('[cloudinary] delete failed', error);
   }
+}
+
+/** Strict delete for Media Library: throws if Cloudinary refuses or fails. */
+export async function destroyCloudinaryResource(publicId: string): Promise<void> {
+  const res = (await cloudinary.uploader.destroy(publicId, {
+    resource_type: 'image',
+    invalidate: true,
+  })) as { result?: string };
+  if (res?.result !== 'ok' && res?.result !== 'not found') {
+    throw new AppError('Failed to delete media from Cloudinary storage.');
+  }
+}
+
+export async function listCloudinaryResourcesByPrefix(prefix: string) {
+  const res = (await cloudinary.api.resources({
+    type: 'upload',
+    prefix,
+    max_results: 100,
+    resource_type: 'image',
+  })) as {
+    resources?: {
+      public_id: string;
+      secure_url: string;
+      format?: string;
+      bytes?: number;
+      width?: number;
+      height?: number;
+      created_at?: string;
+    }[];
+  };
+  return res.resources ?? [];
 }
 
 /**

@@ -172,7 +172,12 @@ export default async function ProductPage({ params }: Props) {
             )}
 
             <div className="mt-7">
-              <PurchasePanel product={product} supportPhone={settings.supportPhone} />
+              <PurchasePanel
+                product={product}
+                supportPhone={settings.supportPhone}
+                whatsappNumber={settings.social.whatsapp || settings.supportPhone}
+                whatsappEnabled={settings.whatsappEnabled && settings.whatsappProductEnabled}
+              />
             </div>
 
             {product.tags.length > 0 && (

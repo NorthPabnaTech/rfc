@@ -18,6 +18,11 @@ function toSettings(s: Partial<Settings>): SettingsDTO {
     shippingFeeOutsideDhaka: s.shippingFeeOutsideDhaka ?? DEFAULT_SETTINGS.shippingFeeOutsideDhaka,
     freeShippingThreshold: s.freeShippingThreshold ?? DEFAULT_SETTINGS.freeShippingThreshold,
     announcement: s.announcement,
+    whatsappEnabled: s.whatsappEnabled ?? DEFAULT_SETTINGS.whatsappEnabled,
+    whatsappProductEnabled:
+      s.whatsappProductEnabled ?? DEFAULT_SETTINGS.whatsappProductEnabled,
+    whatsappDefaultMessage:
+      s.whatsappDefaultMessage ?? DEFAULT_SETTINGS.whatsappDefaultMessage,
     social: { ...(s.social ?? {}) },
   };
 }

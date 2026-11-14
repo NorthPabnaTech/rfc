@@ -55,6 +55,22 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   returned: [],
 };
 
+/**
+ * Flexible admin transitions: authorized admins can move an order to any
+ * appropriate status, including cancelling or returning previously confirmed,
+ * processing, shipped, or delivered orders.
+ */
+export const ADMIN_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ['confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'],
+  confirmed: ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'],
+  processing: ['confirmed', 'shipped', 'delivered', 'completed', 'cancelled', 'returned'],
+  shipped: ['processing', 'delivered', 'completed', 'cancelled', 'returned'],
+  delivered: ['shipped', 'completed', 'cancelled', 'returned'],
+  completed: ['delivered', 'cancelled', 'returned'],
+  cancelled: [],
+  returned: ['completed'],
+};
+
 /** Customers may cancel only before the order is confirmed. */
 export const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = ['pending'];
 
@@ -161,6 +177,59 @@ export type ProductType = (typeof PRODUCT_TYPES)[number];
 export const PRODUCT_STATUSES = ['draft', 'published'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
+export const PRODUCT_VISIBILITIES = ['public', 'private'] as const;
+export type ProductVisibility = (typeof PRODUCT_VISIBILITIES)[number];
+export const PRODUCT_VISIBILITY_LABELS: Record<ProductVisibility, string> = {
+  public: 'Public (Visible on website)',
+  private: 'Private (Admin only)',
+};
+
+export const DEFAULT_BUSINESS_SLUG = 'rfc_gadget';
+
+export const STOCK_MOVEMENT_TYPES = [
+  'stock_in',
+  'stock_out',
+  'order_out',
+  'order_cancel',
+  'order_return',
+] as const;
+export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
+export const STOCK_MOVEMENT_LABELS: Record<StockMovementType, string> = {
+  stock_in: 'Stock In',
+  stock_out: 'Stock Out',
+  order_out: 'Order Placed',
+  order_cancel: 'Order Cancelled',
+  order_return: 'Order Returned',
+};
+
+export const STOCK_ADJUSTMENT_REASONS = [
+  'New inventory purchase',
+  'Supplier restock',
+  'Damaged / defective',
+  'Lost / missing',
+  'Internal use / sample',
+  'Inventory audit correction',
+  'Other',
+] as const;
+
+export const EXPENSE_PAYMENT_METHODS = [
+  'cash',
+  'bkash',
+  'nagad',
+  'bank',
+  'card',
+  'other',
+] as const;
+export type ExpensePaymentMethod = (typeof EXPENSE_PAYMENT_METHODS)[number];
+export const EXPENSE_PAYMENT_METHOD_LABELS: Record<ExpensePaymentMethod, string> = {
+  cash: 'Cash',
+  bkash: 'bKash',
+  nagad: 'Nagad',
+  bank: 'Bank Transfer',
+  card: 'Card',
+  other: 'Other',
+};
+
 export const SUPPLIER_STATUSES = ['active', 'inactive'] as const;
 export type SupplierStatus = (typeof SUPPLIER_STATUSES)[number];
 
@@ -231,6 +300,7 @@ export const UPLOAD_FOLDERS = {
   returns: 'RFC-Gadget/returns',
   categories: 'RFC-Gadget/categories',
   banners: 'RFC-Gadget/banners',
+  expenses: 'RFC-Gadget/expenses',
 } as const;
 export type UploadPurpose = keyof typeof UPLOAD_FOLDERS;
 

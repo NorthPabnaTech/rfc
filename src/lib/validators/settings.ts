@@ -19,6 +19,15 @@ export const settingsSchema = z.object({
   shippingFeeOutsideDhaka: money('Outside Dhaka fee'),
   freeShippingThreshold: money('Free shipping threshold'),
   announcement: optionalText(200),
+  whatsappEnabled: z.boolean().default(true),
+  whatsappProductEnabled: z.boolean().default(true),
+  whatsappDefaultMessage: z
+    .string()
+    .trim()
+    .max(500)
+    .default(
+      'Hello, I visited your website and would like to know more about your products and services.',
+    ),
   social: z.object({
     facebook: optionalUrl,
     instagram: optionalUrl,

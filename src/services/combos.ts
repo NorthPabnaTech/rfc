@@ -12,6 +12,7 @@ import { formatNumber } from '@lib/utils/format';
 import type { ComboOutput } from '@lib/validators/catalog';
 
 import { toImage, toProductCard } from './mappers';
+import { PUBLIC_PRODUCT_FILTER } from './products';
 import { uniqueSlug } from './slug';
 
 /**
@@ -36,7 +37,7 @@ export async function listCombos(page = 1): Promise<Paginated<ProductCardDTO>> {
   await connectDB();
   // Bundles, plus regular products flagged "Show in Combo offers".
   const query: QueryFilter<Product> = {
-    status: 'published',
+    ...PUBLIC_PRODUCT_FILTER,
     $or: [{ type: 'combo' }, { isComboOffer: true }],
   };
   const [docs, total] = await Promise.all([

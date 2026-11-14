@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { PRODUCT_STATUSES, STOCK_STATUSES, SUPPLIER_STATUSES } from '@lib/constants';
+import {
+  DEFAULT_BUSINESS_SLUG,
+  PRODUCT_STATUSES,
+  PRODUCT_VISIBILITIES,
+  STOCK_STATUSES,
+  SUPPLIER_STATUSES,
+} from '@lib/constants';
 
 import {
   httpUrl,
@@ -66,6 +72,10 @@ export const productSchema = z
       .transform((v) => (v === '' || v == null || v === 0 ? null : v)),
 
     stockStatus: z.enum(STOCK_STATUSES).default('in_stock'),
+    stockQuantity: z.coerce.number().int().min(0).max(1_000_000).default(0),
+    trackInventory: z.boolean().default(false),
+    business: z.string().trim().min(1).max(60).default(DEFAULT_BUSINESS_SLUG),
+    visibility: z.enum(PRODUCT_VISIBILITIES).default('public'),
     sku: optionalText(60),
     images: z.array(imageAsset).max(15, 'At most 15 images').default([]),
     variations: z

@@ -11,12 +11,16 @@ export type AdminNavItem = {
 export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
   {
     title: 'Overview',
-    items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: 'grid' }],
+    items: [
+      { href: '/admin/dashboard', label: 'Dashboard', icon: 'grid' },
+      { href: '/admin/analysis', label: 'Analysis', icon: 'trend' },
+    ],
   },
   {
     title: 'Sales',
     items: [
       { href: '/admin/orders', label: 'Orders', icon: 'cart', badge: 'pendingOrders' },
+      { href: '/admin/orders/new', label: 'Manual order', icon: 'plus' },
       { href: '/admin/returns', label: 'Returns', icon: 'refresh', badge: 'openReturns' },
       { href: '/admin/customers', label: 'Customers', icon: 'users' },
     ],
@@ -25,9 +29,18 @@ export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
     title: 'Catalog',
     items: [
       { href: '/admin/products', label: 'Products', icon: 'box' },
+      { href: '/admin/inventory', label: 'Inventory', icon: 'layers' },
       { href: '/admin/categories', label: 'Categories', icon: 'folder' },
       { href: '/admin/tags', label: 'Tags', icon: 'tag' },
       { href: '/admin/suppliers', label: 'Suppliers', icon: 'store' },
+      { href: '/admin/media', label: 'Media library', icon: 'image' },
+    ],
+  },
+  {
+    title: 'Finance & Stores',
+    items: [
+      { href: '/admin/expenses', label: 'Expenses', icon: 'receipt' },
+      { href: '/admin/businesses', label: 'Businesses', icon: 'building' },
     ],
   },
   {

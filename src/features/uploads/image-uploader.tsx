@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { ProductImage } from '@/features/products/product-image';
+import { MediaPickerDialog } from '@/features/uploads/media-picker-dialog';
 import type { ImageDTO } from '@/types';
 import { Icon } from '@components/icon/icon';
 import { Spinner } from '@components/shared';
@@ -53,7 +54,13 @@ export function ImageUploader({
   const [dragOver, setDragOver] = React.useState(false);
   const [url, setUrl] = React.useState('');
   const [dragIndex, setDragIndex] = React.useState<number | null>(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
   const remaining = max - value.length;
+  const canPickFromLibrary =
+    purpose === 'products' ||
+    purpose === 'categories' ||
+    purpose === 'banners' ||
+    purpose === 'expenses';
 
   const handleFiles = async (list: FileList | null) => {
     if (!list?.length) return;
@@ -211,6 +218,27 @@ export function ImageUploader({
             multiple={max > 1}
             hidden
             onChange={(e) => void handleFiles(e.target.files)}
+          />
+        </div>
+      )}
+
+      {canPickFromLibrary && remaining > 0 && !disabled && (
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+          >
+            <Icon name="image" size={14} /> Choose from Media Library
+          </Button>
+          <MediaPickerDialog
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            purpose={purpose}
+            maxSelect={remaining}
+            selectedUrls={value.map((v) => v.url)}
+            onSelect={(picked) => onChange([...value, ...picked].slice(0, max))}
           />
         </div>
       )}

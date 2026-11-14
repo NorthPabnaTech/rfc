@@ -1,6 +1,7 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
 import {
+  DEFAULT_BUSINESS_SLUG,
   ORDER_PLATFORMS,
   ORDER_STATUSES,
   type OrderPlatform,
@@ -23,10 +24,23 @@ export interface OrderStatusEvent {
   by?: Types.ObjectId | null;
 }
 
+export interface ReturnedOrderItem {
+  orderItemId: Types.ObjectId;
+  product: Types.ObjectId;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  supplierPrice: number;
+  lineTotal: number;
+  restocked: boolean;
+}
+
 export interface Order {
   _id: Types.ObjectId;
   /** Human-friendly, sequential: RFC-100001. */
   orderNumber: string;
+  invoiceNumber?: string;
+  business: string;
   /** Null for guest checkouts and manual orders for unregistered customers. */
   user?: Types.ObjectId | null;
   customer: { name: string; phone: string; email?: string };
@@ -56,6 +70,11 @@ export interface Order {
   shippedAt?: Date;
   deliveredAt?: Date;
   cancelledAt?: Date;
+  returnedAt?: Date;
+  stockDeducted: boolean;
+  stockRestored: boolean;
+  refundedAmount: number;
+  returnedItems: ReturnedOrderItem[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,9 +89,25 @@ const statusEventSchema = new Schema<OrderStatusEvent>(
   { _id: false },
 );
 
+const returnedItemSchema = new Schema<ReturnedOrderItem>(
+  {
+    orderItemId: { type: Schema.Types.ObjectId, required: true },
+    product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    name: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    unitPrice: { type: Number, required: true, min: 0 },
+    supplierPrice: { type: Number, required: true, min: 0 },
+    lineTotal: { type: Number, required: true, min: 0 },
+    restocked: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const orderSchema = new Schema<Order>(
   {
     orderNumber: { type: String, required: true },
+    invoiceNumber: { type: String, trim: true },
+    business: { type: String, default: DEFAULT_BUSINESS_SLUG, index: true },
     user: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     customer: {
       name: { type: String, required: true, trim: true, maxlength: 80 },
@@ -106,6 +141,11 @@ const orderSchema = new Schema<Order>(
     shippedAt: Date,
     deliveredAt: Date,
     cancelledAt: Date,
+    returnedAt: Date,
+    stockDeducted: { type: Boolean, default: false },
+    stockRestored: { type: Boolean, default: false },
+    refundedAmount: { type: Number, min: 0, default: 0 },
+    returnedItems: { type: [returnedItemSchema], default: [] },
   },
   baseSchemaOptions,
 );

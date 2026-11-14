@@ -10,6 +10,7 @@ import { AppError } from '@lib/errors';
 import type { ImageAssetInput } from '@lib/validators/common';
 
 import { toQuestion, toReview } from './mappers';
+import { PUBLIC_PRODUCT_FILTER } from './products';
 
 function paged<T>(items: T[], total: number, page: number): Paginated<T> {
   return {
@@ -154,7 +155,7 @@ export async function deleteReview(id: string) {
 
 export async function askQuestion(userId: string, productId: string, question: string) {
   await connectDB();
-  if (!(await ProductModel.exists({ _id: productId, status: 'published' }))) {
+  if (!(await ProductModel.exists({ _id: productId, ...PUBLIC_PRODUCT_FILTER }))) {
     throw new AppError('Product not found.', 404);
   }
   const recent = await QuestionModel.countDocuments({

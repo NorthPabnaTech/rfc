@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { deleteBanner, saveBanner, setBannerActive } from '@/services/banners';
+import { deleteBanner,saveBanner, setBannerActive } from '@/services/banners';
+import { saveBusiness } from '@/services/businesses';
 import {
   deleteCategory,
   deleteSupplier,
@@ -20,6 +21,19 @@ import {
   setQuestionHidden,
   setReviewHidden,
 } from '@/services/engagement';
+import {
+  deleteExpense,
+  deleteExpenseCategory,
+  saveExpense,
+  saveExpenseCategory,
+} from '@/services/expenses';
+import { adjustProductStock } from '@/services/inventory';
+import {
+  deleteMediaAsset,
+  findMediaReferences,
+  listMediaAssets,
+  syncCloudinaryMedia,
+} from '@/services/media';
 import { createManualOrder, updateOrderMeta, updateOrderStatus } from '@/services/orders';
 import { deleteProduct, pickerSearch, saveProduct } from '@/services/products';
 import { updateReturn } from '@/services/returns';
@@ -36,6 +50,12 @@ import {
   tagSchema,
 } from '@lib/validators/catalog';
 import { objectId } from '@lib/validators/common';
+import {
+  businessSchema,
+  expenseCategorySchema,
+  expenseSchema,
+  stockAdjustmentSchema,
+} from '@lib/validators/management';
 import {
   answerSchema,
   manualOrderSchema,
@@ -81,10 +101,16 @@ export async function deleteProductAction(id: string): Promise<ActionResult> {
   }, 'Product deleted');
 }
 
-export async function productPickerAction(q: string, opts: { singlesOnly?: boolean } = {}) {
+export async function productPickerAction(
+  q: string,
+  opts: { singlesOnly?: boolean; business?: string } = {},
+) {
   return runAction(async () => {
     await requireAdmin();
-    return pickerSearch(z.string().max(80).parse(q), { singlesOnly: opts.singlesOnly === true });
+    return pickerSearch(z.string().max(80).parse(q), {
+      singlesOnly: opts.singlesOnly === true,
+      business: opts.business ? z.string().max(60).parse(opts.business) : undefined,
+    });
   });
 }
 
@@ -197,11 +223,12 @@ export async function deleteSupplierAction(id: string): Promise<ActionResult> {
 
 export async function createManualOrderAction(
   input: unknown,
-): Promise<ActionResult<{ id: string; orderNumber: string }>> {
+): Promise<ActionResult<{ id: string; orderNumber: string; invoiceNumber: string; total: number }>> {
   return runAction(async () => {
     const admin = await requireAdmin();
     const d = manualOrderSchema.parse(input);
     const result = await createManualOrder({
+      business: d.business,
       lines: d.items,
       userId: d.userId,
       customer: { name: d.customerName, phone: d.phone, email: d.email },
@@ -230,8 +257,9 @@ export async function createManualOrderAction(
 export async function updateOrderStatusAction(input: unknown): Promise<ActionResult> {
   return runAction(async () => {
     const admin = await requireAdmin();
-    const { orderId, status, note } = updateOrderStatusSchema.parse(input);
-    await updateOrderStatus(orderId, status, admin.id, note);
+    const { orderId, status, note, refundAmount, returnItems } =
+      updateOrderStatusSchema.parse(input);
+    await updateOrderStatus(orderId, status, admin.id, note, { refundAmount, returnItems });
     revalidatePath('/admin', 'layout');
     revalidatePath('/account/orders', 'layout');
     return undefined;
@@ -339,6 +367,119 @@ export async function saveSettingsAction(input: unknown): Promise<ActionResult> 
     await requireAdmin();
     await updateSettings(settingsSchema.parse(input));
     revalidateStorefront();
+    revalidatePath('/admin', 'layout');
     return undefined;
   }, 'Settings saved');
+}
+
+/* ─── Inventory, Expenses & Businesses ───────────────────────────────────── */
+
+export async function adjustStockAction(
+  input: unknown,
+): Promise<ActionResult<{ stockQuantity: number; stockStatus: string }>> {
+  return runAction(async () => {
+    const admin = await requireAdmin();
+    const parsed = stockAdjustmentSchema.parse(input);
+    const res = await adjustProductStock(parsed, admin.id);
+    revalidateStorefront();
+    revalidatePath('/admin', 'layout');
+    return res;
+  }, 'Stock updated');
+}
+
+export async function saveExpenseAction(input: unknown, id?: string): Promise<ActionResult> {
+  return runAction(
+    async () => {
+      const admin = await requireAdmin();
+      await saveExpense(expenseSchema.parse(input), admin.id, optionalId.parse(id));
+      revalidatePath('/admin', 'layout');
+      return undefined;
+    },
+    id ? 'Expense updated' : 'Expense recorded',
+  );
+}
+
+export async function deleteExpenseAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAdmin();
+    await deleteExpense(objectId.parse(id));
+    revalidatePath('/admin', 'layout');
+    return undefined;
+  }, 'Expense deleted');
+}
+
+export async function saveExpenseCategoryAction(
+  input: unknown,
+  id?: string,
+): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAdmin();
+    await saveExpenseCategory(expenseCategorySchema.parse(input), optionalId.parse(id));
+    revalidatePath('/admin/expenses', 'layout');
+    return undefined;
+  }, 'Expense category saved');
+}
+
+export async function deleteExpenseCategoryAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAdmin();
+    await deleteExpenseCategory(objectId.parse(id));
+    revalidatePath('/admin/expenses', 'layout');
+    return undefined;
+  }, 'Expense category deleted');
+}
+
+export async function saveBusinessAction(input: unknown, id?: string): Promise<ActionResult> {
+  return runAction(
+    async () => {
+      await requireAdmin();
+      await saveBusiness(businessSchema.parse(input), optionalId.parse(id));
+      revalidatePath('/admin', 'layout');
+      return undefined;
+    },
+    id ? 'Business updated' : 'Business created',
+  );
+}
+
+/* ─── Media Library ──────────────────────────────────────────────────────── */
+
+export async function listMediaAssetsAction(input: {
+  q?: string;
+  purpose?: string;
+  page?: number;
+}) {
+  return runAction(async () => {
+    await requireAdmin();
+    return listMediaAssets({
+      q: input.q,
+      purpose: input.purpose as never,
+      page: input.page,
+      pageSize: 18,
+    });
+  });
+}
+
+export async function checkMediaReferencesAction(id: string) {
+  return runAction(async () => {
+    await requireAdmin();
+    return findMediaReferences(objectId.parse(id));
+  });
+}
+
+export async function deleteMediaAssetAction(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAdmin();
+    await deleteMediaAsset(objectId.parse(id));
+    revalidatePath('/admin/media');
+    return undefined;
+  }, 'Media deleted');
+}
+
+export async function syncCloudinaryMediaAction(): Promise<ActionResult<{ imported: number }>> {
+  return runAction(async () => {
+    const admin = await requireAdmin();
+    const imported = await syncCloudinaryMedia(admin.id);
+    revalidatePath('/admin/media');
+    return { imported };
+  }, 'Media library synced');
 }

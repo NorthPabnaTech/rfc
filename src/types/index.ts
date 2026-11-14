@@ -5,6 +5,7 @@
  */
 import type {
   BannerPosition,
+  ExpensePaymentMethod,
   ImageSourceType,
   NotificationType,
   OrderPlatform,
@@ -12,10 +13,13 @@ import type {
   PaymentMethod,
   PaymentStatus,
   ProductStatus,
+  ProductVisibility,
   ReturnStatus,
   ShippingZone,
+  StockMovementType,
   StockStatus,
   SupplierStatus,
+  UploadPurpose,
   UserRole,
 } from '@lib/constants';
 
@@ -121,6 +125,10 @@ export type AdminProductRowDTO = {
   salePrice: number | null;
   effectivePrice: number;
   stockStatus: StockStatus;
+  stockQuantity: number;
+  trackInventory: boolean;
+  business: string;
+  visibility: ProductVisibility;
   status: ProductStatus;
   isFeatured: boolean;
   soldCount: number;
@@ -142,6 +150,10 @@ export type AdminProductDTO = {
   price: number;
   salePrice: number | null;
   stockStatus: StockStatus;
+  stockQuantity: number;
+  trackInventory: boolean;
+  business: string;
+  visibility: ProductVisibility;
   sku?: string;
   images: ImageDTO[];
   variations: { name: string; values: string[] }[];
@@ -235,9 +247,22 @@ export type OrderItemDTO = {
   }[];
 };
 
+export type ReturnedOrderItemDTO = {
+  orderItemId: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  supplierPrice: number;
+  lineTotal: number;
+  restocked: boolean;
+};
+
 export type OrderDTO = {
   id: string;
   orderNumber: string;
+  invoiceNumber: string;
+  business: string;
   userId: string | null;
   customer: { name: string; phone: string; email?: string };
   shippingAddress: Omit<AddressDTO, 'id' | 'label' | 'isDefault'>;
@@ -247,15 +272,18 @@ export type OrderDTO = {
   discount: number;
   total: number;
   supplierCost?: number;
+  refundedAmount?: number;
+  returnedItems?: ReturnedOrderItemDTO[];
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   platform: OrderPlatform;
   status: OrderStatus;
-  statusHistory: { status: OrderStatus; note?: string; at: string }[];
+  statusHistory: { status: OrderStatus; note?: string; at: string; byName?: string }[];
   customerNote?: string;
   adminNote?: string;
   cancelReason?: string;
   deliveredAt?: string;
+  returnedAt?: string;
   createdAt: string;
   updatedAt: string;
   /** Customer-facing permissions, computed server-side. */
@@ -268,6 +296,7 @@ export type OrderRowDTO = Pick<
   OrderDTO,
   | 'id'
   | 'orderNumber'
+  | 'business'
   | 'customer'
   | 'total'
   | 'status'
@@ -378,6 +407,9 @@ export type SettingsDTO = {
   shippingFeeOutsideDhaka: number;
   freeShippingThreshold: number;
   announcement?: string;
+  whatsappEnabled: boolean;
+  whatsappProductEnabled: boolean;
+  whatsappDefaultMessage: string;
   social: {
     facebook?: string;
     instagram?: string;
@@ -400,3 +432,133 @@ export type NotificationDTO = {
 
 /** What the bell needs: the latest notifications + the badge count. */
 export type NotificationFeedDTO = { items: NotificationDTO[]; unseen: number };
+
+/* ─── Multi-business, Inventory, Expenses & Analytics ────────────────────── */
+
+export type BusinessDTO = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  invoicePrefix: string;
+  phone?: string;
+  address?: string;
+  isPublicStorefront: boolean;
+  isActive: boolean;
+  productCount?: number;
+  orderCount?: number;
+  createdAt: string;
+};
+
+export type StockMovementDTO = {
+  id: string;
+  productId: string;
+  productName: string;
+  business: string;
+  type: StockMovementType;
+  quantity: number;
+  previousQuantity: number;
+  newQuantity: number;
+  reason?: string;
+  notes?: string;
+  orderId?: string | null;
+  orderNumber?: string;
+  date: string;
+  performedByName?: string;
+};
+
+export type ExpenseCategoryDTO = {
+  id: string;
+  name: string;
+  slug: string;
+  isSystem: boolean;
+  isCostOfGoods: boolean;
+  expenseCount?: number;
+};
+
+export type ExpenseDTO = {
+  id: string;
+  title: string;
+  categoryId: string;
+  categoryName: string;
+  isCostOfGoods: boolean;
+  amount: number;
+  expenseDate: string;
+  paymentMethod: ExpensePaymentMethod;
+  description?: string;
+  attachment?: ImageDTO | null;
+  business: string;
+  createdByName?: string;
+  createdAt: string;
+};
+
+export type AnalysisPeriod = 'today' | 'week' | 'month' | 'year' | 'date' | 'custom';
+
+export type AnalysisDashboardDTO = {
+  range: { from: string; to: string; granularity: 'day' | 'month' };
+  business: string;
+  summary: {
+    grossRevenue: number;
+    discounts: number;
+    refunds: number;
+    netRevenue: number;
+    shippingFees: number;
+    cogs: number;
+    grossProfit: number;
+    operatingExpenses: number;
+    supplierPurchaseExpenses: number;
+    netProfit: number;
+    totalOrders: number;
+    completedOrders: number;
+    cancelledOrders: number;
+    returnedOrders: number;
+    averageOrderValue: number;
+  };
+  timeline: {
+    label: string;
+    key: string;
+    revenue: number;
+    expenses: number;
+    cogs: number;
+    profit: number;
+    orders: number;
+  }[];
+  ordersByStatus: { status: OrderStatus; count: number; revenue: number }[];
+  expenseByCategory: {
+    categoryId: string;
+    categoryName: string;
+    isCostOfGoods: boolean;
+    amount: number;
+    count: number;
+  }[];
+  businessBreakdown: {
+    slug: string;
+    name: string;
+    revenue: number;
+    cogs: number;
+    expenses: number;
+    netProfit: number;
+    orders: number;
+  }[];
+};
+
+export type MediaAssetDTO = {
+  id: string;
+  filename: string;
+  url: string;
+  publicId: string;
+  mimeType: string;
+  format?: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  purpose: UploadPurpose;
+  uploadedByName?: string;
+  createdAt: string;
+};
+
+export type MediaReferenceDTO = {
+  kind: 'Product' | 'Category' | 'Banner' | 'Expense' | 'User' | 'Review' | 'Return';
+  id: string;
+  label: string;
+};

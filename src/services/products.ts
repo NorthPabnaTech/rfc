@@ -21,9 +21,11 @@ import type {
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
 import {
   ADMIN_PAGE_SIZE,
+  DEFAULT_BUSINESS_SLUG,
   PAGE_SIZE,
   type ProductSort,
   type ProductStatus,
+  type ProductVisibility,
   type StockStatus,
 } from '@lib/constants';
 import { AppError } from '@lib/errors';
@@ -45,6 +47,13 @@ const CARD_FIELDS =
 
 /** Normal catalog listings exclude combos (they have their own section). */
 const SINGLES = { type: { $ne: 'combo' } } as const;
+
+/** Public storefront must NEVER expose private products or non-public-storefront businesses. */
+export const PUBLIC_PRODUCT_FILTER: QueryFilter<Product> = {
+  status: 'published',
+  visibility: { $ne: 'private' },
+  business: { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] },
+};
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -81,7 +90,7 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
   await connectDB();
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = filters.pageSize ?? PAGE_SIZE;
-  const query: QueryFilter<Product> = { status: 'published', ...SINGLES };
+  const query: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
 
   if (filters.q) {
     const rx = new RegExp(escapeRegex(filters.q.trim().slice(0, 80)), 'i');
@@ -127,14 +136,14 @@ export async function listProductCards(
   limit = 8,
 ): Promise<ProductCardDTO[]> {
   await connectDB();
-  const base: QueryFilter<Product> = { status: 'published', ...SINGLES };
+  const base: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
   const variants: Record<typeof kind, [QueryFilter<Product>, Record<string, SortOrder>]> = {
     featured: [{ ...base, isFeatured: true }, { updatedAt: -1 }],
     new: [base, { createdAt: -1 }],
     bestsellers: [base, { soldCount: -1, ratingAverage: -1 }],
     deals: [{ ...base, salePrice: { $ne: null } }, { updatedAt: -1 }],
     combos: [
-      { status: 'published', $or: [{ type: 'combo' }, { isComboOffer: true }] },
+      { ...PUBLIC_PRODUCT_FILTER, $or: [{ type: 'combo' }, { isComboOffer: true }] },
       { isFeatured: -1, updatedAt: -1 },
     ],
   };
@@ -149,7 +158,7 @@ export async function listProductCards(
 
 export async function getProductBySlug(slug: string): Promise<ProductDetailDTO | null> {
   await connectDB();
-  const p = await ProductModel.findOne({ slug, status: 'published' })
+  const p = await ProductModel.findOne({ slug, ...PUBLIC_PRODUCT_FILTER })
     .populate('category', 'name slug')
     .populate('subCategory', 'name slug')
     .populate('tags', 'name slug')
@@ -200,7 +209,7 @@ export async function getRelatedProducts(product: ProductDetailDTO, limit = 8) {
   await connectDB();
   if (!product.category) return [];
   const docs = await ProductModel.find(
-    { status: 'published', ...SINGLES, category: product.category.id, _id: { $ne: product.id } },
+    { ...PUBLIC_PRODUCT_FILTER, ...SINGLES, category: product.category.id, _id: { $ne: product.id } },
     CARD_FIELDS,
   )
     .sort({ soldCount: -1, createdAt: -1 })
@@ -212,7 +221,7 @@ export async function getRelatedProducts(product: ProductDetailDTO, limit = 8) {
 
 export async function listPublishedSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
   await connectDB();
-  return ProductModel.find({ status: 'published' }, 'slug updatedAt').lean();
+  return ProductModel.find(PUBLIC_PRODUCT_FILTER, 'slug updatedAt').lean();
 }
 
 /* ─── Admin ──────────────────────────────────────────────────────────────── */
@@ -223,6 +232,8 @@ export type AdminProductFilters = {
   supplier?: string;
   status?: ProductStatus;
   stockStatus?: StockStatus;
+  business?: string;
+  visibility?: ProductVisibility;
   page?: number;
 };
 
@@ -241,6 +252,18 @@ export async function listAdminProducts(
   if (filters.supplier) query.supplier = filters.supplier;
   if (filters.status) query.status = filters.status;
   if (filters.stockStatus) query.stockStatus = filters.stockStatus;
+  if (filters.business && filters.business !== 'all') {
+    query.business =
+      filters.business === DEFAULT_BUSINESS_SLUG
+        ? { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] }
+        : filters.business;
+  }
+  if (filters.visibility) {
+    query.visibility =
+      filters.visibility === 'public'
+        ? { $in: ['public', null] as unknown as ProductVisibility[] }
+        : 'private';
+  }
 
   const [docs, total] = await Promise.all([
     ProductModel.find(query)
@@ -292,8 +315,13 @@ export async function saveProduct(
   await validateRefs(input);
 
   const slug = await uniqueSlug(ProductModel, input.slug || input.name, id);
+  const business = input.business || DEFAULT_BUSINESS_SLUG;
+  const visibility: ProductVisibility =
+    business !== DEFAULT_BUSINESS_SLUG ? 'private' : input.visibility;
   const data = {
     ...input,
+    business,
+    visibility,
     slug,
     sku: input.sku?.toUpperCase(),
     description: input.description ? sanitizeRichText(input.description) : undefined,
@@ -333,7 +361,7 @@ export async function deleteProduct(id: string): Promise<void> {
 /** Lightweight product search for the admin manual-order item picker. */
 export async function pickerSearch(
   q: string,
-  { singlesOnly = false }: { singlesOnly?: boolean } = {},
+  { singlesOnly = false, business }: { singlesOnly?: boolean; business?: string } = {},
 ): Promise<
   {
     id: string;
@@ -343,18 +371,32 @@ export async function pickerSearch(
     supplierPrice: number;
     sku?: string;
     stockStatus: StockStatus;
+    stockQuantity: number;
+    trackInventory: boolean;
+    business: string;
+    visibility: ProductVisibility;
     variations: { name: string; values: string[] }[];
   }[]
 > {
   await connectDB();
   const rx = new RegExp(escapeRegex(q.trim().slice(0, 80)), 'i');
+  const businessFilter =
+    business && business !== 'all'
+      ? {
+          business:
+            business === DEFAULT_BUSINESS_SLUG
+              ? { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] }
+              : business,
+        }
+      : {};
   const docs = await ProductModel.find(
     {
       ...(q.trim() ? { $or: [{ name: rx }, { sku: rx }] } : {}),
       // Combo items can't be combos; their options become the combo's (see saveCombo).
       ...(singlesOnly ? SINGLES : {}),
+      ...businessFilter,
     },
-    'name images effectivePrice supplierPrice sku stockStatus variations',
+    'name images effectivePrice supplierPrice sku stockStatus stockQuantity trackInventory business visibility variations',
   )
     .sort({ updatedAt: -1 })
     .limit(15)
@@ -367,6 +409,10 @@ export async function pickerSearch(
     supplierPrice: d.supplierPrice,
     sku: d.sku,
     stockStatus: d.stockStatus,
+    stockQuantity: d.stockQuantity ?? 0,
+    trackInventory: d.trackInventory ?? false,
+    business: d.business || DEFAULT_BUSINESS_SLUG,
+    visibility: d.visibility || 'public',
     variations: d.variations.map((v) => ({ name: v.name, values: [...v.values] })),
   }));
 }
@@ -374,7 +420,10 @@ export async function pickerSearch(
 /** Current card data for a list of product ids (wishlist), in the given order. */
 export async function listProductCardsByIds(ids: string[]): Promise<ProductCardDTO[]> {
   await connectDB();
-  const docs = await ProductModel.find({ _id: { $in: ids }, status: 'published' }, CARD_FIELDS)
+  const docs = await ProductModel.find(
+    { _id: { $in: ids }, ...PUBLIC_PRODUCT_FILTER },
+    CARD_FIELDS,
+  )
     .populate('category', 'name slug')
     .lean();
   const byId = new Map(docs.map((d) => [String(d._id), toProductCard(d as never)]));

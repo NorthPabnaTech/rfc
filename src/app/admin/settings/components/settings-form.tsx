@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 
 import { saveSettingsAction } from '@/actions/admin';
 import type { SettingsDTO } from '@/types';
-import { Form, FormCurrency, FormInput } from '@components/form';
+import { Form, FormCurrency, FormInput, FormSwitch, FormTextarea } from '@components/form';
 import { FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
@@ -18,6 +18,7 @@ export function SettingsForm({ settings }: { settings: SettingsDTO }) {
       ...settings,
       supportEmail: settings.supportEmail ?? '',
       announcement: settings.announcement ?? '',
+      whatsappDefaultMessage: settings.whatsappDefaultMessage ?? '',
       social: {
         facebook: settings.social.facebook ?? '',
         instagram: settings.social.instagram ?? '',
@@ -98,6 +99,30 @@ export function SettingsForm({ settings }: { settings: SettingsDTO }) {
               placeholder="https://youtube.com/…"
             />
             <FormInput name="social.whatsapp" label="WhatsApp number" placeholder="01XXXXXXXXX" />
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Website WhatsApp & Live Chat"
+          description="Control the floating WhatsApp chat button and product-specific prefilled messages on your public store. Uses the WhatsApp number above (or Support phone if empty)."
+        >
+          <div className="space-y-4">
+            <FormSwitch
+              name="whatsappEnabled"
+              label="Enable website WhatsApp chat"
+              hint="Show the floating WhatsApp contact button across public website pages."
+            />
+            <FormSwitch
+              name="whatsappProductEnabled"
+              label="Enable product-specific WhatsApp messaging"
+              hint="Automatically include the product name and link when customers message from a product page."
+            />
+            <FormTextarea
+              name="whatsappDefaultMessage"
+              label="Default general contact message"
+              placeholder="Hello, I visited your website and would like to know more about your products and services."
+              rows={3}
+            />
           </div>
         </FormSection>
       </Panel>

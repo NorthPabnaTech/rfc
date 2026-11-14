@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  DEFAULT_BUSINESS_SLUG,
   ORDER_PLATFORMS,
   ORDER_STATUSES,
   PAYMENT_STATUSES,
@@ -41,6 +42,7 @@ export type CheckoutInput = z.input<typeof checkoutSchema>;
 
 export const manualOrderSchema = z
   .object({
+    business: z.string().trim().min(1).max(60).default(DEFAULT_BUSINESS_SLUG),
     platform: z.enum(ORDER_PLATFORMS),
     /** Link to an existing customer account (optional). */
     userId: objectId
@@ -68,10 +70,21 @@ export const manualOrderSchema = z
   .transform(withDeliveryZone);
 export type ManualOrderInput = z.input<typeof manualOrderSchema>;
 
+export const returnItemInputSchema = z.object({
+  orderItemId: objectId,
+  quantity: z.coerce.number().int().min(1).max(999),
+  restock: z.boolean().default(true),
+});
+
 export const updateOrderStatusSchema = z.object({
   orderId: objectId,
   status: z.enum(ORDER_STATUSES),
   note: optionalText(500),
+  refundAmount: z
+    .union([money('Refund amount'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  returnItems: z.array(returnItemInputSchema).optional(),
 });
 
 export const updateOrderMetaSchema = z.object({

@@ -16,7 +16,11 @@ import {
   DialogTitle,
 } from '@components/ui/dialog';
 import { useDebouncedValue } from '@hooks/use-debounced-value';
-import { STOCK_STATUS_LABELS, type StockStatus } from '@lib/constants';
+import {
+  type ProductVisibility,
+  STOCK_STATUS_LABELS,
+  type StockStatus,
+} from '@lib/constants';
 import { cn } from '@lib/utils';
 
 export type PickerProduct = {
@@ -27,6 +31,10 @@ export type PickerProduct = {
   supplierPrice: number;
   sku?: string;
   stockStatus: StockStatus;
+  stockQuantity: number;
+  trackInventory: boolean;
+  business: string;
+  visibility: ProductVisibility;
   variations: { name: string; values: string[] }[];
 };
 
@@ -40,6 +48,8 @@ export type PickedLine = {
 export function ProductPicker({
   onPick,
   singlesOnly = false,
+  business,
+  allowOutOfStock = false,
   label = 'Add product',
 }: {
   onPick: (line: PickedLine) => void;
@@ -48,6 +58,8 @@ export function ProductPicker({
    * builder, where the customer chooses the options on the combo itself.
    */
   singlesOnly?: boolean;
+  business?: string;
+  allowOutOfStock?: boolean;
   label?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -65,13 +77,13 @@ export function ProductPicker({
   React.useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    productPickerAction(debounced, { singlesOnly }).then((res) => {
+    productPickerAction(debounced, { singlesOnly, business }).then((res) => {
       if (!cancelled) setFound({ query: debounced, items: res.ok ? res.data : [] });
     });
     return () => {
       cancelled = true;
     };
-  }, [debounced, open, singlesOnly]);
+  }, [debounced, open, singlesOnly, business]);
 
   const reset = () => {
     setChosen(null);
@@ -116,7 +128,7 @@ export function ProductPicker({
                     <li key={p.id}>
                       <button
                         type="button"
-                        disabled={p.stockStatus === 'out_of_stock'}
+                        disabled={!allowOutOfStock && p.stockStatus === 'out_of_stock'}
                         onClick={() => {
                           const single = Object.fromEntries(
                             p.variations
@@ -143,6 +155,8 @@ export function ProductPicker({
                           <span className="text-subtle text-[11.5px]">
                             {p.sku ? `${p.sku} · ` : ''}
                             {STOCK_STATUS_LABELS[p.stockStatus]}
+                            {p.trackInventory ? ` (${p.stockQuantity} qty)` : ''}
+                            {p.visibility === 'private' ? ' · Private' : ''}
                             {p.variations.length > 0 &&
                               ` · ${p.variations.map((v) => v.name).join(', ')}`}
                           </span>

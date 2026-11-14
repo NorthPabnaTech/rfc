@@ -15,6 +15,9 @@ export default async function TrackOrderPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
+  const initialOrderNumber = param(sp, 'orderNumber') ?? param(sp, 'order') ?? '';
+  const initialPhone = param(sp, 'phone') ?? '';
+
   return (
     <div className="container-page max-w-3xl py-14">
       <div className="text-center">
@@ -26,7 +29,10 @@ export default async function TrackOrderPage({
           Enter your order number and the mobile number you used at checkout.
         </p>
       </div>
-      <TrackOrderForm initialOrderNumber={param(sp, 'order') ?? ''} />
+      <TrackOrderForm
+        initialOrderNumber={initialOrderNumber}
+        initialPhone={initialPhone}
+      />
     </div>
   );
 }

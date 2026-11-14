@@ -4,6 +4,7 @@ import type { QueryFilter, Types } from 'mongoose';
 
 import {
   AddressModel,
+  BusinessModel,
   connectDB,
   nextSequence,
   type Order,
@@ -13,13 +14,15 @@ import {
   ReturnRequestModel,
   type Supplier,
   UserModel,
+  withTransaction,
 } from '@/database';
 import type { CartQuote, CartQuoteLine, OrderDTO, OrderRowDTO, Paginated } from '@/types';
 import {
+  ADMIN_ORDER_TRANSITIONS,
   ADMIN_PAGE_SIZE,
   CUSTOMER_CANCELLABLE_STATUSES,
+  DEFAULT_BUSINESS_SLUG,
   ORDER_STATUS_LABELS,
-  ORDER_TRANSITIONS,
   type OrderPlatform,
   type OrderStatus,
   type PaymentStatus,
@@ -29,6 +32,7 @@ import {
 import { AppError } from '@lib/errors';
 import type { CartLineInput } from '@lib/validators/order';
 
+import { deductOrderStock,restoreOrderStock } from './inventory';
 import { toImage, toOrder, toReturn } from './mappers';
 import {
   notifyAdminsOrderCancelled,
@@ -47,13 +51,23 @@ type PricedLine = CartQuoteLine & { item?: Omit<OrderItem, '_id'> };
  */
 async function priceLines(
   lines: CartLineInput[],
-  { includeDrafts = false }: { includeDrafts?: boolean } = {},
+  {
+    includeDrafts = false,
+    includePrivate = false,
+    business,
+  }: { includeDrafts?: boolean; includePrivate?: boolean; business?: string } = {},
 ): Promise<PricedLine[]> {
   await connectDB();
   const ids = [...new Set(lines.map((l) => l.productId))];
   const products = await ProductModel.find({
     _id: { $in: ids },
     ...(includeDrafts ? {} : { status: 'published' }),
+    ...(includePrivate
+      ? {}
+      : {
+          visibility: { $ne: 'private' },
+          business: { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] },
+        }),
   })
     .populate<{ supplier: Supplier | null }>('supplier', 'name')
     .populate<{
@@ -104,6 +118,18 @@ async function priceLines(
       else variant[v.name] = chosen;
     }
     if (p.stockStatus === 'out_of_stock') issue = 'This product is out of stock.';
+    if (
+      business &&
+      (p.business || DEFAULT_BUSINESS_SLUG) !== business
+    ) {
+      issue = 'This product belongs to a different store.';
+    }
+    if (p.trackInventory && (p.stockQuantity ?? 0) < line.quantity) {
+      issue =
+        (p.stockQuantity ?? 0) <= 0
+          ? 'This product is out of stock.'
+          : `Only ${p.stockQuantity} left in stock.`;
+    }
     // A combo is only available while every item in it is.
     const components = p.type === 'combo' ? p.comboItems : [];
     if (components.some((c) => !c.product || c.product.stockStatus === 'out_of_stock')) {
@@ -177,6 +203,7 @@ export async function quoteCart(lines: CartLineInput[], zone?: ShippingZone): Pr
 /* ─── Creating orders ────────────────────────────────────────────────────── */
 
 type NewOrder = {
+  business?: string;
   lines: CartLineInput[];
   userId: string | null;
   customer: { name: string; phone: string; email?: string };
@@ -189,12 +216,18 @@ type NewOrder = {
   adminNote?: string;
   createdBy?: string | null;
   includeDrafts?: boolean;
+  includePrivate?: boolean;
 };
 
 async function createOrder(
   input: NewOrder,
-): Promise<{ id: string; orderNumber: string; total: number }> {
-  const priced = await priceLines(input.lines, { includeDrafts: input.includeDrafts });
+): Promise<{ id: string; orderNumber: string; invoiceNumber: string; total: number }> {
+  const business = input.business || DEFAULT_BUSINESS_SLUG;
+  const priced = await priceLines(input.lines, {
+    includeDrafts: input.includeDrafts,
+    includePrivate: input.includePrivate,
+    business,
+  });
   const problem = priced.find((l) => !l.available);
   if (problem) throw new AppError(`${problem.name}: ${problem.issue}`);
 
@@ -207,40 +240,70 @@ async function createOrder(
   const status = input.status ?? 'pending';
   const now = new Date();
 
-  const orderNumber = `RFC-${await nextSequence('order')}`;
-  const order = await OrderModel.create({
-    orderNumber,
-    user: input.userId,
-    customer: input.customer,
-    shippingAddress: input.shippingAddress,
-    items,
-    subtotal,
-    shippingFee,
-    discount,
-    total: subtotal + shippingFee - discount,
-    supplierCost,
-    paymentMethod: 'cod',
-    platform: input.platform,
-    status,
-    statusHistory: [
-      { status: 'pending' as const, at: now, by: input.createdBy ?? input.userId },
-      ...(status === 'confirmed'
-        ? [{ status: 'confirmed' as const, at: now, by: input.createdBy }]
-        : []),
-    ],
-    customerNote: input.customerNote,
-    adminNote: input.adminNote,
-    createdBy: input.createdBy ?? null,
-    ...(status === 'confirmed' ? { confirmedAt: now } : {}),
+  const bizDoc = await BusinessModel.findOne({ slug: business }, 'invoicePrefix').lean();
+  const invPrefix = bizDoc?.invoicePrefix || 'RFC';
+
+  return withTransaction(async (session) => {
+    const seq = await nextSequence('order');
+    const orderNumber = `RFC-${seq}`;
+    const invoiceNumber = `INV-${invPrefix}-${seq}`;
+
+    const [order] = await OrderModel.create(
+      [
+        {
+          orderNumber,
+          invoiceNumber,
+          business,
+          user: input.userId,
+          customer: input.customer,
+          shippingAddress: input.shippingAddress,
+          items,
+          subtotal,
+          shippingFee,
+          discount,
+          total: subtotal + shippingFee - discount,
+          supplierCost,
+          paymentMethod: 'cod',
+          platform: input.platform,
+          status,
+          statusHistory: [
+            { status: 'pending' as const, at: now, by: input.createdBy ?? input.userId },
+            ...(status === 'confirmed'
+              ? [{ status: 'confirmed' as const, at: now, by: input.createdBy }]
+              : []),
+          ],
+          customerNote: input.customerNote,
+          adminNote: input.adminNote,
+          createdBy: input.createdBy ?? null,
+          ...(status === 'confirmed' ? { confirmedAt: now } : {}),
+        },
+      ],
+      { session },
+    );
+    if (!order) throw new AppError('Failed to create order.');
+
+    const stockDeducted = await deductOrderStock(
+      order,
+      input.createdBy ?? input.userId ?? null,
+      session,
+    );
+    if (stockDeducted) {
+      await OrderModel.updateOne(
+        { _id: order._id },
+        { $set: { stockDeducted: true } },
+        { session },
+      );
+    }
+
+    await ProductModel.bulkWrite(
+      items.map((i) => ({
+        updateOne: { filter: { _id: i.product }, update: { $inc: { soldCount: i.quantity } } },
+      })),
+      { session },
+    );
+
+    return { id: String(order._id), orderNumber, invoiceNumber, total: order.total };
   });
-
-  await ProductModel.bulkWrite(
-    items.map((i) => ({
-      updateOne: { filter: { _id: i.product }, update: { $inc: { soldCount: i.quantity } } },
-    })),
-  );
-
-  return { id: String(order._id), orderNumber, total: order.total };
 }
 
 export async function placeWebsiteOrder(input: {
@@ -281,13 +344,13 @@ export async function placeWebsiteOrder(input: {
 }
 
 export async function createManualOrder(
-  input: Omit<NewOrder, 'includeDrafts'> & { createdBy: string },
+  input: Omit<NewOrder, 'includeDrafts' | 'includePrivate'> & { createdBy: string },
 ) {
   await connectDB();
   if (input.userId && !(await UserModel.exists({ _id: input.userId }))) {
     throw new AppError('Selected customer account not found.');
   }
-  return createOrder({ ...input, includeDrafts: true });
+  return createOrder({ ...input, includeDrafts: true, includePrivate: true });
 }
 
 /* ─── Reading orders ─────────────────────────────────────────────────────── */
@@ -296,6 +359,7 @@ export type AdminOrderFilters = {
   q?: string;
   status?: OrderStatus;
   platform?: OrderPlatform;
+  business?: string;
   from?: string;
   to?: string;
   page?: number;
@@ -309,6 +373,7 @@ function toRow(o: Order): OrderRowDTO {
   return {
     id: String(o._id),
     orderNumber: o.orderNumber,
+    business: o.business || DEFAULT_BUSINESS_SLUG,
     customer: { name: o.customer.name, phone: o.customer.phone, email: o.customer.email },
     total: o.total,
     status: o.status,
@@ -330,6 +395,12 @@ export async function listAdminOrders(f: AdminOrderFilters): Promise<Paginated<O
   }
   if (f.status) query.status = f.status;
   if (f.platform) query.platform = f.platform;
+  if (f.business && f.business !== 'all') {
+    query.business =
+      f.business === DEFAULT_BUSINESS_SLUG
+        ? { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] }
+        : f.business;
+  }
   if (f.from || f.to) {
     query.createdAt = {
       ...(f.from ? { $gte: new Date(f.from) } : {}),
@@ -364,7 +435,7 @@ export async function countOrdersByStatus(): Promise<Record<string, number>> {
 export async function getAdminOrder(id: string): Promise<OrderDTO | null> {
   await connectDB();
   const [doc, ret] = await Promise.all([
-    OrderModel.findById(id).lean(),
+    OrderModel.findById(id).populate('statusHistory.by', 'name').lean(),
     ReturnRequestModel.findOne({ order: id }).lean(),
   ]);
   if (!doc) return null;
@@ -444,32 +515,142 @@ export async function updateOrderStatus(
   next: OrderStatus,
   by: string,
   note?: string,
+  opts?: {
+    refundAmount?: number;
+    returnItems?: { orderItemId: string; quantity: number; restock: boolean }[];
+  },
 ): Promise<void> {
   await connectDB();
-  const order = await OrderModel.findById(orderId);
-  if (!order) throw new AppError('Order not found.', 404);
-  if (!ORDER_TRANSITIONS[order.status].includes(next)) {
-    throw new AppError(
-      `Can't move an order from ${ORDER_STATUS_LABELS[order.status]} to ${ORDER_STATUS_LABELS[next]}.`,
-    );
-  }
+  const updatedOrder = await withTransaction(async (session) => {
+    const order = await OrderModel.findById(orderId).session(session ?? null);
+    if (!order) throw new AppError('Order not found.', 404);
+    if (!ADMIN_ORDER_TRANSITIONS[order.status].includes(next)) {
+      throw new AppError(
+        `Can't move an order from ${ORDER_STATUS_LABELS[order.status]} to ${ORDER_STATUS_LABELS[next]}.`,
+      );
+    }
 
-  const now = new Date();
-  order.status = next;
-  order.statusHistory.push({ status: next, note, at: now, by: by as never });
-  if (next === 'confirmed') order.confirmedAt = now;
-  if (next === 'shipped') order.shippedAt = now;
-  if (next === 'delivered') {
-    order.deliveredAt = now;
-    if (order.paymentMethod === 'cod') order.paymentStatus = 'paid';
-  }
-  if (next === 'cancelled') {
-    order.cancelledAt = now;
-    order.cancelReason = note;
-  }
-  await order.save();
-  if (next === 'cancelled') await revertSoldCounts(order);
-  await notifyCustomerOrderStatus(order, next);
+    const prevStatus = order.status;
+    const now = new Date();
+    order.status = next;
+    order.statusHistory.push({ status: next, note, at: now, by: by as never });
+
+    if (next === 'confirmed' && !order.confirmedAt) order.confirmedAt = now;
+    if (next === 'shipped' && !order.shippedAt) order.shippedAt = now;
+    if (next === 'delivered') {
+      if (!order.deliveredAt) order.deliveredAt = now;
+      if (order.paymentMethod === 'cod' && order.paymentStatus === 'unpaid') {
+        order.paymentStatus = 'paid';
+      }
+    }
+    if (next === 'cancelled') {
+      order.cancelledAt = now;
+      order.cancelReason = note;
+      if (order.stockDeducted && !order.stockRestored) {
+        await restoreOrderStock(
+          order,
+          order.items.map((i) => ({ productId: String(i.product), quantity: i.quantity })),
+          'order_cancel',
+          by,
+          session,
+        );
+        order.stockRestored = true;
+      }
+      if (prevStatus !== 'cancelled' && prevStatus !== 'returned') {
+        await ProductModel.bulkWrite(
+          order.items.map((i) => ({
+            updateOne: { filter: { _id: i.product }, update: { $inc: { soldCount: -i.quantity } } },
+          })),
+          { session },
+        );
+      }
+    }
+
+    if (next === 'returned') {
+      order.returnedAt = now;
+      const alreadyReturnedMap = new Map<string, number>();
+      for (const ri of order.returnedItems ?? []) {
+        const k = String(ri.orderItemId);
+        alreadyReturnedMap.set(k, (alreadyReturnedMap.get(k) ?? 0) + ri.quantity);
+      }
+
+      const requested = opts?.returnItems?.length
+        ? opts.returnItems
+        : order.items
+            .map((i) => ({
+              orderItemId: String(i._id),
+              quantity: Math.max(0, i.quantity - (alreadyReturnedMap.get(String(i._id)) ?? 0)),
+              restock: true,
+            }))
+            .filter((x) => x.quantity > 0);
+
+      const newReturnEntries = [];
+      const toRestock: { productId: string; quantity: number }[] = [];
+      let computedRefund = 0;
+
+      for (const req of requested) {
+        const line = order.items.find((i) => String(i._id) === req.orderItemId);
+        if (!line) throw new AppError('Returned item not found in this order.');
+        const prevQty = alreadyReturnedMap.get(req.orderItemId) ?? 0;
+        const remaining = line.quantity - prevQty;
+        if (req.quantity > remaining) {
+          throw new AppError(
+            `Cannot return ${req.quantity} of "${line.name}" — only ${remaining} remaining.`,
+          );
+        }
+        const lineRefund = line.unitPrice * req.quantity;
+        computedRefund += lineRefund;
+        const shouldRestock = req.restock && order.stockDeducted && !order.stockRestored;
+        if (shouldRestock) {
+          toRestock.push({ productId: String(line.product), quantity: req.quantity });
+        }
+        newReturnEntries.push({
+          orderItemId: line._id,
+          product: line.product,
+          name: line.name,
+          quantity: req.quantity,
+          unitPrice: line.unitPrice,
+          supplierPrice: line.supplierPrice,
+          lineTotal: lineRefund,
+          restocked: shouldRestock,
+        });
+      }
+
+      if (toRestock.length > 0) {
+        await restoreOrderStock(order, toRestock, 'order_return', by, session);
+      }
+      order.returnedItems = [...(order.returnedItems ?? []), ...newReturnEntries];
+      const addRefund = opts?.refundAmount ?? computedRefund;
+      order.refundedAmount = (order.refundedAmount ?? 0) + addRefund;
+      if (addRefund > 0 && order.paymentStatus === 'paid') {
+        order.paymentStatus = 'refunded';
+      }
+
+      // If all ordered units have been returned, mark stockRestored to prevent duplicate restock.
+      const totalOrdered = order.items.reduce((s, i) => s + i.quantity, 0);
+      const totalReturned = order.returnedItems.reduce((s, i) => s + i.quantity, 0);
+      if (totalReturned >= totalOrdered) {
+        order.stockRestored = true;
+      }
+
+      if (prevStatus !== 'cancelled' && prevStatus !== 'returned') {
+        await ProductModel.bulkWrite(
+          newReturnEntries.map((ri) => ({
+            updateOne: {
+              filter: { _id: ri.product },
+              update: { $inc: { soldCount: -ri.quantity } },
+            },
+          })),
+          { session },
+        );
+      }
+    }
+
+    await order.save({ session });
+    return order;
+  });
+
+  await notifyCustomerOrderStatus(updatedOrder, next);
 }
 
 export async function updateOrderMeta(
@@ -501,6 +682,15 @@ export async function cancelOrderByCustomer(userId: string, orderId: string, rea
   ).lean();
   if (!order) {
     throw new AppError('This order can no longer be cancelled — it has already been confirmed.');
+  }
+  if (order.stockDeducted && !order.stockRestored) {
+    await restoreOrderStock(
+      order,
+      order.items.map((i) => ({ productId: String(i.product), quantity: i.quantity })),
+      'order_cancel',
+      userId,
+    );
+    await OrderModel.updateOne({ _id: order._id }, { $set: { stockRestored: true } });
   }
   await revertSoldCounts(order);
   await notifyAdminsOrderCancelled(order);

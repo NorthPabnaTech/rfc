@@ -1,10 +1,13 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
 import {
+  DEFAULT_BUSINESS_SLUG,
   PRODUCT_STATUSES,
   PRODUCT_TYPES,
+  PRODUCT_VISIBILITIES,
   type ProductStatus,
   type ProductType,
+  type ProductVisibility,
   STOCK_STATUSES,
   type StockStatus,
 } from '@lib/constants';
@@ -62,12 +65,17 @@ export interface Product {
   effectivePrice: number;
 
   stockStatus: StockStatus;
+  stockQuantity: number;
+  /** True once numeric stock is actively managed (e.g. via Stock In/Out). */
+  trackInventory: boolean;
   sku?: string;
   images: ImageAsset[];
   variations: ProductVariation[];
   specifications: ProductSpecification[];
   seo: ProductSeo;
 
+  business: string;
+  visibility: ProductVisibility;
   status: ProductStatus;
   isFeatured: boolean;
   /** A regular product (e.g. "5 pcs T-shirt combo") also listed under Combo offers. */
@@ -123,6 +131,8 @@ const productSchema = new Schema<Product>(
     effectivePrice: { type: Number, required: true, min: 0, index: true },
 
     stockStatus: { type: String, enum: STOCK_STATUSES, default: 'in_stock', index: true },
+    stockQuantity: { type: Number, default: 0, min: 0 },
+    trackInventory: { type: Boolean, default: false },
     sku: { type: String, trim: true, uppercase: true, maxlength: 60 },
     images: { type: [imageAssetSchema], default: [] },
     variations: { type: [variationSchema], default: [] },
@@ -133,6 +143,8 @@ const productSchema = new Schema<Product>(
       keywords: [{ type: String, trim: true, maxlength: 60 }],
     },
 
+    business: { type: String, default: DEFAULT_BUSINESS_SLUG, index: true },
+    visibility: { type: String, enum: PRODUCT_VISIBILITIES, default: 'public', index: true },
     status: { type: String, enum: PRODUCT_STATUSES, default: 'published', index: true },
     isFeatured: { type: Boolean, default: false, index: true },
     isComboOffer: { type: Boolean, default: false, index: true },

@@ -13,6 +13,7 @@ import {
 import type { OrderDTO } from '@/types';
 import { Form, FormInput } from '@components/form';
 import { Icon } from '@components/icon/icon';
+import { Callout, Spinner } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
 import { formatStoreDate } from '@lib/utils';
@@ -20,13 +21,56 @@ import { trackOrderSchema } from '@lib/validators/order';
 
 type Values = z.input<typeof trackOrderSchema>;
 
-export function TrackOrderForm({ initialOrderNumber }: { initialOrderNumber: string }) {
+export function TrackOrderForm({
+  initialOrderNumber,
+  initialPhone = '',
+}: {
+  initialOrderNumber: string;
+  initialPhone?: string;
+}) {
+  const initialParsed = React.useMemo(() => {
+    const num = initialOrderNumber.trim();
+    const ph = initialPhone.trim();
+    if (!num || !ph) return null;
+    return trackOrderSchema.safeParse({ orderNumber: num, phone: ph });
+  }, [initialOrderNumber, initialPhone]);
+
   const [order, setOrder] = React.useState<OrderDTO | null>(null);
+  const [autoLoading, setAutoLoading] = React.useState(Boolean(initialParsed?.success));
+  const [lookupError, setLookupError] = React.useState<string | null>(
+    initialParsed && !initialParsed.success
+      ? (initialParsed.error.issues[0]?.message ?? 'Invalid tracking link parameters.')
+      : null,
+  );
+  const autoFetchedKey = React.useRef<string | null>(null);
+
   const form = Form.useForm<Values>({
     schema: trackOrderSchema,
-    defaultValues: { orderNumber: initialOrderNumber, phone: '' },
+    defaultValues: { orderNumber: initialOrderNumber, phone: initialPhone },
   });
   const { isSubmitting } = form.formState;
+
+  React.useEffect(() => {
+    if (!initialParsed?.success) return;
+    const key = `${initialParsed.data.orderNumber}|${initialParsed.data.phone}`;
+    if (autoFetchedKey.current === key) return;
+    autoFetchedKey.current = key;
+
+    let cancelled = false;
+    trackOrderAction(initialParsed.data).then((res) => {
+      if (cancelled) return;
+      setAutoLoading(false);
+      if (res.ok) {
+        setOrder(res.data);
+      } else {
+        setOrder(null);
+        setLookupError(res.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialParsed]);
 
   return (
     <div className="mt-10 space-y-10">
@@ -35,8 +79,13 @@ export function TrackOrderForm({ initialOrderNumber }: { initialOrderNumber: str
         className="bg-cream grid gap-4 rounded-3xl p-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
         onFinish={async (values) => {
           setOrder(null);
+          setLookupError(null);
           const res = await trackOrderAction(values);
-          if (handleActionResult(res, form, { successToast: false })) setOrder(res.data);
+          if (handleActionResult(res, form, { successToast: false })) {
+            setOrder(res.data);
+          } else if (!res.ok) {
+            setLookupError(res.error);
+          }
         }}
       >
         <FormInput name="orderNumber" label="Order number" placeholder="RFC-100001" required />
@@ -53,11 +102,26 @@ export function TrackOrderForm({ initialOrderNumber }: { initialOrderNumber: str
           <span aria-hidden className="type-label invisible hidden sm:block">
             Track
           </span>
-          <Button type="submit" variant="noir" size="lg" disabled={isSubmitting}>
+          <Button type="submit" variant="noir" size="lg" disabled={isSubmitting || autoLoading}>
             <Icon name="search" size={16} /> {isSubmitting ? 'Searching…' : 'Track'}
           </Button>
         </div>
       </Form>
+
+      {autoLoading && (
+        <div className="flex items-center justify-center gap-2 py-8 text-sm">
+          <Spinner size="sm" />
+          <span className="text-muted">Loading your order tracking details…</span>
+        </div>
+      )}
+
+      {lookupError && !autoLoading && !order && (
+        <Callout
+          tone="warn"
+          title="Order not found"
+          description={lookupError}
+        />
+      )}
 
       {order && (
         <div className="animate-fade-up border-line space-y-8 rounded-3xl border bg-white p-6 sm:p-8">
