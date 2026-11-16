@@ -50,6 +50,8 @@ export interface Order {
   subtotal: number;
   shippingFee: number;
   discount: number;
+  couponCode?: string | null;
+  campaignId?: Types.ObjectId | null;
   total: number;
   /** Sum of supplier cost across lines, for profit = total - shipping - cost. */
   supplierCost: number;
@@ -123,6 +125,8 @@ const orderSchema = new Schema<Order>(
     subtotal: { type: Number, required: true, min: 0 },
     shippingFee: { type: Number, required: true, min: 0, default: 0 },
     discount: { type: Number, min: 0, default: 0 },
+    couponCode: { type: String, trim: true, uppercase: true, default: null },
+    campaignId: { type: Schema.Types.ObjectId, ref: 'Campaign', default: null },
     total: { type: Number, required: true, min: 0 },
     supplierCost: { type: Number, min: 0, default: 0 },
 

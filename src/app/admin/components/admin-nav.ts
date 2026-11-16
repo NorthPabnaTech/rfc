@@ -43,6 +43,7 @@ export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
   {
     title: 'Marketing',
     items: [
+      { href: '/admin/campaigns', label: 'Campaigns', icon: 'coupon' },
       { href: '/admin/banners', label: 'Banners', icon: 'image' },
       { href: '/admin/combos', label: 'Combo offers', icon: 'layers' },
     ],

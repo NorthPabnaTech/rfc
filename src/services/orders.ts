@@ -17,6 +17,8 @@ import {
   withTransaction,
 } from '@/database';
 import type { CartQuote, CartQuoteLine, OrderDTO, OrderRowDTO, Paginated } from '@/types';
+
+import { calculateCampaignDiscount } from './campaigns';
 import {
   ADMIN_ORDER_TRANSITIONS,
   ADMIN_PAGE_SIZE,
@@ -187,17 +189,28 @@ async function shippingFor(zone: ShippingZone | undefined, subtotal: number) {
   return zone === 'inside_dhaka' ? s.shippingFeeInsideDhaka : s.shippingFeeOutsideDhaka;
 }
 
-export async function quoteCart(lines: CartLineInput[], zone?: ShippingZone): Promise<CartQuote> {
+export async function quoteCart(
+  lines: CartLineInput[],
+  zone?: ShippingZone,
+  couponCode?: string | null,
+): Promise<CartQuote> {
   const priced = await priceLines(lines);
   const subtotal = priced.filter((l) => l.available).reduce((sum, l) => sum + l.lineTotal, 0);
   const shippingFee = await shippingFor(zone, subtotal);
   const { freeShippingThreshold } = await getSettings();
+  const { discount, appliedCampaign, couponError } = await calculateCampaignDiscount(
+    priced,
+    couponCode,
+  );
   return {
     lines: priced.map(({ item: _item, ...rest }) => rest),
     subtotal,
     shippingFee,
-    total: subtotal + shippingFee,
+    discount,
+    total: Math.max(0, subtotal - discount) + shippingFee,
     freeShippingThreshold,
+    appliedCampaign,
+    couponError,
   };
 }
 
@@ -213,6 +226,8 @@ type NewOrder = {
   status?: Extract<OrderStatus, 'pending' | 'confirmed'>;
   shippingFeeOverride?: number;
   discount?: number;
+  couponCode?: string | null;
+  campaignId?: string | null;
   customerNote?: string;
   adminNote?: string;
   createdBy?: string | null;
@@ -262,6 +277,8 @@ async function createOrder(
           subtotal,
           shippingFee,
           discount,
+          couponCode: input.couponCode ?? null,
+          campaignId: input.campaignId ?? null,
           total: subtotal + shippingFee - discount,
           supplierCost,
           paymentMethod: 'cod',
@@ -320,15 +337,28 @@ export async function placeWebsiteOrder(input: {
   phone: string;
   email?: string;
   address: Order['shippingAddress'];
+  couponCode?: string | null;
   customerNote?: string;
   saveAddress?: boolean;
 }) {
+  const priced = await priceLines(input.lines);
+  const { discount, appliedCampaign, couponError } = await calculateCampaignDiscount(
+    priced,
+    input.couponCode,
+  );
+  if (input.couponCode?.trim() && couponError) {
+    throw new AppError(couponError);
+  }
+
   const result = await createOrder({
     lines: input.lines,
     userId: input.userId,
     customer: { name: input.name, phone: input.phone, email: input.email },
     shippingAddress: input.address,
     platform: 'website',
+    discount,
+    couponCode: appliedCampaign?.couponCode ?? null,
+    campaignId: appliedCampaign?.id ?? null,
     customerNote: input.customerNote,
   });
   await notifyAdminsOrderPlaced({

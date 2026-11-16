@@ -1,4 +1,5 @@
 import { ProductChatProvider, WhatsAppWidget } from '@/features/chat/whatsapp-widget';
+import { getActiveCampaigns } from '@/services/campaigns';
 import { getCategoryTree } from '@/services/catalog';
 import { getNotificationFeed } from '@/services/notifications';
 import { getSettings } from '@/services/settings';
@@ -6,16 +7,19 @@ import { getCurrentUser } from '@lib/auth/current-user';
 import { pushClientKey, realtimeClientConfig } from '@lib/realtime/channels';
 
 import { CartDrawer } from './components/cart-drawer';
+import { OfferModal } from './components/offer-modal';
 import { SiteFooter } from './components/site-footer';
 import { SiteHeader } from './components/site-header';
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-  const [settings, categories, user] = await Promise.all([
+  const [settings, categories, user, campaigns] = await Promise.all([
     getSettings(),
     getCategoryTree(),
     getCurrentUser(),
+    getActiveCampaigns(),
   ]);
   const notifications = user ? await getNotificationFeed(user.id) : null;
+  const modalCampaign = campaigns.find((c) => c.showModal) ?? null;
 
   return (
     <ProductChatProvider>
@@ -47,6 +51,7 @@ export default async function PublicLayout({ children }: { children: React.React
       </main>
       <SiteFooter settings={settings} categories={categories} />
       <CartDrawer />
+      <OfferModal campaign={modalCampaign} />
       <WhatsAppWidget settings={settings} />
     </div>
     </ProductChatProvider>

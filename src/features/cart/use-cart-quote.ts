@@ -12,9 +12,18 @@ import type { ShippingZone } from '@lib/constants';
  * Re-quotes whenever the lines or delivery zone change; `loading` is derived
  * from whether the latest quote matches the current cart.
  */
-export function useCartQuote(items: CartItem[], zone?: ShippingZone, enabled = true) {
+export function useCartQuote(
+  items: CartItem[],
+  zone?: ShippingZone,
+  enabled = true,
+  couponCode?: string,
+) {
   const [result, setResult] = React.useState<{ signature: string; quote: CartQuote } | null>(null);
-  const signature = JSON.stringify([items.map((i) => [i.productId, i.quantity, i.variant]), zone]);
+  const signature = JSON.stringify([
+    items.map((i) => [i.productId, i.quantity, i.variant]),
+    zone,
+    couponCode ?? '',
+  ]);
   const active = enabled && items.length > 0;
 
   React.useEffect(() => {
@@ -27,6 +36,7 @@ export function useCartQuote(items: CartItem[], zone?: ShippingZone, enabled = t
         variant: i.variant,
       })),
       zone,
+      couponCode: couponCode || undefined,
     }).then((res) => {
       if (!cancelled && res.ok) setResult({ signature, quote: res.data });
     });

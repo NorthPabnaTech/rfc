@@ -1,12 +1,14 @@
 import { ProductGrid } from '@/features/products/product-card';
 import { BannerCard } from '@/features/promotions/banner-card';
 import { getActiveBanners } from '@/services/banners';
+import { getActiveCampaigns } from '@/services/campaigns';
 import { getCategoryTree } from '@/services/catalog';
 import { listFeaturedReviews } from '@/services/engagement';
 import { listProductCards } from '@/services/products';
 import type { BannerDTO, ProductCardDTO } from '@/types';
 import type { IconRegistryKey } from '@components/icon/icon';
 
+import { ActiveCampaignBanner } from './components/home/active-campaign-banner';
 import { CategoryRail } from './components/home/category-rail';
 import { HeroBanners } from './components/home/hero-banners';
 import { ReviewsSection } from './components/home/reviews-section';
@@ -19,9 +21,10 @@ import { ServiceStrip } from './components/home/service-strip';
  * discounts → combos → special offer banner → popular → reviews.
  */
 export default async function HomePage() {
-  const [banners, categories, featured, fresh, deals, combos, popular, reviews] = await Promise.all(
-    [
+  const [banners, campaigns, categories, featured, fresh, deals, combos, popular, reviews] =
+    await Promise.all([
       getActiveBanners(),
+      getActiveCampaigns(),
       getCategoryTree(),
       listProductCards('featured', 5),
       listProductCards('new', 10),
@@ -37,6 +40,7 @@ export default async function HomePage() {
     <div className="bg-surface pb-12 sm:pb-16">
       <HeroBanners hero={banners.hero} side={banners.hero_side} />
       <ServiceStrip />
+      <ActiveCampaignBanner campaigns={campaigns} />
       <CategoryRail categories={categories} />
 
       <ProductSection

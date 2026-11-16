@@ -390,12 +390,53 @@ export type CartQuoteLine = {
   issue?: string;
 };
 
+export type AppliedCampaignDTO = {
+  id: string;
+  title: string;
+  type: 'offer' | 'coupon';
+  couponCode?: string | null;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+};
+
 export type CartQuote = {
   lines: CartQuoteLine[];
   subtotal: number;
   shippingFee: number;
+  discount: number;
   total: number;
   freeShippingThreshold: number;
+  appliedCampaign?: AppliedCampaignDTO | null;
+  couponError?: string | null;
+};
+
+export type CampaignProductRef = {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  salePrice?: number | null;
+  image?: ImageDTO;
+};
+
+export type CampaignDTO = {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'offer' | 'coupon';
+  couponCode?: string | null;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderAmount: number;
+  scope: 'all' | 'products';
+  productIds: string[];
+  products: CampaignProductRef[];
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  showModal: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 /* ─── Engagement ─────────────────────────────────────────────────────────── */

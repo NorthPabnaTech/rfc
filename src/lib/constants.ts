@@ -263,6 +263,17 @@ export const BANNER_POSITION_HINTS: Record<BannerPosition, string> = {
   combo: 'Header banner on the Combo Offers page. ~1600×480.',
 };
 
+/* ─── Campaigns & Coupons ────────────────────────────────────────────────── */
+
+export const CAMPAIGN_TYPES = ['offer', 'coupon'] as const;
+export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
+
+export const DISCOUNT_TYPES = ['percentage', 'fixed'] as const;
+export type DiscountType = (typeof DISCOUNT_TYPES)[number];
+
+export const CAMPAIGN_SCOPES = ['all', 'products'] as const;
+export type CampaignScope = (typeof CAMPAIGN_SCOPES)[number];
+
 /* ─── Notifications ──────────────────────────────────────────────────────── */
 
 /**

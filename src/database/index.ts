@@ -4,6 +4,7 @@ export { connectDB, withTransaction } from './connect';
 export { type Address, AddressModel, type AddressSnapshot } from './models/address';
 export { type Banner, BannerModel } from './models/banner';
 export { type Business, BusinessModel } from './models/business';
+export { type Campaign, CampaignModel } from './models/campaign';
 export { type Category, CategoryModel } from './models/category';
 export { nextSequence } from './models/counter';
 export { type Expense, ExpenseModel } from './models/expense';

@@ -15,7 +15,9 @@ import { useCart } from '@/stores/cart-store';
 import type { AddressDTO } from '@/types';
 import { Form, FormCheckbox, FormInput, FormItem, FormTextarea } from '@components/form';
 import { Icon } from '@components/icon/icon';
+import { Spinner } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { Input } from '@components/ui/input';
 import { useHydrated } from '@hooks/use-hydrated';
 import { handleActionResult } from '@lib/action-client';
 import { SHIPPING_ZONE_LABELS, SHIPPING_ZONES, type ShippingZone } from '@lib/constants';
@@ -56,6 +58,9 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
   const [addressId, setAddressId] = React.useState<string | 'new'>(defaultAddress?.id ?? 'new');
   const [placed, setPlaced] = React.useState(false);
+  const [couponInput, setCouponInput] = React.useState('');
+  const [appliedCoupon, setAppliedCoupon] = React.useState('');
+  const [couponAction, setCouponAction] = React.useState<'apply' | 'remove' | null>(null);
 
   const form = Form.useForm<FormValues>({
     schema: formSchema,
@@ -77,7 +82,13 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
     },
   });
   const zone = useWatch({ control: form.control, name: 'zone' }) as ShippingZone | undefined;
-  const { quote, loading } = useCartQuote(items, zone, hydrated);
+  const { quote, loading } = useCartQuote(items, zone, hydrated, appliedCoupon);
+
+  React.useEffect(() => {
+    if (!loading && couponAction) {
+      setCouponAction(null);
+    }
+  }, [loading, couponAction]);
   const { isSubmitting } = form.formState;
   const issues = quote?.lines.filter((l) => !l.available) ?? [];
 
@@ -123,6 +134,7 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
       onFinish={async (values) => {
         const res = await placeOrderAction({
           ...values,
+          couponCode: appliedCoupon || undefined,
           items: items.map((i) => ({
             productId: i.productId,
             quantity: i.quantity,
@@ -305,6 +317,71 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             );
           })}
         </ul>
+        <div className="border-line mt-3 border-t pt-3">
+          <div className="flex items-center gap-2">
+            <Input
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+              placeholder="Coupon code"
+              aria-label="Coupon code"
+              className="h-10 bg-white text-xs uppercase"
+            />
+            {(appliedCoupon && appliedCoupon === couponInput.trim().toUpperCase()) ||
+            (couponAction === 'remove' && loading) ? (
+              <Button
+                type="button"
+                variant="danger"
+                className="h-10 shrink-0 px-4"
+                disabled={loading}
+                onClick={() => {
+                  setCouponAction('remove');
+                  setAppliedCoupon('');
+                  setCouponInput('');
+                }}
+              >
+                {couponAction === 'remove' && loading ? (
+                  <>
+                    <Spinner size="sm" /> Removing…
+                  </>
+                ) : (
+                  'Remove'
+                )}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                className="h-10 shrink-0 px-4"
+                disabled={!couponInput.trim() || loading}
+                onClick={() => {
+                  setCouponAction('apply');
+                  setAppliedCoupon(couponInput.trim().toUpperCase());
+                }}
+              >
+                {couponAction === 'apply' && loading ? (
+                  <>
+                    <Spinner size="sm" /> Applying…
+                  </>
+                ) : (
+                  'Apply'
+                )}
+              </Button>
+            )}
+          </div>
+          {quote?.couponError && (
+            <p className="mt-1.5 text-xs text-[var(--status-danger-fg)]">{quote.couponError}</p>
+          )}
+          {quote?.appliedCampaign && quote.discount > 0 && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[var(--status-ok-fg)]">
+              <Icon name="coupon" size={13} />
+              <span>
+                {quote.appliedCampaign.title}
+                {quote.appliedCampaign.couponCode ? ` (${quote.appliedCampaign.couponCode})` : ''}{' '}
+                applied
+              </span>
+            </p>
+          )}
+        </div>
         <dl className="border-line mt-3 space-y-2.5 border-t pt-4 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted">Subtotal</dt>
@@ -312,6 +389,19 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
               {quote ? <Taka amount={quote.subtotal} /> : '—'}
             </dd>
           </div>
+          {quote && quote.discount > 0 && (
+            <div className="flex justify-between text-[var(--status-ok-fg)]">
+              <dt>
+                Discount
+                {quote.appliedCampaign?.discountType === 'percentage'
+                  ? ` (${quote.appliedCampaign.discountValue}%)`
+                  : ''}
+              </dt>
+              <dd className="font-semibold">
+                -<Taka amount={quote.discount} />
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-muted">Delivery</dt>
             <dd className="text-ink font-medium">

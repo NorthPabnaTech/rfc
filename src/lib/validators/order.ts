@@ -33,6 +33,7 @@ export const checkoutFields = z.object({
   items: z.array(cartLineSchema).min(1, 'Your cart is empty').max(50),
   ...addressFields,
   email: optionalEmail,
+  couponCode: optionalText(32),
   customerNote: optionalText(1000),
   /** Optional: save this address to the signed-in customer's address book. */
   saveAddress: z.boolean().default(false),

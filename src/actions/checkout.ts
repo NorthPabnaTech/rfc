@@ -13,13 +13,14 @@ import { cartLineSchema, checkoutSchema, trackOrderSchema } from '@lib/validator
 const quoteSchema = z.object({
   items: z.array(cartLineSchema).max(50),
   zone: z.enum(SHIPPING_ZONES).optional(),
+  couponCode: z.string().trim().max(32).optional(),
 });
 
 /** Live prices/availability for the cart — the browser's copy is only a hint. */
 export async function quoteCartAction(input: unknown): Promise<ActionResult<CartQuote>> {
   return runAction(async () => {
-    const { items, zone } = quoteSchema.parse(input);
-    return quoteCart(items, zone);
+    const { items, zone, couponCode } = quoteSchema.parse(input);
+    return quoteCart(items, zone, couponCode);
   });
 }
 
@@ -44,6 +45,7 @@ export async function placeOrderAction(
         city: data.city,
         zone: data.zone,
       },
+      couponCode: data.couponCode,
       customerNote: data.customerNote,
       saveAddress: data.saveAddress,
     });
