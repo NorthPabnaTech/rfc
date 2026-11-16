@@ -58,6 +58,11 @@ export interface Order {
 
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  paymentGateway?: string | null;
+  paymentReference?: string | null;
+  gatewayTransactionId?: string | null;
+  gatewayPaymentMethod?: string | null;
+  paidAt?: Date | null;
   platform: OrderPlatform;
   status: OrderStatus;
   statusHistory: OrderStatusEvent[];
@@ -132,6 +137,11 @@ const orderSchema = new Schema<Order>(
 
     paymentMethod: { type: String, enum: PAYMENT_METHODS, default: 'cod' },
     paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: 'unpaid' },
+    paymentGateway: { type: String, trim: true, default: null },
+    paymentReference: { type: String, trim: true, default: null },
+    gatewayTransactionId: { type: String, trim: true, default: null },
+    gatewayPaymentMethod: { type: String, trim: true, default: null },
+    paidAt: { type: Date, default: null },
     platform: { type: String, enum: ORDER_PLATFORMS, default: 'website', index: true },
     status: { type: String, enum: ORDER_STATUSES, default: 'pending', index: true },
     statusHistory: { type: [statusEventSchema], default: [] },
@@ -158,5 +168,7 @@ orderSchema.index({ orderNumber: 1 }, { unique: true });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ 'customer.phone': 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ paymentReference: 1 }, { sparse: true });
+orderSchema.index({ gatewayTransactionId: 1 }, { sparse: true });
 
 export const OrderModel: Model<Order> = defineModel<Order>('Order', orderSchema);

@@ -54,7 +54,6 @@ export default async function DashboardPage() {
           tone="ok"
         />
         <StatCard label="Products" value={d.totals.products} icon="box" tone="neutral" />
-        <StatCard label="Customers" value={d.totals.customers} icon="users" tone="neutral" />
       </StatCardGrid>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -131,7 +130,7 @@ export default async function DashboardPage() {
         <section className="bg-panel hairline rounded-xl2 p-5">
           <h2 className="text-ink mb-4 text-[14px] font-semibold">Top products</h2>
           {d.topProducts.length === 0 ? (
-            <p className="text-muted text-sm">No sales yet.</p>
+            <p className="text-muted py-6 text-center text-sm">No sales yet.</p>
           ) : (
             <ol className="space-y-3">
               {d.topProducts.map((p, i) => (
@@ -163,7 +162,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
         {d.recentOrders.length === 0 ? (
-          <p className="text-muted text-sm">No orders yet.</p>
+          <p className="text-muted py-6 text-center text-sm">No orders yet.</p>
         ) : (
           <ul className="divide-line divide-y">
             {d.recentOrders.map((o) => (

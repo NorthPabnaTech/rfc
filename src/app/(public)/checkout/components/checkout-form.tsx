@@ -21,6 +21,7 @@ import { Input } from '@components/ui/input';
 import { useHydrated } from '@hooks/use-hydrated';
 import { handleActionResult } from '@lib/action-client';
 import { SHIPPING_ZONE_LABELS, SHIPPING_ZONES, type ShippingZone } from '@lib/constants';
+import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
 import { checkLocation } from '@lib/validators/common';
 import { checkoutFields, type CheckoutInput } from '@lib/validators/order';
@@ -77,18 +78,21 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             zone: 'outside_dhaka',
           }),
       email: user?.email ?? '',
+      paymentMethod: 'paymently',
       customerNote: '',
       saveAddress: !!user && addresses.length === 0,
     },
   });
   const zone = useWatch({ control: form.control, name: 'zone' }) as ShippingZone | undefined;
-  const { quote, loading } = useCartQuote(items, zone, hydrated, appliedCoupon);
-
-  React.useEffect(() => {
-    if (!loading && couponAction) {
-      setCouponAction(null);
-    }
-  }, [loading, couponAction]);
+  const paymentMethod = useWatch({ control: form.control, name: 'paymentMethod' }) ?? 'paymently';
+  const clearCouponAction = React.useCallback(() => setCouponAction(null), []);
+  const { quote, loading } = useCartQuote(
+    items,
+    zone,
+    hydrated,
+    appliedCoupon,
+    clearCouponAction,
+  );
   const { isSubmitting } = form.formState;
   const issues = quote?.lines.filter((l) => !l.available) ?? [];
 
@@ -142,6 +146,41 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
           })),
         });
         if (handleActionResult(res, form, { successToast: false })) {
+          if (values.paymentMethod === 'paymently') {
+            try {
+              const payRes = await fetch('/api/payments/paymently/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: res.data.orderId,
+                  paymentToken: res.data.paymentToken,
+                }),
+              });
+              const payJson = (await payRes.json()) as {
+                ok?: boolean;
+                paymentUrl?: string;
+                error?: string;
+              };
+              if (payRes.ok && payJson.ok && payJson.paymentUrl) {
+                setPlaced(true);
+                clear();
+                window.location.assign(payJson.paymentUrl);
+                return;
+              }
+              toast.error('Online payment could not be started', {
+                description: payJson.error || 'You can retry payment from your order page.',
+              });
+            } catch {
+              toast.error('Unable to reach payment gateway', {
+                description: 'Your order was saved — you can retry payment now.',
+              });
+            }
+            setPlaced(true);
+            clear();
+            router.push(`/order-success/${res.data.orderNumber}?gateway=paymently&error=1`);
+            return;
+          }
+
           setPlaced(true);
           clear();
           router.push(`/order-success/${res.data.orderNumber}`);
@@ -257,18 +296,43 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
         </Step>
 
         <Step n={3} title="Payment">
-          <div className="border-noir bg-cream flex items-center gap-4 rounded-2xl border-2 px-5 py-4">
-            <span className="bg-noir text-brand-300 grid size-11 place-items-center rounded-full">
-              <Icon name="money" size={20} />
-            </span>
-            <div className="cap-trim">
-              <p className="text-ink leading-tight font-semibold">Cash on Delivery</p>
-              <p className="text-muted mt-1.5 text-[13px] leading-tight">
-                Pay in cash when you receive your order.
-              </p>
-            </div>
-            <Icon name="checkCircle" size={22} className="text-ink ml-auto" />
-          </div>
+          <FormItem name="paymentMethod">
+            {(field) => (
+              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
+                <AddressChoice
+                  active={field.value === 'paymently'}
+                  onClick={() => field.onChange('paymently')}
+                  role="radio"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="bg-brand text-brand-contrast grid size-10 shrink-0 place-items-center rounded-full">
+                      <Icon name="card" size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-ink font-semibold">Pay Online</p>
+                      <p className="text-muted text-xs">bKash</p>
+                    </div>
+                  </div>
+                </AddressChoice>
+
+                <AddressChoice
+                  active={field.value === 'cod'}
+                  onClick={() => field.onChange('cod')}
+                  role="radio"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="bg-noir text-brand-300 grid size-10 shrink-0 place-items-center rounded-full">
+                      <Icon name="money" size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-ink font-semibold">Cash on Delivery</p>
+                      <p className="text-muted text-xs">Pay in cash when you receive your order</p>
+                    </div>
+                  </div>
+                </AddressChoice>
+              </div>
+            )}
+          </FormItem>
           <FormTextarea
             name="customerNote"
             label="Order note (optional)"
@@ -417,7 +481,9 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             </dd>
           </div>
           <div className="border-line flex justify-between border-t pt-3">
-            <dt className="text-ink font-semibold">Total (pay on delivery)</dt>
+            <dt className="text-ink font-semibold">
+              {paymentMethod === 'paymently' ? 'Total (pay online)' : 'Total (pay on delivery)'}
+            </dt>
             <dd className="text-ink text-xl font-bold">
               {quote ? <Taka amount={quote.total} /> : '—'}
             </dd>
@@ -425,12 +491,18 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
         </dl>
         <Button
           type="submit"
-          variant="noir"
+          variant={paymentMethod === 'paymently' ? 'primary' : 'noir'}
           size="xl"
           className="mt-6 w-full"
           disabled={isSubmitting || loading || !quote || issues.length > 0}
         >
-          {isSubmitting ? 'Placing order…' : 'Place order'}
+          {isSubmitting
+            ? paymentMethod === 'paymently'
+              ? 'Redirecting to payment…'
+              : 'Placing order…'
+            : paymentMethod === 'paymently'
+              ? 'Pay Now'
+              : 'Place order'}
         </Button>
         {issues.length > 0 && (
           <p className="mt-3 text-center text-xs text-[var(--status-danger-fg)]">

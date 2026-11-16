@@ -12,12 +12,14 @@ import {
 } from '@/features/orders/order-ui';
 import { getCustomerOrder } from '@/services/orders';
 import { Icon } from '@components/icon/icon';
+import { Badge } from '@components/ui/badge';
 import { requireUserPage } from '@lib/auth/current-user';
 import { PAYMENT_METHOD_LABELS } from '@lib/constants';
 import { formatStoreDate, formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
 
 import { CancelOrderButton } from './components/cancel-order-button';
+import { PayNowButton } from './components/pay-now-button';
 
 export const metadata: Metadata = { title: 'Order details' };
 
@@ -104,9 +106,48 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <section className="border-line rounded-3xl border bg-white p-6">
             <h3 className="text-ink mb-4 font-semibold">Summary</h3>
             <OrderTotals order={order} />
-            <p className="text-muted mt-4 text-xs">
-              Payment: {PAYMENT_METHOD_LABELS[order.paymentMethod]}
-            </p>
+            <div className="border-line mt-4 flex items-center justify-between gap-2 border-t pt-3 text-xs">
+              <span className="text-muted">
+                Payment: {PAYMENT_METHOD_LABELS[order.paymentMethod]}
+              </span>
+              <Badge
+                tone={
+                  order.paymentStatus === 'paid'
+                    ? 'ok'
+                    : order.paymentStatus === 'refunded'
+                      ? 'neutral'
+                      : 'warn'
+                }
+              >
+                {order.paymentStatus === 'paid'
+                  ? 'Paid'
+                  : order.paymentStatus === 'refunded'
+                    ? 'Refunded'
+                    : 'Unpaid'}
+              </Badge>
+            </div>
+            {order.paymentMethod === 'paymently' &&
+              order.paymentStatus === 'paid' &&
+              (order.gatewayTransactionId || order.paymentReference) && (
+                <div className="mt-2 space-y-1 text-xs">
+                  {order.gatewayPaymentMethod && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted">Method</span>
+                      <span className="text-ink font-medium">{order.gatewayPaymentMethod}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted">Transaction ID</span>
+                    <span className="text-ink font-mono font-semibold">
+                      {order.gatewayTransactionId || order.paymentReference}
+                    </span>
+                  </div>
+                </div>
+              )}
+            {order.paymentMethod === 'paymently' &&
+              order.paymentStatus === 'unpaid' &&
+              order.status !== 'cancelled' &&
+              order.status !== 'returned' && <PayNowButton orderId={order.id} />}
           </section>
           <section className="border-line rounded-3xl border bg-white p-6">
             <h3 className="text-ink mb-3 font-semibold">Delivery address</h3>

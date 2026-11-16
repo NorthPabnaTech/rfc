@@ -12,7 +12,7 @@ import { formatNumber } from '@lib/utils';
 
 export function ActiveCampaignBanner({ campaigns }: { campaigns: CampaignDTO[] }) {
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
-  const campaign = campaigns[0];
+  const campaign = campaigns.find((c) => c.showOnHome);
   if (!campaign) return null;
 
   const discountLabel =

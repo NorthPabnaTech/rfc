@@ -30,6 +30,7 @@ export interface Campaign {
   startsAt: Date;
   endsAt: Date;
   isActive: boolean;
+  showOnHome: boolean;
   showModal: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +56,7 @@ const campaignSchema = new Schema<Campaign>(
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     isActive: { type: Boolean, default: true },
+    showOnHome: { type: Boolean, default: true },
     showModal: { type: Boolean, default: true },
   },
   baseSchemaOptions,

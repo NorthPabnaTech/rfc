@@ -158,7 +158,7 @@ export function RevenueChart({ data }: { data: Point[] }) {
 /** Horizontal bars for a breakdown (single hue; value at the bar tip). */
 export function BarList({ rows }: { rows: { label: string; value: number; hint?: string }[] }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
-  if (rows.length === 0) return <p className="text-muted text-sm">No data yet.</p>;
+  if (rows.length === 0) return <p className="text-muted py-6 text-center text-sm">No data yet.</p>;
   return (
     <ul className="space-y-3">
       {rows.map((r) => (

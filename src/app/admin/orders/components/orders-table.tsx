@@ -66,10 +66,14 @@ export function OrdersTable({ data }: { data: Paginated<OrderRowDTO> }) {
       cell: (o) => (
         <span className={o.paymentStatus === 'paid' ? 'text-[var(--status-ok-fg)]' : 'text-muted'}>
           {o.paymentStatus === 'paid'
-            ? 'Paid'
+            ? o.paymentMethod === 'paymently'
+              ? 'Paid (Online)'
+              : 'Paid'
             : o.paymentStatus === 'refunded'
               ? 'Refunded'
-              : 'COD due'}
+              : o.paymentMethod === 'paymently'
+                ? 'Online unpaid'
+                : 'COD due'}
         </span>
       ),
     },

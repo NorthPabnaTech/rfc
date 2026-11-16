@@ -17,8 +17,6 @@ import {
   withTransaction,
 } from '@/database';
 import type { CartQuote, CartQuoteLine, OrderDTO, OrderRowDTO, Paginated } from '@/types';
-
-import { calculateCampaignDiscount } from './campaigns';
 import {
   ADMIN_ORDER_TRANSITIONS,
   ADMIN_PAGE_SIZE,
@@ -27,13 +25,16 @@ import {
   ORDER_STATUS_LABELS,
   type OrderPlatform,
   type OrderStatus,
+  type PaymentMethod,
   type PaymentStatus,
   RETURN_WINDOW_HOURS,
   type ShippingZone,
 } from '@lib/constants';
 import { AppError } from '@lib/errors';
+import { signOrderPaymentToken } from '@lib/payments/paymently';
 import type { CartLineInput } from '@lib/validators/order';
 
+import { calculateCampaignDiscount } from './campaigns';
 import { deductOrderStock,restoreOrderStock } from './inventory';
 import { toImage, toOrder, toReturn } from './mappers';
 import {
@@ -223,6 +224,7 @@ type NewOrder = {
   customer: { name: string; phone: string; email?: string };
   shippingAddress: Order['shippingAddress'];
   platform: OrderPlatform;
+  paymentMethod?: PaymentMethod;
   status?: Extract<OrderStatus, 'pending' | 'confirmed'>;
   shippingFeeOverride?: number;
   discount?: number;
@@ -281,7 +283,7 @@ async function createOrder(
           campaignId: input.campaignId ?? null,
           total: subtotal + shippingFee - discount,
           supplierCost,
-          paymentMethod: 'cod',
+          paymentMethod: input.paymentMethod ?? 'cod',
           platform: input.platform,
           status,
           statusHistory: [
@@ -337,6 +339,7 @@ export async function placeWebsiteOrder(input: {
   phone: string;
   email?: string;
   address: Order['shippingAddress'];
+  paymentMethod?: PaymentMethod;
   couponCode?: string | null;
   customerNote?: string;
   saveAddress?: boolean;
@@ -356,6 +359,7 @@ export async function placeWebsiteOrder(input: {
     customer: { name: input.name, phone: input.phone, email: input.email },
     shippingAddress: input.address,
     platform: 'website',
+    paymentMethod: input.paymentMethod ?? 'cod',
     discount,
     couponCode: appliedCampaign?.couponCode ?? null,
     campaignId: appliedCampaign?.id ?? null,
@@ -377,7 +381,10 @@ export async function placeWebsiteOrder(input: {
       isDefault: !hasAny,
     });
   }
-  return result;
+  return {
+    ...result,
+    paymentToken: signOrderPaymentToken(result.id, result.orderNumber),
+  };
 }
 
 export async function createManualOrder(
@@ -415,6 +422,7 @@ function toRow(o: Order): OrderRowDTO {
     total: o.total,
     status: o.status,
     platform: o.platform,
+    paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
     createdAt: new Date(o.createdAt).toISOString(),
     itemCount: o.items.reduce((s, i) => s + i.quantity, 0),
@@ -526,14 +534,21 @@ export async function getOrderConfirmation(orderNumber: string) {
   await connectDB();
   const doc = await OrderModel.findOne(
     { orderNumber },
-    'orderNumber total createdAt customer.name items.quantity status',
+    'orderNumber total createdAt customer.name items.quantity status paymentMethod paymentStatus gatewayPaymentMethod paymentGateway',
   ).lean();
   if (!doc) return null;
   return {
+    id: String(doc._id),
     orderNumber: doc.orderNumber,
     total: doc.total,
     firstName: doc.customer.name.split(' ')[0] ?? '',
     itemCount: doc.items.reduce((s, i) => s + i.quantity, 0),
+    status: doc.status,
+    paymentMethod: doc.paymentMethod,
+    paymentStatus: doc.paymentStatus,
+    gatewayPaymentMethod: doc.gatewayPaymentMethod ?? null,
+    paymentGateway: doc.paymentGateway ?? null,
+    paymentToken: signOrderPaymentToken(String(doc._id), doc.orderNumber),
   };
 }
 

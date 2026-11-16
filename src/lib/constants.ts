@@ -94,10 +94,11 @@ export const ORDER_PLATFORM_LABELS: Record<OrderPlatform, string> = {
   other: 'Other',
 };
 
-export const PAYMENT_METHODS = ['cod'] as const;
+export const PAYMENT_METHODS = ['cod', 'paymently'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cod: 'Cash on Delivery',
+  paymently: 'Pay Online',
 };
 
 export const PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded'] as const;

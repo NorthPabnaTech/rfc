@@ -293,7 +293,7 @@ export async function downloadOrderInvoicePdf(
   drawSmartText(doc, 'UNIT PRICE', rightX - 90, y + 15, { ...headerOpts, align: 'right' });
   drawSmartText(doc, 'TOTAL', rightX - 8, y + 15, { ...headerOpts, align: 'right' });
 
-  y += 32;
+  y += 40;
 
   for (const item of order.items) {
     if (y > 720) {
@@ -308,13 +308,12 @@ export async function downloadOrderInvoicePdf(
       item.sku ? `${item.name} (${item.sku})` : item.name,
       rightX - margin - 210,
       9.5,
-      'bold',
+      'normal',
     );
 
     titleLines.forEach((line, idx) => {
       drawSmartText(doc, line, margin + 8, y + idx * 13, {
         size: 9.5,
-        weight: 'bold',
         color: [17, 24, 39],
       });
     });
@@ -347,7 +346,7 @@ export async function downloadOrderInvoicePdf(
     y += rowH + 8;
     doc.setDrawColor(229, 231, 235);
     doc.line(margin, y - 4, rightX, y - 4);
-    y += 4;
+    y += 10;
   }
 
   // Totals block

@@ -128,7 +128,14 @@ export function OrderActions({ order }: { order: OrderDTO }) {
           onValueChange={(v) => setPayment(v as typeof payment)}
           items={PAYMENT_STATUSES.map((p) => ({
             value: p,
-            label: p === 'unpaid' ? 'Unpaid (COD due)' : p === 'paid' ? 'Paid' : 'Refunded',
+            label:
+              p === 'unpaid'
+                ? order.paymentMethod === 'paymently'
+                  ? 'Unpaid (Online)'
+                  : 'Unpaid (COD due)'
+                : p === 'paid'
+                  ? 'Paid'
+                  : 'Refunded',
           }))}
         />
         <Textarea

@@ -346,6 +346,10 @@ export type OrderDTO = {
   returnedItems?: ReturnedOrderItemDTO[];
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  gatewayTransactionId?: string | null;
+  gatewayPaymentMethod?: string | null;
+  paymentReference?: string | null;
+  paidAt?: string | null;
   platform: OrderPlatform;
   status: OrderStatus;
   statusHistory: { status: OrderStatus; note?: string; at: string; byName?: string }[];
@@ -371,6 +375,7 @@ export type OrderRowDTO = Pick<
   | 'total'
   | 'status'
   | 'platform'
+  | 'paymentMethod'
   | 'paymentStatus'
   | 'createdAt'
 > & { itemCount: number; city: string };
@@ -434,6 +439,7 @@ export type CampaignDTO = {
   startsAt: string;
   endsAt: string;
   isActive: boolean;
+  showOnHome: boolean;
   showModal: boolean;
   createdAt: string;
   updatedAt: string;

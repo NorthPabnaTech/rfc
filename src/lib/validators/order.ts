@@ -4,6 +4,7 @@ import {
   DEFAULT_BUSINESS_SLUG,
   ORDER_PLATFORMS,
   ORDER_STATUSES,
+  PAYMENT_METHODS,
   PAYMENT_STATUSES,
   RETURN_REASONS,
   RETURN_STATUSES,
@@ -33,6 +34,7 @@ export const checkoutFields = z.object({
   items: z.array(cartLineSchema).min(1, 'Your cart is empty').max(50),
   ...addressFields,
   email: optionalEmail,
+  paymentMethod: z.enum(PAYMENT_METHODS).default('cod'),
   couponCode: optionalText(32),
   customerNote: optionalText(1000),
   /** Optional: save this address to the signed-in customer's address book. */

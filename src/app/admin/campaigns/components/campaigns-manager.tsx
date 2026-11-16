@@ -6,9 +6,10 @@ import { useRouter } from 'nextjs-toploader/app';
 import { deleteCampaignAction, saveCampaignAction, toggleCampaignAction } from '@/actions/campaigns';
 import type { CampaignDTO, CampaignProductRef } from '@/types';
 import { Icon } from '@components/icon/icon';
-import { ConfirmDialog, EmptyState } from '@components/shared';
+import { ConfirmDialog, EmptyState, PageHeader, StatCard, StatCardGrid } from '@components/shared';
 import { Badge } from '@components/ui/badge';
 import { Button } from '@components/ui/button';
+import { type Column, DataTable } from '@components/ui/data-table';
 import { DatePicker } from '@components/ui/date-picker';
 import {
   Dialog,
@@ -18,12 +19,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@components/ui/dialog';
+import { Dropdown, type DropdownEntry } from '@components/ui/dropdown';
 import { Input } from '@components/ui/input';
 import { Switch } from '@components/ui/switch';
 import { Textarea } from '@components/ui/textarea';
 import { TimePicker } from '@components/ui/time-picker';
 import { handleActionResult } from '@lib/action-client';
 import type { CampaignScope, CampaignType, DiscountType } from '@lib/constants';
+import { toast } from '@lib/toast';
 import { cn, formatNumber, formatStoreDate } from '@lib/utils';
 
 type FormState = {
@@ -39,6 +42,7 @@ type FormState = {
   startsAt: string;
   endsAt: string;
   isActive: boolean;
+  showOnHome: boolean;
   showModal: boolean;
 };
 
@@ -72,6 +76,7 @@ function emptyForm(): FormState {
     startsAt,
     endsAt,
     isActive: true,
+    showOnHome: true,
     showModal: true,
   };
 }
@@ -90,6 +95,7 @@ function fromCampaign(c: CampaignDTO): FormState {
     startsAt: toLocalInputValue(c.startsAt),
     endsAt: toLocalInputValue(c.endsAt),
     isActive: c.isActive,
+    showOnHome: c.showOnHome ?? true,
     showModal: c.showModal,
   };
 }
@@ -101,7 +107,7 @@ function getStatus(c: CampaignDTO): { label: string; tone: 'ok' | 'info' | 'neut
   const end = new Date(c.endsAt).getTime();
   if (now < start) return { label: 'Scheduled', tone: 'info' };
   if (now > end) return { label: 'Expired', tone: 'danger' };
-  return { label: 'Live', tone: 'ok' };
+  return { label: 'Active', tone: 'ok' };
 }
 
 export function CampaignsManager({
@@ -113,9 +119,50 @@ export function CampaignsManager({
 }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState<{ id?: string; form: FormState } | null>(null);
+  const [viewing, setViewing] = React.useState<CampaignDTO | null>(null);
+  const [toggling, setToggling] = React.useState<CampaignDTO | null>(null);
+  const [filter, setFilter] = React.useState<'all' | 'active' | 'offers' | 'coupons'>('all');
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState<CampaignDTO | null>(null);
   const [productQuery, setProductQuery] = React.useState('');
+
+  const filteredCampaigns = React.useMemo(() => {
+    if (filter === 'all') return campaigns;
+    return campaigns.filter((c) => {
+      if (getStatus(c).label !== 'Active') return false;
+      if (filter === 'offers') return c.type === 'offer';
+      if (filter === 'coupons') return c.type === 'coupon';
+      return true;
+    });
+  }, [campaigns, filter]);
+
+  const copyCoupon = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(`Copied coupon: ${code}`);
+    } catch {
+      toast.error('Could not copy coupon code');
+    }
+  };
+
+  const stats = React.useMemo(() => {
+    let activeCount = 0;
+    let runningOffers = 0;
+    let runningCoupons = 0;
+    for (const c of campaigns) {
+      if (getStatus(c).label === 'Active') {
+        activeCount++;
+        if (c.type === 'offer') runningOffers++;
+        else runningCoupons++;
+      }
+    }
+    return {
+      total: campaigns.length,
+      activeCount,
+      runningOffers,
+      runningCoupons,
+    };
+  }, [campaigns]);
 
   const filteredProducts = React.useMemo(() => {
     const q = productQuery.trim().toLowerCase();
@@ -153,6 +200,7 @@ export function CampaignsManager({
           startsAt: new Date(f.startsAt).toISOString(),
           endsAt: new Date(f.endsAt).toISOString(),
           isActive: f.isActive,
+          showOnHome: f.showOnHome,
           showModal: f.showModal,
         },
         editing.id,
@@ -180,13 +228,169 @@ export function CampaignsManager({
     });
   };
 
+  const columns: Column<CampaignDTO>[] = [
+    {
+      key: 'title',
+      header: 'Campaign',
+      cell: (c) => (
+        <div className="min-w-0">
+          <p className="text-ink max-w-[240px] truncate font-semibold">{c.title}</p>
+          {c.type === 'coupon' && c.couponCode && (
+            <button
+              type="button"
+              onClick={() => void copyCoupon(c.couponCode!)}
+              className="text-muted hover:text-ink mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] transition-colors"
+              title="Copy coupon code"
+            >
+              <span>Code: {c.couponCode}</span>
+              <Icon name="copy" size={11} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: (c) => (
+        <Badge tone={c.type === 'coupon' ? 'neutral' : 'info'}>
+          {c.type === 'coupon' ? 'Coupon' : 'Offer'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'discount',
+      header: 'Discount',
+      cell: (c) => (
+        <div>
+          <span className="text-ink font-semibold">
+            {c.discountType === 'percentage'
+              ? `${c.discountValue}% OFF`
+              : `৳${formatNumber(c.discountValue)} OFF`}
+          </span>
+          {c.minOrderAmount > 0 && (
+            <p className="text-subtle text-[11px]">Min ৳{formatNumber(c.minOrderAmount)}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'target',
+      header: 'Target',
+      cell: (c) => (
+        <span className="text-muted text-xs">
+          {c.scope === 'all'
+            ? 'All products'
+            : `${c.productIds.length} product${c.productIds.length === 1 ? '' : 's'}`}
+        </span>
+      ),
+    },
+    {
+      key: 'window',
+      header: 'Date Range',
+      cell: (c) => (
+        <span className="text-muted text-xs whitespace-nowrap">
+          {formatStoreDate(c.startsAt)} → {formatStoreDate(c.endsAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (c) => {
+        const status = getStatus(c);
+        return <Badge tone={status.tone}>{status.label}</Badge>;
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      cell: (c) => {
+        const items: DropdownEntry[] = [
+          { label: 'View details', icon: 'eye', onClick: () => setViewing(c) },
+          ...(c.type === 'coupon' && c.couponCode
+            ? [{ label: 'Copy coupon', icon: 'copy' as const, onClick: () => void copyCoupon(c.couponCode!) }]
+            : []),
+          { label: 'Edit', icon: 'pencil', onClick: () => openEdit(c) },
+          {
+            label: c.isActive ? 'Deactivate' : 'Activate',
+            icon: c.isActive ? 'cancelCircle' : 'checkCircle',
+            onClick: () => setToggling(c),
+          },
+          { type: 'separator' },
+          {
+            label: 'Delete',
+            icon: 'trash',
+            destructive: true,
+            onClick: () => setDeleting(c),
+          },
+        ];
+
+        return (
+          <Dropdown align="end" items={items}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${c.title}`}
+            >
+              <Icon name="more" size={16} />
+            </Button>
+          </Dropdown>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button type="button" variant="primary" onClick={openNew}>
-          <Icon name="plus" size={16} /> New campaign
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        title="Campaigns & Coupons"
+        description="Run timed offers or coupon codes with percentage or fixed discounts across one, multiple, or all products."
+        actions={
+          <Button type="button" variant="primary" onClick={openNew}>
+            <Icon name="plus" size={16} /> New campaign
+          </Button>
+        }
+      />
+
+      <div className="space-y-6">
+
+      <StatCardGrid>
+        <StatCard
+          label="Total campaigns"
+          value={formatNumber(stats.total)}
+          icon="layers"
+          tone="neutral"
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
+        />
+        <StatCard
+          label="Active campaigns"
+          value={formatNumber(stats.activeCount)}
+          icon="checkCircle"
+          tone="ok"
+          active={filter === 'active'}
+          onClick={() => setFilter('active')}
+        />
+        <StatCard
+          label="Running offers"
+          value={formatNumber(stats.runningOffers)}
+          icon="discount"
+          tone="info"
+          active={filter === 'offers'}
+          onClick={() => setFilter('offers')}
+        />
+        <StatCard
+          label="Running coupons"
+          value={formatNumber(stats.runningCoupons)}
+          icon="coupon"
+          tone="warn"
+          active={filter === 'coupons'}
+          onClick={() => setFilter('coupons')}
+        />
+      </StatCardGrid>
 
       {campaigns.length === 0 ? (
         <div className="panel">
@@ -201,73 +405,15 @@ export function CampaignsManager({
           />
         </div>
       ) : (
-        <div className="grid gap-4">
-          {campaigns.map((c) => {
-            const status = getStatus(c);
-            const discountText =
-              c.discountType === 'percentage'
-                ? `${c.discountValue}% OFF`
-                : `৳${formatNumber(c.discountValue)} OFF`;
-
-            return (
-              <div key={c.id} className="panel p-4 sm:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-ink text-base font-semibold">{c.title}</h3>
-                      <Badge tone={status.tone}>{status.label}</Badge>
-                      <Badge tone="brand">{discountText}</Badge>
-                      {c.type === 'coupon' && c.couponCode ? (
-                        <Badge tone="neutral">Coupon: {c.couponCode}</Badge>
-                      ) : (
-                        <Badge tone="info">Auto offer</Badge>
-                      )}
-                      {c.showModal && <Badge tone="neutral">1st-visit modal</Badge>}
-                    </div>
-                    {c.description && <p className="text-muted text-sm">{c.description}</p>}
-                    <div className="text-subtle flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      <span>
-                        Window: {formatStoreDate(c.startsAt)} → {formatStoreDate(c.endsAt)}
-                      </span>
-                      <span>
-                        Target:{' '}
-                        {c.scope === 'all'
-                          ? 'All products'
-                          : `${c.productIds.length} product${c.productIds.length === 1 ? '' : 's'}`}
-                      </span>
-                      {c.minOrderAmount > 0 && (
-                        <span>Min order: ৳{formatNumber(c.minOrderAmount)}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Switch
-                      checked={c.isActive}
-                      aria-label={`Toggle ${c.title}`}
-                      onCheckedChange={async (checked) => {
-                        const res = await toggleCampaignAction(c.id, checked);
-                        if (handleActionResult(res)) router.refresh();
-                      }}
-                    />
-                    <Button type="button" variant="secondary" size="sm" onClick={() => openEdit(c)}>
-                      <Icon name="pencil" size={14} /> Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete ${c.title}`}
-                      onClick={() => setDeleting(c)}
-                    >
-                      <Icon name="trash" size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <DataTable
+          columns={columns}
+          source={filteredCampaigns}
+          rowKey="id"
+          empty={{
+            title: 'No matching campaigns',
+            description: 'Try selecting another summary card above.',
+          }}
+        />
       )}
 
       {/* Create / Edit Dialog */}
@@ -396,7 +542,7 @@ export function CampaignsManager({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-ink text-xs font-semibold">Min order (৳)</label>
+                    <label className="text-ink text-xs font-semibold">Min amount (৳)</label>
                     <Input
                       type="number"
                       min={0}
@@ -564,6 +710,15 @@ export function CampaignsManager({
                   </label>
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
                     <Switch
+                      checked={editing.form.showOnHome}
+                      onCheckedChange={(v) =>
+                        setEditing({ ...editing, form: { ...editing.form, showOnHome: v } })
+                      }
+                    />
+                    <span>Show banner on homepage</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                    <Switch
                       checked={editing.form.showModal}
                       onCheckedChange={(v) =>
                         setEditing({ ...editing, form: { ...editing.form, showModal: v } })
@@ -591,6 +746,139 @@ export function CampaignsManager({
         </DialogContent>
       </Dialog>
 
+      {/* View Details Dialog */}
+      <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewing?.title}</DialogTitle>
+          </DialogHeader>
+          {viewing && (
+            <DialogBody className="space-y-4 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={getStatus(viewing).tone}>{getStatus(viewing).label}</Badge>
+                <Badge tone="brand">
+                  {viewing.discountType === 'percentage'
+                    ? `${viewing.discountValue}% OFF`
+                    : `৳${formatNumber(viewing.discountValue)} OFF`}
+                </Badge>
+                {viewing.type === 'coupon' && viewing.couponCode ? (
+                  <button
+                    type="button"
+                    onClick={() => void copyCoupon(viewing.couponCode!)}
+                    className="border-line bg-well text-ink hover:border-brand inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold transition"
+                    title="Copy coupon code"
+                  >
+                    <span>Coupon: {viewing.couponCode}</span>
+                    <Icon name="copy" size={12} />
+                  </button>
+                ) : (
+                  <Badge tone="info">Auto offer</Badge>
+                )}
+              </div>
+
+              {viewing.description && (
+                <div className="bg-well rounded-xl p-3">
+                  <p className="text-muted text-xs font-semibold uppercase">Description</p>
+                  <p className="text-ink mt-1 whitespace-pre-line">{viewing.description}</p>
+                </div>
+              )}
+
+              <dl className="divide-line divide-y text-xs">
+                <div className="flex justify-between py-2">
+                  <dt className="text-muted">Date window</dt>
+                  <dd className="text-ink font-medium">
+                    {formatStoreDate(viewing.startsAt)} → {formatStoreDate(viewing.endsAt)}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-2">
+                  <dt className="text-muted">Minimum amount</dt>
+                  <dd className="text-ink font-medium">
+                    {viewing.minOrderAmount > 0
+                      ? `৳${formatNumber(viewing.minOrderAmount)}`
+                      : 'None'}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-2">
+                  <dt className="text-muted">Homepage banner</dt>
+                  <dd className="text-ink font-medium">
+                    {viewing.showOnHome ? 'Shown' : 'Hidden'}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-2">
+                  <dt className="text-muted">1st-visit modal</dt>
+                  <dd className="text-ink font-medium">
+                    {viewing.showModal ? 'Enabled' : 'Disabled'}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-2">
+                  <dt className="text-muted">Target</dt>
+                  <dd className="text-ink font-medium">
+                    {viewing.scope === 'all'
+                      ? 'All products'
+                      : `${viewing.productIds.length} product(s)`}
+                  </dd>
+                </div>
+              </dl>
+
+              {viewing.scope === 'products' && viewing.products.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-muted text-xs font-semibold uppercase">Targeted products</p>
+                  <ul className="border-line max-h-40 divide-y overflow-y-auto rounded-xl border text-xs">
+                    {viewing.products.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between px-3 py-2">
+                        <span className="text-ink truncate font-medium">{p.name}</span>
+                        <span className="text-muted shrink-0">
+                          ৳{formatNumber(p.salePrice ?? p.price)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </DialogBody>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setViewing(null)}>
+              Close
+            </Button>
+            {viewing && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  const target = viewing;
+                  setViewing(null);
+                  openEdit(target);
+                }}
+              >
+                <Icon name="pencil" size={14} /> Edit campaign
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!toggling}
+        onOpenChange={(o) => !o && setToggling(null)}
+        tone={toggling?.isActive ? 'danger' : undefined}
+        title={toggling?.isActive ? 'Deactivate campaign?' : 'Activate campaign?'}
+        description={
+          toggling?.isActive
+            ? `"${toggling?.title}" will be paused and will no longer apply on the store.`
+            : `"${toggling?.title}" will become active within its scheduled date window.`
+        }
+        confirmLabel={toggling?.isActive ? 'Deactivate' : 'Activate'}
+        onConfirm={async () => {
+          if (!toggling) return;
+          const res = await toggleCampaignAction(toggling.id, !toggling.isActive);
+          if (handleActionResult(res)) {
+            setToggling(null);
+            router.refresh();
+          }
+        }}
+      />
+
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(null)}
@@ -607,6 +895,7 @@ export function CampaignsManager({
           }
         }}
       />
-    </div>
+      </div>
+    </>
   );
 }

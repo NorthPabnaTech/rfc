@@ -450,6 +450,19 @@ export async function getCustomerDetail(id: string) {
   };
 }
 
+export async function getCustomerCounts(): Promise<{
+  total: number;
+  active: number;
+  disabled: number;
+}> {
+  await connectDB();
+  const [active, disabled] = await Promise.all([
+    UserModel.countDocuments({ role: 'customer', isActive: true }),
+    UserModel.countDocuments({ role: 'customer', isActive: false }),
+  ]);
+  return { total: active + disabled, active, disabled };
+}
+
 export async function setCustomerActive(id: string, isActive: boolean) {
   await connectDB();
   const res = await UserModel.updateOne({ _id: id, role: 'customer' }, { $set: { isActive } });

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { useHydrated } from '@hooks/use-hydrated';
 import { cn } from '@lib/utils';
 
 type TimeLeft = {
@@ -12,8 +13,8 @@ type TimeLeft = {
   expired: boolean;
 };
 
-function computeTimeLeft(targetMs: number): TimeLeft {
-  const diff = targetMs - Date.now();
+function computeTimeLeft(targetMs: number, nowMs: number): TimeLeft {
+  const diff = targetMs - nowMs;
   if (diff <= 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
   }
@@ -34,18 +35,20 @@ export function CountdownTimer({
   tone?: 'dark' | 'light';
   className?: string;
 }) {
+  const hydrated = useHydrated();
   const targetMs = React.useMemo(() => new Date(endsAt).getTime(), [endsAt]);
-  const [left, setLeft] = React.useState<TimeLeft | null>(null);
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
 
   React.useEffect(() => {
-    setLeft(computeTimeLeft(targetMs));
     const timer = window.setInterval(() => {
-      setLeft(computeTimeLeft(targetMs));
+      setNowMs(Date.now());
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [targetMs]);
+  }, []);
 
-  if (!left || left.expired) return null;
+  if (!hydrated) return null;
+  const left = computeTimeLeft(targetMs, nowMs);
+  if (left.expired) return null;
 
   const units = [
     { label: 'Days', value: left.days },

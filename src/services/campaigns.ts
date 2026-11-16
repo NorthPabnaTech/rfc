@@ -61,6 +61,7 @@ function toCampaignDTO(
     startsAt: new Date(doc.startsAt).toISOString(),
     endsAt: new Date(doc.endsAt).toISOString(),
     isActive: doc.isActive,
+    showOnHome: doc.showOnHome ?? true,
     showModal: doc.showModal ?? true,
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt).toISOString(),
@@ -142,6 +143,7 @@ export async function saveCampaign(input: CampaignParsed, id?: string): Promise<
     startsAt: new Date(input.startsAt),
     endsAt: new Date(input.endsAt),
     isActive: input.isActive,
+    showOnHome: input.showOnHome,
     showModal: input.showModal,
   };
 

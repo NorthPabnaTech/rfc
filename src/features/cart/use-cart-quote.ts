@@ -17,6 +17,7 @@ export function useCartQuote(
   zone?: ShippingZone,
   enabled = true,
   couponCode?: string,
+  onSettled?: () => void,
 ) {
   const [result, setResult] = React.useState<{ signature: string; quote: CartQuote } | null>(null);
   const signature = JSON.stringify([
@@ -25,6 +26,11 @@ export function useCartQuote(
     couponCode ?? '',
   ]);
   const active = enabled && items.length > 0;
+  const onSettledRef = React.useRef(onSettled);
+
+  React.useEffect(() => {
+    onSettledRef.current = onSettled;
+  }, [onSettled]);
 
   React.useEffect(() => {
     if (!active) return;
@@ -38,7 +44,10 @@ export function useCartQuote(
       zone,
       couponCode: couponCode || undefined,
     }).then((res) => {
-      if (!cancelled && res.ok) setResult({ signature, quote: res.data });
+      if (!cancelled) {
+        if (res.ok) setResult({ signature, quote: res.data });
+        onSettledRef.current?.();
+      }
     });
     return () => {
       cancelled = true;

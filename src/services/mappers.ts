@@ -389,6 +389,10 @@ export function toOrder(o: Order, { admin }: { admin: boolean }): OrderDTO {
       : {}),
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
+    gatewayTransactionId: o.gatewayTransactionId ?? null,
+    gatewayPaymentMethod: o.gatewayPaymentMethod ?? null,
+    paymentReference: o.paymentReference ?? null,
+    paidAt: o.paidAt ? iso(o.paidAt) : null,
     platform: o.platform,
     status: o.status,
     statusHistory: o.statusHistory.map((e) => ({

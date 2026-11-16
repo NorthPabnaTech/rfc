@@ -1,6 +1,6 @@
-import type * as React from 'react';
 import type { Metadata } from 'next';
 import { Anek_Bangla } from 'next/font/google';
+import type * as React from 'react';
 
 import { getSettings } from '@/services/settings';
 

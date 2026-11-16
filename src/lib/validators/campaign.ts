@@ -25,6 +25,7 @@ export const campaignSchema = z
     startsAt: z.string().min(1, 'Start date is required'),
     endsAt: z.string().min(1, 'End date is required'),
     isActive: z.boolean().default(true),
+    showOnHome: z.boolean().default(true),
     showModal: z.boolean().default(true),
   })
   .superRefine((val, ctx) => {

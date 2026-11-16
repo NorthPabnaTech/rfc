@@ -190,6 +190,36 @@ export default async function AdminOrderPage({
               {PAYMENT_METHOD_LABELS[order.paymentMethod]} ·{' '}
               <span className="font-semibold capitalize">{order.paymentStatus}</span>
             </p>
+            {(order.gatewayTransactionId || order.paymentReference || order.gatewayPaymentMethod) && (
+              <dl className="border-line mt-3 space-y-1.5 border-t pt-3 text-xs">
+                {order.gatewayPaymentMethod && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted">Channel</dt>
+                    <dd className="text-ink font-medium">{order.gatewayPaymentMethod}</dd>
+                  </div>
+                )}
+                {order.gatewayTransactionId && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted">Transaction ID</dt>
+                    <dd className="text-ink font-mono font-semibold">
+                      {order.gatewayTransactionId}
+                    </dd>
+                  </div>
+                )}
+                {order.paymentReference && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted">Gateway Ref</dt>
+                    <dd className="text-ink font-mono">{order.paymentReference}</dd>
+                  </div>
+                )}
+                {order.paidAt && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-muted">Paid at</dt>
+                    <dd className="text-ink">{formatStoreDateTime(order.paidAt)}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
           </Card>
           {order.customerNote && (
             <Card title="Customer note">

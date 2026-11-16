@@ -26,11 +26,11 @@ export async function quoteCartAction(input: unknown): Promise<ActionResult<Cart
 
 export async function placeOrderAction(
   input: unknown,
-): Promise<ActionResult<{ orderNumber: string }>> {
+): Promise<ActionResult<{ orderNumber: string; orderId: string; paymentToken: string }>> {
   return runAction(async () => {
     const data = checkoutSchema.parse(input);
     const user = await getCurrentUser();
-    const { orderNumber } = await placeWebsiteOrder({
+    const { id, orderNumber, paymentToken } = await placeWebsiteOrder({
       lines: data.items,
       userId: user?.id ?? null,
       name: data.fullName,
@@ -45,13 +45,14 @@ export async function placeOrderAction(
         city: data.city,
         zone: data.zone,
       },
+      paymentMethod: data.paymentMethod,
       couponCode: data.couponCode,
       customerNote: data.customerNote,
       saveAddress: data.saveAddress,
     });
     revalidatePath('/admin', 'layout');
     revalidatePath('/account/orders');
-    return { orderNumber };
+    return { orderNumber, orderId: id, paymentToken };
   });
 }
 
