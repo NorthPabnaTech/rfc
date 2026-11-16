@@ -22,7 +22,7 @@ export function SectionHeading({
     <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
       <div className="flex items-center gap-3">
         {icon && (
-          <span className="bg-noir text-brand-300 hidden size-10 shrink-0 place-items-center rounded-xl sm:grid">
+          <span className="bg-noir text-brand-300 hidden size-10 shrink-0 place-items-center rounded-xl shadow-xs ring-1 ring-black/5 sm:grid">
             <Icon name={icon} size={19} />
           </span>
         )}
@@ -39,7 +39,7 @@ export function SectionHeading({
           {href && (
             <Link
               href={href}
-              className="group text-ink hover:border-ink border-line-2/70 flex shrink-0 items-center gap-1 rounded-lg border bg-white px-3 py-1.5 text-[13px] font-semibold transition"
+              className="group text-ink border-line-2/70 hover:bg-noir hover:border-noir flex shrink-0 items-center gap-1 rounded-xl border bg-white px-3.5 py-1.5 text-[13px] font-semibold shadow-xs transition-all hover:text-white"
             >
               {linkLabel}
               <Icon

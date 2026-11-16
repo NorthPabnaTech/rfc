@@ -11,9 +11,12 @@ const ITEMS: [IconRegistryKey, string, string][] = [
 export function ServiceStrip() {
   return (
     <section className="container-page pt-3 sm:pt-4" aria-label="Why shop with us">
-      <ul className="border-line grid grid-cols-2 divide-[var(--color-line)] rounded-2xl border bg-white lg:grid-cols-4 lg:divide-x">
+      <ul className="border-line grid grid-cols-2 divide-y divide-[var(--color-line)] overflow-hidden rounded-2xl border bg-white shadow-xs lg:grid-cols-4 lg:divide-x lg:divide-y-0">
         {ITEMS.map(([icon, title, sub]) => (
-          <li key={title} className="flex items-center px-4 py-3.5 sm:px-5">
+          <li
+            key={title}
+            className="hover:bg-cream/50 flex items-center px-3.5 py-3 transition-colors sm:px-5 sm:py-3.5"
+          >
             <IconText
               className="gap-3"
               media={

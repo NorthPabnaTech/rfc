@@ -22,6 +22,8 @@ export function CategoryRail({ categories }: { categories: CategoryTreeDTO[] }) 
     onScroll,
     scrollByStep,
     onMouseDown,
+    onTouchStart,
+    onTouchEnd,
     onClickCapture,
   } = useInfiniteCarousel(tiles.length);
 
@@ -31,9 +33,8 @@ export function CategoryRail({ categories }: { categories: CategoryTreeDTO[] }) 
     <section className="container-page pt-8 sm:pt-10">
       <SectionHeading
         title="Shop by category"
+        subtitle="Explore our curated collections"
         icon="layers"
-        href="/products"
-        linkLabel="All products"
         rightExtra={
           <CarouselControls
             visible={overflowing}
@@ -47,8 +48,11 @@ export function CategoryRail({ categories }: { categories: CategoryTreeDTO[] }) 
         ref={trackRef}
         onScroll={onScroll}
         onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
         onClickCapture={onClickCapture}
-        className="scrollbar-hidden -mx-4 flex cursor-grab flex-nowrap gap-3 overflow-x-auto px-4 pb-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
+        className="scrollbar-hidden -mx-4 flex cursor-grab flex-nowrap gap-3 overflow-x-auto px-4 py-1 select-none active:cursor-grabbing sm:mx-0 sm:gap-4 sm:px-0"
       >
         {copies.map((copyIdx) => (
           <ul
@@ -58,29 +62,34 @@ export function CategoryRail({ categories }: { categories: CategoryTreeDTO[] }) 
             className="flex shrink-0 flex-nowrap gap-3 sm:gap-4"
           >
             {tiles.map((c) => (
-              <li key={`${copyIdx}-${c.id}`} className="w-[104px] shrink-0 sm:w-[138px] lg:w-[146px]">
+              <li
+                key={`${copyIdx}-${c.id}`}
+                className="w-[108px] shrink-0 sm:w-[130px] lg:w-[140px]"
+              >
                 <Link
                   href={`/products?category=${c.slug}`}
                   draggable={false}
                   tabIndex={copyIdx !== 0 ? -1 : undefined}
-                  className="group border-line hover:border-brand-300 hover:shadow-pop flex h-full flex-col items-center gap-2.5 rounded-xl border bg-white p-3 text-center transition"
+                  className="group border-line hover:border-brand-300 hover:bg-brand-50/30 hover:shadow-pop flex h-full flex-col items-center justify-center gap-2 rounded-2xl border bg-white px-2 py-3 text-center shadow-xs transition-all duration-300 hover:-translate-y-0.5 sm:px-2.5 sm:py-3.5"
                 >
-                  <span className="bg-cream relative grid size-16 place-items-center overflow-hidden rounded-full sm:size-[72px]">
-                    {c.image ? (
-                      <ProductImage
-                        src={c.image.url}
-                        alt=""
-                        fill
-                        sizes="72px"
-                        className="transition duration-500 group-hover:scale-110"
-                      />
-                    ) : (
-                      <span className="font-display text-brand-600 text-2xl font-semibold">
-                        {c.name.charAt(0)}
-                      </span>
-                    )}
+                  <span className="flex items-center justify-center p-1 sm:p-1.5">
+                    <span className="relative block size-10 sm:size-12">
+                      {c.image ? (
+                        <ProductImage
+                          src={c.image.url}
+                          alt=""
+                          fill
+                          sizes="48px"
+                          className="object-contain transition duration-300 group-hover:scale-110"
+                        />
+                      ) : (
+                        <span className="font-display text-brand-600 grid size-full place-items-center text-xl font-semibold">
+                          {c.name.charAt(0)}
+                        </span>
+                      )}
+                    </span>
                   </span>
-                  <span className="text-ink line-clamp-2 text-[12.5px] leading-tight font-medium">
+                  <span className="text-ink group-hover:text-brand-700 w-full truncate px-0.5 text-[11px] leading-tight font-semibold transition-colors sm:text-[12px]">
                     {c.name}
                   </span>
                 </Link>

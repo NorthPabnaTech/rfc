@@ -30,7 +30,7 @@ export function ProductCard({ product, priority, className }: Props) {
   return (
     <article
       className={cn(
-        'group border-line hover:shadow-pop relative flex flex-col overflow-hidden rounded-xl border bg-white transition duration-300 hover:-translate-y-0.5',
+        'group border-line hover:border-brand-300/80 hover:shadow-pop relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-xs transition-all duration-300 hover:-translate-y-0.5',
         className,
       )}
     >

@@ -166,16 +166,16 @@ function ImageCropSession({
     };
   }, [currentFile]);
 
-  const activeRatio = profile.defaultAspect;
+  const isFreeCrop = purpose !== 'users';
 
   // Base frame keeps the image fixed in place (especially when resizing Free crop)
   const baseFrame: FrameRect = React.useMemo(() => {
     if (!decoded) {
-      return computeAspectFrame(stageSize.width, stageSize.height, activeRatio ?? 1);
+      return computeAspectFrame(stageSize.width, stageSize.height, 1);
     }
-    const ratio = activeRatio ?? decoded.width / decoded.height;
+    const ratio = isFreeCrop ? decoded.width / decoded.height : (profile.defaultAspect ?? 1);
     return computeAspectFrame(stageSize.width, stageSize.height, ratio);
-  }, [decoded, stageSize, activeRatio]);
+  }, [decoded, stageSize, isFreeCrop, profile.defaultAspect]);
 
   // Minimum scale so the image always covers baseFrame
   const minScale = React.useMemo(() => {
@@ -214,9 +214,12 @@ function ImageCropSession({
     };
   }, [decoded, scale, baseFrame, clampedPan, stageSize]);
 
-  // Current crop frame in stage coordinates
+  // Current crop frame in stage coordinates (defaults to 1:1 square in free-crop mode)
   const cropFrame: FrameRect = React.useMemo(() => {
-    if (activeRatio === null && freeBox) {
+    if (!isFreeCrop) {
+      return baseFrame;
+    }
+    if (freeBox) {
       const x = clamp(
         freeBox.x,
         imageBounds.x,
@@ -231,8 +234,14 @@ function ImageCropSession({
       const h = clamp(freeBox.height, MIN_CROP_PX, imageBounds.y + imageBounds.height - y);
       return { x, y, width: w, height: h };
     }
-    return baseFrame;
-  }, [activeRatio, freeBox, baseFrame, imageBounds]);
+    const side = Math.max(MIN_CROP_PX, Math.min(baseFrame.width, baseFrame.height));
+    return {
+      x: baseFrame.x + (baseFrame.width - side) / 2,
+      y: baseFrame.y + (baseFrame.height - side) / 2,
+      width: side,
+      height: side,
+    };
+  }, [isFreeCrop, freeBox, baseFrame, imageBounds]);
 
   const computeNaturalCrop = React.useCallback((): CropRect | undefined => {
     if (!decoded) return undefined;
@@ -258,7 +267,7 @@ function ImageCropSession({
     if (!decoded) return;
     e.currentTarget.setPointerCapture(e.pointerId);
 
-    if (activeRatio === null) {
+    if (isFreeCrop) {
       const rect = e.currentTarget.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
@@ -289,7 +298,7 @@ function ImageCropSession({
 
   const onCornerPointerDown = (corner: Corner) => (e: React.PointerEvent) => {
     e.stopPropagation();
-    if (activeRatio !== null || !decoded) return;
+    if (!isFreeCrop || !decoded) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       type: 'corner',
@@ -518,7 +527,7 @@ function ImageCropSession({
                     </div>
 
                     {/* Corner resize handles in Free mode */}
-                    {activeRatio === null && (
+                    {isFreeCrop && (
                       <>
                         {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
                           <button
@@ -536,7 +545,12 @@ function ImageCropSession({
                                   ? cropFrame.y - 8
                                   : cropFrame.y + cropFrame.height - 8,
                             }}
-                            className="bg-brand absolute size-4 cursor-nwse-resize rounded-full border-2 border-white shadow"
+                            className={cn(
+                              'bg-brand absolute size-4 rounded-full border-2 border-white shadow',
+                              corner === 'nw' || corner === 'se'
+                                ? 'cursor-nwse-resize'
+                                : 'cursor-nesw-resize',
+                            )}
                           />
                         ))}
                       </>

@@ -19,7 +19,7 @@ export function ReviewsSection({ reviews }: { reviews: ReviewDTO[] }) {
         {reviews.map((r) => (
           <li
             key={r.id}
-            className="border-line flex w-[82%] shrink-0 snap-start flex-col rounded-2xl border bg-white p-5 sm:w-auto"
+            className="border-line hover:border-brand-300/80 hover:shadow-pop flex w-[82%] shrink-0 snap-start flex-col rounded-2xl border bg-white p-5 shadow-xs transition-all duration-300 hover:-translate-y-0.5 sm:w-auto"
           >
             <RatingStars value={r.rating} size={15} />
             <p className="text-base-700 mt-3 line-clamp-4 flex-1 text-[14px] leading-relaxed">

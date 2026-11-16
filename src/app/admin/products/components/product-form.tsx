@@ -29,6 +29,7 @@ import {
 import { Icon } from '@components/icon/icon';
 import { Callout, FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { Textarea } from '@components/ui/textarea';
 import { handleActionResult } from '@lib/action-client';
 import {
   DEFAULT_BUSINESS_SLUG,
@@ -54,6 +55,22 @@ type Props = {
   suppliers: SupplierDTO[];
   businesses: BusinessDTO[];
 };
+
+function parseSpecificationsText(text: string): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim().replace(/^[-*•]\s*/, '');
+    if (!line) continue;
+    const colonIdx = line.indexOf(':');
+    if (colonIdx <= 0) continue;
+    const label = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    if (label && value) {
+      rows.push({ label, value });
+    }
+  }
+  return rows;
+}
 
 const EMPTY: ProductInput = {
   name: '',
@@ -111,6 +128,7 @@ export function ProductForm({
 }: Props) {
   const router = useRouter();
   const source = product ?? initialDraft;
+  const [specPasteText, setSpecPasteText] = React.useState('');
   const form = Form.useForm<ProductInput>({
     schema: productSchema,
     defaultValues: source ? toFormValues(source) : EMPTY,
@@ -302,44 +320,97 @@ export function ProductForm({
               description="Shown as a table on the product page."
             >
               <Form.List name="specifications">
-                {(fields, { add, remove }) => (
-                  <div className="space-y-3">
-                    {fields.map((f) => (
-                      <div
-                        key={f.key}
-                        className="grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)_auto] sm:items-start"
-                      >
-                        <FormInput
-                          name={[f.name, 'label']}
-                          placeholder="Material"
-                          aria-label="Specification label"
+                {(fields, { add, remove }) => {
+                  const applyParsedSpecs = (rawText: string): boolean => {
+                    const parsed = parseSpecificationsText(rawText);
+                    if (parsed.length === 0) return false;
+                    const current = form.getValues('specifications') ?? [];
+                    // Remove trailing/existing blank placeholder rows before appending parsed rows.
+                    for (let i = current.length - 1; i >= 0; i--) {
+                      const row = current[i];
+                      if (!row?.label?.trim() && !row?.value?.trim()) {
+                        remove(i);
+                      }
+                    }
+                    add(parsed);
+                    setSpecPasteText('');
+                    return true;
+                  };
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Textarea
+                          rows={3}
+                          value={specPasteText}
+                          onChange={(e) => setSpecPasteText(e.target.value)}
+                          onPaste={(e) => {
+                            const pasted = e.clipboardData.getData('text');
+                            if (pasted && applyParsedSpecs(pasted)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                              if (applyParsedSpecs(specPasteText)) {
+                                e.preventDefault();
+                              }
+                            }
+                          }}
+                          placeholder={'Quick paste (Label: Value per line)\ne.g. Material: Food Grade Silicone & SS 304\nPower: 600W'}
+                          aria-label="Quick paste specifications"
+                          className="text-xs"
                         />
-                        <FormInput
-                          name={[f.name, 'value']}
-                          placeholder="Genuine leather"
-                          aria-label="Specification value"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Remove row"
-                          onClick={() => remove(f.name)}
-                        >
-                          <Icon name="trash" size={16} />
-                        </Button>
+                        {specPasteText.trim() && (
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => applyParsedSpecs(specPasteText)}
+                            >
+                              Apply to table
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => add({ label: '', value: '' })}
-                    >
-                      <Icon name="plus" size={14} /> Add specification
-                    </Button>
-                  </div>
-                )}
+                      {fields.map((f) => (
+                        <div
+                          key={f.key}
+                          className="grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)_auto] sm:items-start"
+                        >
+                          <FormInput
+                            name={[f.name, 'label']}
+                            placeholder="Material"
+                            aria-label="Specification label"
+                          />
+                          <FormInput
+                            name={[f.name, 'value']}
+                            placeholder="Genuine leather"
+                            aria-label="Specification value"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove row"
+                            onClick={() => remove(f.name)}
+                          >
+                            <Icon name="trash" size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => add({ label: '', value: '' })}
+                      >
+                        <Icon name="plus" size={14} /> Add specification
+                      </Button>
+                    </div>
+                  );
+                }}
               </Form.List>
             </FormSection>
           </Panel>
