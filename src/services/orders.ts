@@ -13,6 +13,7 @@ import {
   ProductModel,
   ReturnRequestModel,
   type Supplier,
+  SupplierOrderModel,
   UserModel,
   withTransaction,
 } from '@/database';
@@ -742,6 +743,40 @@ export async function updateOrderMeta(
   await connectDB();
   const res = await OrderModel.updateOne({ _id: orderId }, { $set: data });
   if (!res.matchedCount) throw new AppError('Order not found.', 404);
+}
+
+export async function updateOrderShippingAddress(
+  orderId: string,
+  address: {
+    fullName: string;
+    phone: string;
+    addressLine: string;
+    division: string;
+    city: string;
+    area: string;
+    zone: ShippingZone;
+  },
+): Promise<void> {
+  await connectDB();
+  const res = await OrderModel.updateOne({ _id: orderId }, { $set: { shippingAddress: address } });
+  if (!res.matchedCount) throw new AppError('Order not found.', 404);
+
+  // Keep unsubmitted supplier dropshipping orders in sync with the edited address.
+  await SupplierOrderModel.updateMany(
+    { order: orderId, status: { $in: ['awaiting_confirmation', 'failed'] } },
+    {
+      $set: {
+        customer: {
+          name: address.fullName,
+          phone: address.phone,
+          address: address.addressLine,
+          division: address.division,
+          district: address.city,
+          area: address.area,
+        },
+      },
+    },
+  );
 }
 
 export async function cancelOrderByCustomer(userId: string, orderId: string, reason?: string) {

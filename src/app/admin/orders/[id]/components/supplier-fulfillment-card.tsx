@@ -10,7 +10,7 @@ import {
 import { Taka } from '@/features/products/price';
 import type { SupplierOrderDTO } from '@/types';
 import { Icon } from '@components/icon/icon';
-import { Callout, StatusBadge } from '@components/shared';
+import { Callout, ConfirmDialog, StatusBadge } from '@components/shared';
 import { Badge } from '@components/ui/badge';
 import { Button } from '@components/ui/button';
 import { SUPPLIER_ORDER_STATUS_LABELS, type SupplierOrderStatus } from '@lib/constants';
@@ -99,6 +99,7 @@ function SupplierOrderItemCard({
   const [paidUpfront, setPaidUpfront] = React.useState(so.deliveryChargePaidUpfront);
   const [customerNote, setCustomerNote] = React.useState(so.customerNote ?? '');
   const [allowDuplicate, setAllowDuplicate] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -143,6 +144,7 @@ function SupplierOrderItemCard({
       allowDuplicate,
     });
     setSubmitting(false);
+    setConfirmOpen(false);
     if (!res.ok) {
       toast.error(res.error);
       router.refresh();
@@ -353,12 +355,23 @@ function SupplierOrderItemCard({
               type="button"
               size="sm"
               disabled={submitting || Boolean(priceError) || Boolean(variantError)}
-              onClick={handleConfirmAndSend}
+              onClick={() => setConfirmOpen(true)}
             >
               <Icon name="check" size={14} />
               {submitting ? 'Sending to Supplier…' : 'Confirm & Send to Supplier'}
             </Button>
           </div>
+          <ConfirmDialog
+            open={confirmOpen}
+            onOpenChange={(o) => !o && !submitting && setConfirmOpen(false)}
+            tone="info"
+            title={`Send order to ${so.supplierName}?`}
+            description={`Submit ${so.productName} × ${so.quantity} to ${so.supplierName} with Selling Price ৳${parsedPrice} (Cost ৳${so.costPrice}, Packaging ৳${so.packagingCost}, Expected Profit ৳${expectedProfit}).`}
+            confirmLabel="Confirm & Send"
+            loading={submitting}
+            autoClose={false}
+            onConfirm={handleConfirmAndSend}
+          />
         </div>
       ) : (
         <div className="bg-surface grid grid-cols-2 gap-3 rounded-xl p-3 text-xs sm:grid-cols-4">
@@ -413,17 +426,33 @@ function SupplierOrderItemCard({
           <summary className="text-subtle hover:text-ink cursor-pointer font-medium">
             Supplier submission history ({so.statusHistory.length})
           </summary>
-          <ul className="mt-2 space-y-1.5 pl-2">
-            {[...so.statusHistory].reverse().map((ev, idx) => (
-              <li key={idx} className="text-muted">
-                <span className="text-ink font-semibold">
-                  {SUPPLIER_ORDER_STATUS_LABELS[ev.status]}
-                </span>{' '}
-                · {formatStoreDateTime(ev.at)}
-                {ev.note ? ` — ${ev.note}` : ''}
+          <ol className="mt-3">
+            {[...so.statusHistory].reverse().map((ev, idx, arr) => (
+              <li key={idx} className="relative flex gap-3.5 pb-5 text-sm last:pb-0">
+                {idx < arr.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="bg-line absolute top-4 bottom-0 left-[5px] w-0.5 -translate-x-1/2"
+                  />
+                )}
+                <span className="bg-brand-400 ring-panel relative z-10 mt-1.5 size-2.5 shrink-0 rounded-full ring-2" />
+                <div className="min-w-0 flex-1">
+                  <div>
+                    <StatusBadge
+                      status={statusTone(ev.status)}
+                      label={SUPPLIER_ORDER_STATUS_LABELS[ev.status]}
+                    />
+                  </div>
+                  {ev.note && (
+                    <p className="text-muted mt-1 text-xs leading-relaxed break-words">
+                      {ev.note}
+                    </p>
+                  )}
+                  <p className="text-subtle mt-1 text-xs">{formatStoreDateTime(ev.at)}</p>
+                </div>
               </li>
             ))}
-          </ul>
+          </ol>
         </details>
       )}
     </div>

@@ -34,7 +34,12 @@ import {
   listMediaAssets,
   syncCloudinaryMedia,
 } from '@/services/media';
-import { createManualOrder, updateOrderMeta, updateOrderStatus } from '@/services/orders';
+import {
+  createManualOrder,
+  updateOrderMeta,
+  updateOrderShippingAddress,
+  updateOrderStatus,
+} from '@/services/orders';
 import { deleteProduct, pickerSearch, saveProduct } from '@/services/products';
 import { updateReturn } from '@/services/returns';
 import { updateSettings } from '@/services/settings';
@@ -64,6 +69,7 @@ import {
 import {
   answerSchema,
   manualOrderSchema,
+  updateOrderAddressSchema,
   updateOrderMetaSchema,
   updateOrderStatusSchema,
   updateReturnSchema,
@@ -291,6 +297,18 @@ export async function updateOrderMetaAction(input: unknown): Promise<ActionResul
     revalidatePath(`/admin/orders/${orderId}`);
     return undefined;
   }, 'Order updated');
+}
+
+export async function updateOrderAddressAction(input: unknown): Promise<ActionResult> {
+  return runAction(async () => {
+    await requireAdmin();
+    const { orderId, ...address } = updateOrderAddressSchema.parse(input);
+    await updateOrderShippingAddress(orderId, address);
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath('/admin/suppliers', 'layout');
+    revalidatePath('/account/orders', 'layout');
+    return undefined;
+  }, 'Delivery address updated');
 }
 
 export async function updateReturnAction(input: unknown): Promise<ActionResult> {

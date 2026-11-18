@@ -98,6 +98,15 @@ export const updateOrderMetaSchema = z.object({
   adminNote: optionalText(2000),
 });
 
+export const updateOrderAddressSchema = z
+  .object({
+    orderId: objectId,
+    ...addressFields,
+  })
+  .superRefine(checkLocation)
+  .transform(withDeliveryZone);
+export type UpdateOrderAddressInput = z.input<typeof updateOrderAddressSchema>;
+
 export const cancelOrderSchema = z.object({
   orderId: objectId,
   reason: optionalText(500),

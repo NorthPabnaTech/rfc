@@ -9,7 +9,6 @@ import {
   OrderStatusBadge,
   OrderTotals,
   ReturnStatusBadge,
-  ShippingAddressBlock,
 } from '@/features/orders/order-ui';
 import { Taka } from '@/features/products/price';
 import { getBusinessBySlug } from '@/services/businesses';
@@ -24,6 +23,7 @@ import { param, type SearchParams } from '@lib/search-params';
 import { formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
 
+import { DeliveryAddressCard } from './components/delivery-address-card';
 import { OrderActions } from './components/order-actions';
 import { OrderToolbar } from './components/order-toolbar';
 import {
@@ -201,9 +201,7 @@ export default async function AdminOrderPage({
               <p className="text-subtle mt-2 text-xs">Guest order (no account)</p>
             )}
           </Card>
-          <Card title="Delivery address">
-            <ShippingAddressBlock order={order} />
-          </Card>
+          <DeliveryAddressCard order={order} />
           <Card title="Payment">
             <p className="text-sm">
               {PAYMENT_METHOD_LABELS[order.paymentMethod]} ·{' '}
