@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { QueryFilter } from 'mongoose';
+import type { ClientSession, QueryFilter } from 'mongoose';
 
 import {
   connectDB,
@@ -227,4 +227,42 @@ export async function deleteExpense(id: string): Promise<void> {
   const doc = await ExpenseModel.findByIdAndDelete(id).lean();
   if (!doc) throw new AppError('Expense not found.', 404);
   if (doc.attachment) await deleteImages([doc.attachment]);
+}
+
+/** Record an automated system expense (e.g. return delivery or supplier packaging). */
+export async function recordSystemExpense(
+  input: {
+    categorySlug: string;
+    title: string;
+    amount: number;
+    description?: string;
+    business?: string;
+    createdBy?: string;
+  },
+  session?: ClientSession | null,
+): Promise<void> {
+  if (input.amount <= 0) return;
+  if (!session) await ensureDefaultExpenseCategories();
+  const category = await ExpenseCategoryModel.findOne({ slug: input.categorySlug })
+    .session(session ?? null)
+    .lean();
+  if (!category) return;
+
+  await ExpenseModel.create(
+    [
+      {
+        title: input.title,
+        category: category._id,
+        categoryName: category.name,
+        isCostOfGoods: category.isCostOfGoods,
+        amount: input.amount,
+        expenseDate: dayjs().tz('Asia/Dhaka').startOf('day').toDate(),
+        paymentMethod: 'cash',
+        description: input.description,
+        business: input.business || DEFAULT_BUSINESS_SLUG,
+        createdBy: input.createdBy as never,
+      },
+    ],
+    session ? { session } : undefined,
+  );
 }

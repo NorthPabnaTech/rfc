@@ -241,15 +241,21 @@ function ReturnOrderDialog({
   );
   const [note, setNote] = React.useState(initialNote);
   const [refundOverride, setRefundOverride] = React.useState('');
+  const [customerPaidDelivery, setCustomerPaidDelivery] = React.useState<boolean | null>(null);
+  const [deliveryExpenseAmount, setDeliveryExpenseAmount] = React.useState(
+    String(order.shippingFee ?? 0),
+  );
   const [busy, setBusy] = React.useState(false);
 
   const computedRefund = rows.reduce((s, r) => s + r.quantity * r.unitPrice, 0);
   const selectedItems = rows
     .filter((r) => r.quantity > 0)
     .map((r) => ({ orderItemId: r.orderItemId, quantity: r.quantity, restock: r.restock }));
+  const parsedDeliveryExpense = Number(deliveryExpenseAmount) || 0;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (customerPaidDelivery === null) return;
     setBusy(true);
     const res = await updateOrderStatusAction({
       orderId: order.id,
@@ -257,6 +263,11 @@ function ReturnOrderDialog({
       note: note || undefined,
       refundAmount: refundOverride !== '' ? Number(refundOverride) : computedRefund,
       returnItems: selectedItems,
+      customerPaidDelivery,
+      returnDeliveryExpenseAmount:
+        customerPaidDelivery === false && parsedDeliveryExpense > 0
+          ? parsedDeliveryExpense
+          : undefined,
     });
     setBusy(false);
     if (handleActionResult(res)) {
@@ -336,6 +347,51 @@ function ReturnOrderDialog({
                 />
               </div>
             </div>
+            <div className="border-line bg-well/40 space-y-3 rounded-lg border p-3.5">
+              <div>
+                <p className="text-ink text-sm font-semibold">
+                  Did the customer pay the delivery charge?
+                </p>
+                <p className="text-subtle text-xs">
+                  Order delivery fee: <Taka amount={order.shippingFee} />. If not paid by the
+                  customer, it will be recorded in Expenses.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={customerPaidDelivery === true ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setCustomerPaidDelivery(true)}
+                >
+                  Yes, customer paid
+                </Button>
+                <Button
+                  type="button"
+                  variant={customerPaidDelivery === false ? 'danger' : 'secondary'}
+                  size="sm"
+                  onClick={() => setCustomerPaidDelivery(false)}
+                >
+                  No, add to Expenses
+                </Button>
+              </div>
+              {customerPaidDelivery === false && (
+                <div>
+                  <label className="type-label mb-1 block">
+                    Delivery charge expense (BDT)
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={deliveryExpenseAmount}
+                    onChange={(e) => setDeliveryExpenseAmount(e.target.value)}
+                  />
+                  <p className="text-subtle mt-1 text-xs">
+                    Will be added under Delivery / Courier Charges in Expenses.
+                  </p>
+                </div>
+              )}
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose}>
@@ -344,7 +400,7 @@ function ReturnOrderDialog({
             <Button
               type="submit"
               variant="danger"
-              disabled={busy || selectedItems.length === 0}
+              disabled={busy || selectedItems.length === 0 || customerPaidDelivery === null}
             >
               {busy ? 'Processing…' : 'Confirm Return'}
             </Button>

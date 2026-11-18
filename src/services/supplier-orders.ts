@@ -5,6 +5,7 @@ import type { QueryFilter, Types } from 'mongoose';
 import {
   connectDB,
   type Order,
+  OrderModel,
   ProductModel,
   SupplierModel,
   SupplierOrderModel,
@@ -14,6 +15,7 @@ import { ADMIN_PAGE_SIZE, type SupplierOrderStatus } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import { normalizeBDPhone } from '@lib/phone';
 
+import { recordSystemExpense } from './expenses';
 import { toSupplierOrder } from './mappers';
 import { getSupplierAdapter } from './suppliers/registry';
 
@@ -21,6 +23,41 @@ function isInsideDhaka(division?: string, district?: string): boolean {
   const div = (division ?? '').trim().toLowerCase();
   const dist = (district ?? '').trim().toLowerCase();
   return dist === 'dhaka' || (div === 'dhaka' && !dist);
+}
+
+/**
+ * Distribute an order-level discount across items proportionally by `lineTotal`
+ * so each item's net selling price reflects any coupon/promo discount.
+ */
+export function computeDiscountedItemPrices(
+  items: ReadonlyArray<{ id: string; lineTotal: number }>,
+  subtotal: number,
+  discount: number,
+): Map<string, { lineTotal: number; netSellingPrice: number }> {
+  const result = new Map<string, { lineTotal: number; netSellingPrice: number }>();
+  const cappedDiscount = subtotal > 0 ? Math.max(0, Math.min(discount, subtotal)) : 0;
+  let remainingDiscount = cappedDiscount;
+
+  items.forEach((item, index) => {
+    let itemDiscount = 0;
+    if (remainingDiscount > 0 && subtotal > 0) {
+      itemDiscount =
+        index === items.length - 1
+          ? Math.min(item.lineTotal, remainingDiscount)
+          : Math.min(
+              item.lineTotal,
+              remainingDiscount,
+              Math.round((cappedDiscount * item.lineTotal) / subtotal),
+            );
+      remainingDiscount -= itemDiscount;
+    }
+    result.set(item.id, {
+      lineTotal: item.lineTotal,
+      netSellingPrice: Math.max(0, item.lineTotal - itemDiscount),
+    });
+  });
+
+  return result;
 }
 
 function matchVariant(
@@ -87,6 +124,11 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
     order.shippingAddress.city,
   );
   const deliveryPaidByCustomer = (order.shippingFee ?? 0) > 0;
+  const itemPrices = computeDiscountedItemPrices(
+    order.items.map((i) => ({ id: String(i._id), lineTotal: i.lineTotal })),
+    order.subtotal,
+    order.discount ?? 0,
+  );
 
   for (const item of order.items) {
     const product = productById.get(String(item.product));
@@ -104,7 +146,8 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
         130);
     const costPrice = product.supplierPrice * item.quantity;
     const packagingCost = (product.supplierPackagingCost ?? 0) * item.quantity;
-    const sellingPrice = item.lineTotal;
+    const sellingPrice =
+      itemPrices.get(String(item._id))?.netSellingPrice ?? item.lineTotal;
     const expectedProfit =
       sellingPrice - costPrice - packagingCost - (deliveryPaidByCustomer ? 0 : deliveryCharge);
 
@@ -384,6 +427,17 @@ export async function confirmAndSendSupplierOrder(
     });
 
     await locked.save();
+    if (packagingCost > 0) {
+      const orderDoc = await OrderModel.findById(locked.order).select('business').lean();
+      await recordSystemExpense({
+        categorySlug: 'packaging-cost',
+        title: `Packaging charge — ${locked.orderNumber}`,
+        amount: packagingCost,
+        description: `Supplier packaging cost for ${locked.productName} × ${locked.quantity} (${supplier.name}).`,
+        business: orderDoc?.business,
+        createdBy: input.adminId,
+      });
+    }
     const populated = await SupplierOrderModel.findById(locked._id)
       .populate('confirmedBy', 'name')
       .lean();

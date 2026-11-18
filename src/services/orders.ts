@@ -35,6 +35,7 @@ import { signOrderPaymentToken } from '@lib/payments/paymently';
 import type { CartLineInput } from '@lib/validators/order';
 
 import { calculateCampaignDiscount } from './campaigns';
+import { ensureDefaultExpenseCategories, recordSystemExpense } from './expenses';
 import { deductOrderStock,restoreOrderStock } from './inventory';
 import { toImage, toOrder, toReturn } from './mappers';
 import {
@@ -570,9 +571,14 @@ export async function updateOrderStatus(
   opts?: {
     refundAmount?: number;
     returnItems?: { orderItemId: string; quantity: number; restock: boolean }[];
+    customerPaidDelivery?: boolean;
+    returnDeliveryExpenseAmount?: number;
   },
 ): Promise<void> {
   await connectDB();
+  if (next === 'returned' && opts?.customerPaidDelivery === false) {
+    await ensureDefaultExpenseCategories();
+  }
   const updatedOrder = await withTransaction(async (session) => {
     const order = await OrderModel.findById(orderId).session(session ?? null);
     if (!order) throw new AppError('Order not found.', 404);
@@ -703,6 +709,21 @@ export async function updateOrderStatus(
             },
           })),
           { session },
+        );
+      }
+
+      if (opts?.customerPaidDelivery === false) {
+        const deliveryExpenseAmount = opts.returnDeliveryExpenseAmount ?? order.shippingFee ?? 0;
+        await recordSystemExpense(
+          {
+            categorySlug: 'delivery-courier-charges',
+            title: `Return delivery charge — ${order.orderNumber}`,
+            amount: deliveryExpenseAmount,
+            description: `Customer did not pay delivery charge on returned order ${order.orderNumber} (${order.customer.name}, ${order.customer.phone}).`,
+            business: order.business,
+            createdBy: by,
+          },
+          session,
         );
       }
     }

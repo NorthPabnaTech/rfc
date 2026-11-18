@@ -16,6 +16,7 @@ import { Icon } from '@components/icon/icon';
 import { Callout } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
+import { getRecentOrderPhone } from '@lib/recent-order';
 import { formatStoreDate } from '@lib/utils';
 import { trackOrderSchema } from '@lib/validators/order';
 
@@ -41,6 +42,29 @@ export function TrackOrderForm({
   });
   const { isSubmitting } = form.formState;
 
+  const applyLookupResult = React.useCallback(
+    (res: Awaited<ReturnType<typeof trackOrderAction>>) => {
+      if (handleActionResult(res, form, { successToast: false })) {
+        setOrder(res.data);
+      } else if (!res.ok) {
+        setLookupError(res.error);
+      }
+    },
+    [form],
+  );
+
+  const autoLookupRef = React.useRef(false);
+  React.useEffect(() => {
+    if (autoLookupRef.current || initialPhone || !initialOrderNumber || initialOrder) return;
+    autoLookupRef.current = true;
+    const savedPhone = getRecentOrderPhone(initialOrderNumber);
+    if (!savedPhone) return;
+    form.setValue('phone', savedPhone, { shouldValidate: true });
+    void trackOrderAction({ orderNumber: initialOrderNumber, phone: savedPhone }).then(
+      applyLookupResult,
+    );
+  }, [applyLookupResult, form, initialOrder, initialOrderNumber, initialPhone]);
+
   return (
     <div className="mt-10 space-y-10">
       <Form
@@ -49,12 +73,7 @@ export function TrackOrderForm({
         onFinish={async (values) => {
           setOrder(null);
           setLookupError(null);
-          const res = await trackOrderAction(values);
-          if (handleActionResult(res, form, { successToast: false })) {
-            setOrder(res.data);
-          } else if (!res.ok) {
-            setLookupError(res.error);
-          }
+          applyLookupResult(await trackOrderAction(values));
         }}
       >
         <FormInput name="orderNumber" label="Order number" placeholder="RFC-100001" required />

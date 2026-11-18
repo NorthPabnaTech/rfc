@@ -88,6 +88,8 @@ export const updateOrderStatusSchema = z.object({
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
   returnItems: z.array(returnItemInputSchema).optional(),
+  customerPaidDelivery: z.boolean().optional(),
+  returnDeliveryExpenseAmount: money('Delivery expense amount').optional(),
 });
 
 export const updateOrderMetaSchema = z.object({

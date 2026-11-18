@@ -21,6 +21,7 @@ import { Input } from '@components/ui/input';
 import { useHydrated } from '@hooks/use-hydrated';
 import { handleActionResult } from '@lib/action-client';
 import { SHIPPING_ZONE_LABELS, SHIPPING_ZONES, type ShippingZone } from '@lib/constants';
+import { saveRecentOrder } from '@lib/recent-order';
 import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
 import { checkLocation } from '@lib/validators/common';
@@ -146,6 +147,7 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
           })),
         });
         if (handleActionResult(res, form, { successToast: false })) {
+          saveRecentOrder(res.data.orderNumber, values.phone);
           if (values.paymentMethod === 'paymently') {
             try {
               const payRes = await fetch('/api/payments/paymently/create', {

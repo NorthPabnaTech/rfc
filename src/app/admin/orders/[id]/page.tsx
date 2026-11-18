@@ -14,7 +14,10 @@ import {
 import { Taka } from '@/features/products/price';
 import { getBusinessBySlug } from '@/services/businesses';
 import { getAdminOrder } from '@/services/orders';
-import { listSupplierOrdersForOrder } from '@/services/supplier-orders';
+import {
+  computeDiscountedItemPrices,
+  listSupplierOrdersForOrder,
+} from '@/services/supplier-orders';
 import { Callout, PageHeader } from '@components/shared';
 import { ORDER_PLATFORM_LABELS, PAYMENT_METHOD_LABELS } from '@lib/constants';
 import { param, type SearchParams } from '@lib/search-params';
@@ -44,6 +47,19 @@ export default async function AdminOrderPage({
     listSupplierOrdersForOrder(id),
   ]);
   if (!order) notFound();
+  const itemPrices = computeDiscountedItemPrices(order.items, order.subtotal, order.discount);
+  const normalizedSupplierOrders = supplierOrders.map((so) => {
+    if (so.status !== 'awaiting_confirmation' || order.discount <= 0) return so;
+    const pricing = itemPrices.get(so.orderItemId);
+    if (!pricing || so.sellingPrice !== pricing.lineTotal) return so;
+    const sellingPrice = pricing.netSellingPrice;
+    const expectedProfit =
+      sellingPrice -
+      so.costPrice -
+      so.packagingCost -
+      (so.deliveryChargePaidByCustomer ? 0 : so.deliveryCharge);
+    return { ...so, sellingPrice, expectedProfit };
+  });
   const [business, productDocs] = await Promise.all([
     getBusinessBySlug(order.business),
     supplierOrders.length
@@ -105,7 +121,10 @@ export default async function AdminOrderPage({
               <OrderTotals order={order} admin />
             </div>
           </Card>
-          <SupplierFulfillmentCard supplierOrders={supplierOrders} productMeta={productMeta} />
+          <SupplierFulfillmentCard
+            supplierOrders={normalizedSupplierOrders}
+            productMeta={productMeta}
+          />
           {order.returnedItems && order.returnedItems.length > 0 && (
             <Card title="Returned items">
               <ul className="divide-line divide-y text-sm">

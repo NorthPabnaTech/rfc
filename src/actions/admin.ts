@@ -262,9 +262,21 @@ export async function createManualOrderAction(
 export async function updateOrderStatusAction(input: unknown): Promise<ActionResult> {
   return runAction(async () => {
     const admin = await requireAdmin();
-    const { orderId, status, note, refundAmount, returnItems } =
-      updateOrderStatusSchema.parse(input);
-    await updateOrderStatus(orderId, status, admin.id, note, { refundAmount, returnItems });
+    const {
+      orderId,
+      status,
+      note,
+      refundAmount,
+      returnItems,
+      customerPaidDelivery,
+      returnDeliveryExpenseAmount,
+    } = updateOrderStatusSchema.parse(input);
+    await updateOrderStatus(orderId, status, admin.id, note, {
+      refundAmount,
+      returnItems,
+      customerPaidDelivery,
+      returnDeliveryExpenseAmount,
+    });
     revalidatePath('/admin', 'layout');
     revalidatePath('/account/orders', 'layout');
     return undefined;
@@ -584,6 +596,7 @@ export async function confirmAndSendSupplierOrderAction(input: unknown) {
     });
     revalidatePath(`/admin/orders/${res.orderId}`);
     revalidatePath('/admin/suppliers', 'layout');
+    revalidatePath('/admin/expenses');
     return res;
   }, 'Order confirmed and sent to supplier');
 }
@@ -594,6 +607,7 @@ export async function refreshSupplierOrderStatusAction(supplierOrderId: string) 
     const res = await refreshSupplierOrderStatus(objectId.parse(supplierOrderId), admin.id);
     revalidatePath(`/admin/orders/${res.orderId}`);
     revalidatePath('/admin/suppliers', 'layout');
+    revalidatePath('/admin/expenses');
     return res;
   }, 'Supplier order status refreshed');
 }
