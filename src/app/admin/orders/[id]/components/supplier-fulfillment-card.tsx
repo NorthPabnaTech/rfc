@@ -50,6 +50,40 @@ function statusTone(status: SupplierOrderStatus): 'ok' | 'warn' | 'danger' | 'ne
   }
 }
 
+function parseSyncedNote(note?: string): {
+  externalStatus: string | null;
+  displayNote: string | undefined;
+} {
+  if (!note) return { externalStatus: null, displayNote: note };
+  const match = note.match(/^(Status synced from .+?):\s*(.+)$/i);
+  if (!match) return { externalStatus: null, displayNote: note };
+  return {
+    externalStatus: match[2]!.trim(),
+    displayNote: match[1]!.trim(),
+  };
+}
+
+function formatExternalStatusLabel(ext: string): string {
+  return ext
+    .trim()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function externalStatusTone(ext: string): 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | 'locked' {
+  const s = ext.toUpperCase();
+  if (['DELIVERED', 'COMPLETED', 'SHIPPED'].includes(s)) return 'ok';
+  if (['COURIER_CREATED', 'IN_TRANSIT', 'DISPATCHED'].includes(s)) return 'locked';
+  if (['CONFIRMED', 'PROCESSING', 'PACKAGING', 'APPROVED'].includes(s)) return 'info';
+  if (['PENDING_REVIEW', 'PENDING', 'PENDING_PAYMENT', 'AWAITING_CONFIRMATION'].includes(s)) {
+    return 'warn';
+  }
+  if (['CANCELLED', 'FAILED', 'RETURNED', 'REJECTED'].includes(s)) return 'danger';
+  return 'neutral';
+}
+
 export function SupplierFulfillmentCard({
   supplierOrders,
   productMeta,
@@ -427,31 +461,41 @@ function SupplierOrderItemCard({
             Supplier submission history ({so.statusHistory.length})
           </summary>
           <ol className="mt-3">
-            {[...so.statusHistory].reverse().map((ev, idx, arr) => (
-              <li key={idx} className="relative flex gap-3.5 pb-5 text-sm last:pb-0">
-                {idx < arr.length - 1 && (
-                  <span
-                    aria-hidden
-                    className="bg-line absolute top-4 bottom-0 left-[5px] w-0.5 -translate-x-1/2"
-                  />
-                )}
-                <span className="bg-brand-400 ring-panel relative z-10 mt-1.5 size-2.5 shrink-0 rounded-full ring-2" />
-                <div className="min-w-0 flex-1">
-                  <div>
-                    <StatusBadge
-                      status={statusTone(ev.status)}
-                      label={SUPPLIER_ORDER_STATUS_LABELS[ev.status]}
+            {[...so.statusHistory].reverse().map((ev, idx, arr) => {
+              const { externalStatus, displayNote } = parseSyncedNote(ev.note);
+              return (
+                <li key={idx} className="relative flex gap-3.5 pb-5 text-sm last:pb-0">
+                  {idx < arr.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="bg-line absolute top-4 bottom-0 left-[5px] w-0.5 -translate-x-1/2"
                     />
-                  </div>
-                  {ev.note && (
-                    <p className="text-muted mt-1 text-xs leading-relaxed break-words">
-                      {ev.note}
-                    </p>
                   )}
-                  <p className="text-subtle mt-1 text-xs">{formatStoreDateTime(ev.at)}</p>
-                </div>
-              </li>
-            ))}
+                  <span className="bg-brand-400 ring-panel relative z-10 mt-1.5 size-2.5 shrink-0 rounded-full ring-2" />
+                  <div className="min-w-0 flex-1">
+                    <div>
+                      {externalStatus ? (
+                        <StatusBadge
+                          status={externalStatusTone(externalStatus)}
+                          label={formatExternalStatusLabel(externalStatus)}
+                        />
+                      ) : (
+                        <StatusBadge
+                          status={statusTone(ev.status)}
+                          label={SUPPLIER_ORDER_STATUS_LABELS[ev.status]}
+                        />
+                      )}
+                    </div>
+                    {displayNote && (
+                      <p className="text-muted mt-1 text-xs leading-relaxed break-words">
+                        {displayNote}
+                      </p>
+                    )}
+                    <p className="text-subtle mt-1 text-xs">{formatStoreDateTime(ev.at)}</p>
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </details>
       )}
