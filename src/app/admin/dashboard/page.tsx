@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { DashboardCourierCheckerButton } from '@/features/fraud-checker/courier-checker-buttons';
 import { OrderStatusBadge } from '@/features/orders/order-ui';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
@@ -25,7 +26,11 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" description="Your store at a glance." />
+      <PageHeader
+        title="Dashboard"
+        description="Your store at a glance."
+        actions={<DashboardCourierCheckerButton />}
+      />
 
       <StatCardGrid>
         <StatCard

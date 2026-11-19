@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ProductModel } from '@/database';
+import { CheckCourierHistoryButton } from '@/features/fraud-checker/courier-checker-buttons';
 import {
   OrderItemsList,
   OrderProgress,
@@ -200,6 +201,7 @@ export default async function AdminOrderPage({
             ) : (
               <p className="text-subtle mt-2 text-xs">Guest order (no account)</p>
             )}
+            <CheckCourierHistoryButton phone={order.customer.phone} />
           </Card>
           <DeliveryAddressCard order={order} />
           <Card title="Payment">
