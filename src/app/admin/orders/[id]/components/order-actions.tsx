@@ -30,11 +30,36 @@ import {
   RETURN_WINDOW_HOURS,
 } from '@lib/constants';
 
+const ORDER_ACTIONS_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
+const AUTO_HIDE_STATUSES: ReadonlySet<OrderStatus> = new Set([
+  'delivered',
+  'completed',
+  'cancelled',
+  'returned',
+]);
+
+function getStatusEnteredAt(order: OrderDTO): number | null {
+  if ((order.status === 'delivered' || order.status === 'completed') && order.deliveredAt) {
+    return new Date(order.deliveredAt).getTime();
+  }
+  for (let i = order.statusHistory.length - 1; i >= 0; i--) {
+    const entry = order.statusHistory[i];
+    if (entry?.status === order.status) {
+      return new Date(entry.at).getTime();
+    }
+  }
+  const last = order.statusHistory[order.statusHistory.length - 1];
+  return last ? new Date(last.at).getTime() : new Date(order.updatedAt).getTime();
+}
+
 /** Moves the order along its workflow (including flexible cancel/return), plus payment & notes. */
 export function OrderActions({ order }: { order: OrderDTO }) {
   const router = useRouter();
   const isPostDelivery = order.status === 'delivered' || order.status === 'completed';
   const [now] = React.useState(() => Date.now());
+  const enteredAt = AUTO_HIDE_STATUSES.has(order.status) ? getStatusEnteredAt(order) : null;
+  const isActionsExpired =
+    enteredAt !== null && Number.isFinite(enteredAt) && now - enteredAt >= ORDER_ACTIONS_EXPIRY_MS;
   const withinReturnWindow =
     !isPostDelivery ||
     (!!order.deliveredAt &&
@@ -63,6 +88,8 @@ export function OrderActions({ order }: { order: OrderDTO }) {
       router.refresh();
     }
   };
+
+  if (isActionsExpired) return null;
 
   return (
     <section className="bg-panel hairline rounded-xl2 space-y-5 p-5">

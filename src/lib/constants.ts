@@ -61,11 +61,11 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
  */
 export const ADMIN_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
-  confirmed: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
-  processing: ['confirmed', 'shipped', 'delivered', 'cancelled', 'returned'],
-  shipped: ['processing', 'delivered', 'cancelled', 'returned'],
-  delivered: ['shipped', 'cancelled', 'returned'],
-  completed: ['delivered', 'cancelled', 'returned'],
+  confirmed: ['processing', 'shipped', 'delivered', 'cancelled'],
+  processing: ['shipped', 'delivered'],
+  shipped: ['delivered', 'returned'],
+  delivered: ['returned'],
+  completed: ['returned'],
   cancelled: [],
   returned: [],
 };
