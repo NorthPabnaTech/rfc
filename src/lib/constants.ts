@@ -104,6 +104,12 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
+export const PAYMENT_STATUS_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
+  unpaid: ['paid'],
+  paid: ['refunded'],
+  refunded: [],
+};
+
 export const SHIPPING_ZONES = ['inside_dhaka', 'outside_dhaka'] as const;
 export type ShippingZone = (typeof SHIPPING_ZONES)[number];
 export const SHIPPING_ZONE_LABELS: Record<ShippingZone, string> = {

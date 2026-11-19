@@ -26,6 +26,7 @@ import {
   ORDER_STATUS_LABELS,
   type OrderPlatform,
   type OrderStatus,
+  PAYMENT_STATUS_TRANSITIONS,
   type PaymentMethod,
   type PaymentStatus,
   RETURN_WINDOW_HOURS,
@@ -742,8 +743,17 @@ export async function updateOrderMeta(
   data: { paymentStatus: PaymentStatus; adminNote?: string },
 ): Promise<void> {
   await connectDB();
-  const res = await OrderModel.updateOne({ _id: orderId }, { $set: data });
-  if (!res.matchedCount) throw new AppError('Order not found.', 404);
+  const order = await OrderModel.findById(orderId, 'paymentStatus').lean();
+  if (!order) throw new AppError('Order not found.', 404);
+  if (
+    data.paymentStatus !== order.paymentStatus &&
+    !PAYMENT_STATUS_TRANSITIONS[order.paymentStatus].includes(data.paymentStatus)
+  ) {
+    throw new AppError(
+      `Can't change payment status from ${order.paymentStatus} to ${data.paymentStatus}.`,
+    );
+  }
+  await OrderModel.updateOne({ _id: orderId }, { $set: data });
 }
 
 export async function updateOrderShippingAddress(

@@ -26,7 +26,8 @@ import {
   ADMIN_ORDER_TRANSITIONS,
   ORDER_STATUS_LABELS,
   type OrderStatus,
-  PAYMENT_STATUSES,
+  PAYMENT_STATUS_TRANSITIONS,
+  type PaymentStatus,
   RETURN_WINDOW_HOURS,
 } from '@lib/constants';
 
@@ -75,8 +76,18 @@ export function OrderActions({ order }: { order: OrderDTO }) {
   const [metaConfirm, setMetaConfirm] = React.useState(false);
   const [returnOpen, setReturnOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const [payment, setPayment] = React.useState(order.paymentStatus);
+  const nextPayments = PAYMENT_STATUS_TRANSITIONS[order.paymentStatus];
+  const [payment, setPayment] = React.useState<PaymentStatus | ''>('');
   const [adminNote, setAdminNote] = React.useState(order.adminNote ?? '');
+
+  const formatPaymentLabel = (p: PaymentStatus) =>
+    p === 'unpaid'
+      ? order.paymentMethod === 'paymently'
+        ? 'Unpaid (Online)'
+        : 'Unpaid (COD due)'
+      : p === 'paid'
+        ? 'Paid'
+        : 'Refunded';
 
   const move = async (status: OrderStatus) => {
     setBusy(true);
@@ -149,22 +160,26 @@ export function OrderActions({ order }: { order: OrderDTO }) {
 
       <div className="border-line space-y-2.5 border-t pt-5">
         <h2 className="text-ink text-[14px] font-semibold">Payment & internal note</h2>
-        <Select
-          aria-label="Payment status"
-          value={payment}
-          onValueChange={(v) => setPayment(v as typeof payment)}
-          items={PAYMENT_STATUSES.map((p) => ({
-            value: p,
-            label:
-              p === 'unpaid'
-                ? order.paymentMethod === 'paymently'
-                  ? 'Unpaid (Online)'
-                  : 'Unpaid (COD due)'
-                : p === 'paid'
-                  ? 'Paid'
-                  : 'Refunded',
-          }))}
-        />
+        {nextPayments.length === 0 ? (
+          <p className="text-muted text-sm">
+            Payment:{' '}
+            <span className="text-ink font-medium">{formatPaymentLabel(order.paymentStatus)}</span>{' '}
+            — no further changes.
+          </p>
+        ) : (
+          <Select
+            aria-label="Payment status"
+            value={payment}
+            onValueChange={(v) => setPayment(v as PaymentStatus)}
+            placeholder={formatPaymentLabel(order.paymentStatus)}
+            clearable
+            onClear={() => setPayment('')}
+            items={nextPayments.map((p) => ({
+              value: p,
+              label: formatPaymentLabel(p),
+            }))}
+          />
+        )}
         <Textarea
           value={adminNote}
           onChange={(e) => setAdminNote(e.target.value)}
@@ -193,12 +208,15 @@ export function OrderActions({ order }: { order: OrderDTO }) {
           setBusy(true);
           const res = await updateOrderMetaAction({
             orderId: order.id,
-            paymentStatus: payment,
+            paymentStatus: payment || order.paymentStatus,
             adminNote,
           });
           setBusy(false);
           setMetaConfirm(false);
-          if (handleActionResult(res)) router.refresh();
+          if (handleActionResult(res)) {
+            setPayment('');
+            router.refresh();
+          }
         }}
       />
 
