@@ -10,6 +10,7 @@ import {
   ReturnStatusBadge,
   ShippingAddressBlock,
 } from '@/features/orders/order-ui';
+import { getBusinessBySlug } from '@/services/businesses';
 import { getCustomerOrder } from '@/services/orders';
 import { Icon } from '@components/icon/icon';
 import { Badge } from '@components/ui/badge';
@@ -19,6 +20,7 @@ import { formatStoreDate, formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
 
 import { CancelOrderButton } from './components/cancel-order-button';
+import { DownloadInvoiceButton } from './components/download-invoice-button';
 import { PayNowButton } from './components/pay-now-button';
 
 export const metadata: Metadata = { title: 'Order details' };
@@ -29,6 +31,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (!objectId.safeParse(id).success) notFound();
   const order = await getCustomerOrder(user.id, id);
   if (!order) notFound();
+  const business = await getBusinessBySlug(order.business);
 
   return (
     <div className="space-y-6">
@@ -43,10 +46,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-ink text-2xl">{order.orderNumber}</h2>
-            <p className="text-muted text-sm">Placed {formatStoreDateTime(order.createdAt)}</p>
+            <p className="text-muted text-sm">
+              {order.invoiceNumber} · Placed {formatStoreDateTime(order.createdAt)}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <OrderStatusBadge status={order.status} />
+            <DownloadInvoiceButton order={order} business={business ?? undefined} />
             {order.canCancel && <CancelOrderButton orderId={order.id} />}
           </div>
         </div>

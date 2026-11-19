@@ -40,7 +40,9 @@ export default async function MyOrdersPage() {
               >
                 <div className="min-w-[140px]">
                   <p className="text-ink font-semibold">{o.orderNumber}</p>
-                  <p className="text-muted text-xs">{formatStoreDate(o.createdAt)}</p>
+                  <p className="text-muted text-xs">
+                    {o.invoiceNumber} · {formatStoreDate(o.createdAt)}
+                  </p>
                 </div>
                 <OrderStatusBadge status={o.status} />
                 <p className="text-muted text-sm">

@@ -40,9 +40,8 @@ export default async function AnalysisPage({
   const s = data.summary;
   const totalCost = s.cogs + s.operatingExpenses + s.supplierPurchaseExpenses + s.shippingFees;
   const totalRevenue = s.netRevenue;
-  const netAll = s.netProfit - s.supplierPurchaseExpenses;
-  const totalProfit = Math.max(0, netAll);
-  const totalLoss = Math.max(0, -netAll);
+  const totalProfit = Math.max(0, s.grossProfit);
+  const totalLoss = Math.max(0, totalCost - totalProfit);
 
   return (
     <>

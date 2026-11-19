@@ -70,7 +70,8 @@ function ToastCard({ id, variant, title, description }: ToastCardProps) {
     <div
       role="status"
       className={cn(
-        'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden',
+        'group pointer-events-auto relative flex w-full gap-3 overflow-hidden',
+        description ? 'items-start' : 'items-center',
         'rounded-xl2 border-line bg-panel shadow-pop border px-3.5 py-3',
         // opacity-only entrance — sonner owns the transform (stacking/slide),
         // so a transform-based keyframe here would fight it mid-animation.
@@ -94,7 +95,7 @@ function ToastCard({ id, variant, title, description }: ToastCardProps) {
       </span>
 
       {/* copy */}
-      <div className="min-w-0 flex-1 pt-px pr-5">
+      <div className={cn('min-w-0 flex-1 pr-5', description && 'pt-px')}>
         <p className="text-ink text-[13px] leading-snug font-semibold tracking-[-0.01em]">
           {title}
         </p>

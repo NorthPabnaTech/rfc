@@ -370,6 +370,7 @@ export type OrderRowDTO = Pick<
   OrderDTO,
   | 'id'
   | 'orderNumber'
+  | 'invoiceNumber'
   | 'business'
   | 'customer'
   | 'total'

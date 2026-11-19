@@ -8,6 +8,7 @@ import {
   ExpenseModel,
   type Order,
   OrderModel,
+  SupplierOrderModel,
 } from '@/database';
 import type { AnalysisDashboardDTO, AnalysisPeriod } from '@/types';
 import {
@@ -134,6 +135,21 @@ export async function getAnalysisDashboard(opts: {
     listBusinesses(),
   ]);
 
+  const deliveredOrderIds = orders
+    .filter((o) => o.status === 'delivered' || o.status === 'completed')
+    .map((o) => o._id);
+  const supplierOrders = deliveredOrderIds.length
+    ? await SupplierOrderModel.find(
+        { order: { $in: deliveredOrderIds }, status: { $ne: 'cancelled' } },
+        'order packagingCost',
+      ).lean()
+    : [];
+  const packagingByOrderId = new Map<string, number>();
+  for (const so of supplierOrders) {
+    const oid = String(so.order);
+    packagingByOrderId.set(oid, (packagingByOrderId.get(oid) ?? 0) + (so.packagingCost ?? 0));
+  }
+
   let fromStr = resolved.fromStr;
   let toStr = resolved.toStr;
   let granularity = resolved.granularity;
@@ -160,6 +176,7 @@ export async function getAnalysisDashboard(opts: {
   let refunds = 0;
   let shippingFees = 0;
   let cogs = 0;
+  let deliveredPackagingCost = 0;
   let totalOrders = 0;
   let completedOrders = 0;
   let cancelledOrders = 0;
@@ -172,12 +189,12 @@ export async function getAnalysisDashboard(opts: {
 
   const timelineMap = new Map<
     string,
-    { revenue: number; expenses: number; cogs: number; orders: number }
+    { revenue: number; expenses: number; cogs: number; profit: number; orders: number }
   >();
   const ensureSlot = (key: string) => {
     let slot = timelineMap.get(key);
     if (!slot) {
-      slot = { revenue: 0, expenses: 0, cogs: 0, orders: 0 };
+      slot = { revenue: 0, expenses: 0, cogs: 0, profit: 0, orders: 0 };
       timelineMap.set(key, slot);
     }
     return slot;
@@ -206,9 +223,27 @@ export async function getAnalysisDashboard(opts: {
       continue;
     }
 
-    if (o.status === 'delivered' || o.status === 'completed') completedOrders += 1;
-    if (o.status === 'returned') returnedOrders += 1;
+    if (o.status === 'returned') {
+      returnedOrders += 1;
+      const returnShipping = o.shippingFee ?? 0;
+      shippingFees += returnShipping;
+      const key = dayjs(o.createdAt)
+        .tz(TZ)
+        .format(granularity === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD');
+      const slot = ensureSlot(key);
+      // Delivery charge on a returned order is deducted from us and counts as a loss.
+      slot.expenses += returnShipping;
+      slot.orders += 1;
+      continue;
+    }
 
+    const isDelivered = o.status === 'delivered' || o.status === 'completed';
+    if (!isDelivered) {
+      // Profit and revenue are only realized once the order is delivered/completed.
+      continue;
+    }
+
+    completedOrders += 1;
     validOrderCount += 1;
     const returnedCost = (o.returnedItems ?? []).reduce(
       (s, ri) => s + ri.supplierPrice * ri.quantity,
@@ -216,22 +251,19 @@ export async function getAnalysisDashboard(opts: {
     );
     const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
     const orderRefund =
-      o.refundedAmount && o.refundedAmount > 0
-        ? o.refundedAmount
-        : o.status === 'returned'
-          ? returnedTotal > 0
-            ? returnedTotal
-            : o.total
-          : 0;
+      o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : returnedTotal;
 
     const netOrderRev = Math.max(0, o.total - orderRefund);
     const netOrderCogs = Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+    const orderShipping = o.shippingFee ?? 0;
+    const orderPackaging = packagingByOrderId.get(String(o._id)) ?? 0;
 
     grossRevenue += o.total;
     discounts += o.discount ?? 0;
     refunds += orderRefund;
-    shippingFees += o.shippingFee ?? 0;
+    shippingFees += orderShipping;
     cogs += netOrderCogs;
+    deliveredPackagingCost += orderPackaging;
 
     stEntry.revenue += netOrderRev;
     const rawPlat = (o.platform ?? 'website') as OrderPlatform;
@@ -243,7 +275,7 @@ export async function getAnalysisDashboard(opts: {
 
     bStat.revenue += netOrderRev;
     bStat.cogs += netOrderCogs;
-    bStat.shipping += o.shippingFee ?? 0;
+    bStat.shipping += orderShipping;
     bStat.orders += 1;
 
     const key = dayjs(o.createdAt)
@@ -251,11 +283,8 @@ export async function getAnalysisDashboard(opts: {
       .format(granularity === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD');
     const slot = ensureSlot(key);
     slot.revenue += netOrderRev;
-    slot.cogs += netOrderCogs;
-    // Delivery charge on a returned order is deducted from us and counts as a loss.
-    if (o.status === 'returned') {
-      slot.expenses += o.shippingFee ?? 0;
-    }
+    slot.cogs += netOrderCogs + orderShipping;
+    slot.profit += netOrderRev - orderShipping - netOrderCogs - orderPackaging;
     slot.orders += 1;
   }
 
@@ -297,7 +326,7 @@ export async function getAnalysisDashboard(opts: {
   }
 
   const netRevenue = Math.max(0, grossRevenue - refunds);
-  const grossProfit = netRevenue - shippingFees - cogs;
+  const grossProfit = netRevenue - shippingFees - cogs - deliveredPackagingCost;
   const netProfit = grossProfit - operatingExpenses;
   const averageOrderValue = validOrderCount > 0 ? Math.round(netRevenue / validOrderCount) : 0;
 
@@ -308,14 +337,14 @@ export async function getAnalysisDashboard(opts: {
   while (!cursor.isAfter(endCursor)) {
     const key = cursor.format(granularity === 'month' ? 'YYYY-MM' : 'YYYY-MM-DD');
     const label = cursor.format(granularity === 'month' ? 'MMM YYYY' : 'DD MMM');
-    const slot = timelineMap.get(key) ?? { revenue: 0, expenses: 0, cogs: 0, orders: 0 };
+    const slot = timelineMap.get(key) ?? { revenue: 0, expenses: 0, cogs: 0, profit: 0, orders: 0 };
     timeline.push({
       key,
       label,
       revenue: slot.revenue,
       expenses: slot.expenses,
       cogs: slot.cogs,
-      profit: slot.revenue - slot.cogs - slot.expenses,
+      profit: slot.profit,
       orders: slot.orders,
     });
     cursor = cursor.add(1, granularity);

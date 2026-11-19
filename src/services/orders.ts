@@ -419,6 +419,7 @@ function toRow(o: Order): OrderRowDTO {
   return {
     id: String(o._id),
     orderNumber: o.orderNumber,
+    invoiceNumber: o.invoiceNumber || `INV-${o.orderNumber}`,
     business: o.business || DEFAULT_BUSINESS_SLUG,
     customer: { name: o.customer.name, phone: o.customer.phone, email: o.customer.email },
     total: o.total,

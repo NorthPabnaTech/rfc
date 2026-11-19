@@ -156,9 +156,9 @@ export async function downloadOrderInvoicePdf(
   store?: Partial<StoreIdentity>,
 ): Promise<void> {
   const biz: StoreIdentity = {
-    name: store?.name || DEFAULT_STORE.name,
-    address: store?.address || DEFAULT_STORE.address,
-    phone: store?.phone || DEFAULT_STORE.phone,
+    name: store?.name?.trim() || DEFAULT_STORE.name,
+    address: store ? store.address?.trim() : DEFAULT_STORE.address,
+    phone: store ? store.phone?.trim() : DEFAULT_STORE.phone,
     logoUrl: store?.logoUrl,
   };
 

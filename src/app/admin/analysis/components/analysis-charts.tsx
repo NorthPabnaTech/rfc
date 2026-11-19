@@ -328,14 +328,14 @@ function buildRevenueExpensePoints(
 function buildProfitLossPoints(
   data: AnalysisDashboardDTO['timeline'],
 ): CryptoSeriesPoint[] {
-  let cumRev = 0;
-  let cumExp = 0;
+  let cumOrderProfit = 0;
+  let cumCost = 0;
   return data.map((d) => {
-    cumRev += d.revenue;
-    cumExp += d.expenses + d.cogs;
-    const net = cumRev - cumExp;
-    const profit = Math.max(0, net);
-    const loss = Math.max(0, -net);
+    cumOrderProfit += d.profit;
+    cumCost += d.expenses + d.cogs;
+    const profit = Math.max(0, cumOrderProfit);
+    const loss = Math.max(0, cumCost - profit);
+    const net = profit - cumCost;
     return {
       key: d.key,
       label: d.label,
