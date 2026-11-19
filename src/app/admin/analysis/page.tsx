@@ -38,7 +38,7 @@ export default async function AnalysisPage({
   ]);
 
   const s = data.summary;
-  const totalCost = s.cogs + s.operatingExpenses + s.supplierPurchaseExpenses + s.shippingFees;
+  const totalCost = s.operatingExpenses + s.supplierPurchaseExpenses;
   const totalRevenue = s.netRevenue;
   const totalProfit = Math.max(0, s.grossProfit);
   const totalLoss = Math.max(0, totalCost - totalProfit);

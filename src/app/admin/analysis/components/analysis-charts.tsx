@@ -290,8 +290,7 @@ function CryptoDualAreaChart({
 }
 
 /**
- * Crypto-style Running Revenue vs Remaining Expense Balance chart:
- * Expenses persist until offset by revenue (e.g. 200 expense + 150 revenue -> 50 remaining expense).
+ * Crypto-style Running Revenue vs Total Cost chart.
  */
 function buildRevenueExpensePoints(
   data: AnalysisDashboardDTO['timeline'],
@@ -299,26 +298,19 @@ function buildRevenueExpensePoints(
   let cumRev = 0;
   let cumExp = 0;
   return data.map((d) => {
-    const dayExp = d.expenses + d.cogs;
     cumRev += d.revenue;
-    cumExp += dayExp;
-    const uncoveredExp = Math.max(0, cumExp - cumRev);
+    cumExp += d.expenses;
     return {
       key: d.key,
       label: d.label,
       primary: cumRev,
-      secondary: uncoveredExp,
+      secondary: cumExp,
       tooltipRows: [
         { label: 'Total Revenue', value: `৳${formatNumber(cumRev)}`, colorClass: 'text-sky-300' },
         {
-          label: 'Uncovered Expense',
-          value: `৳${formatNumber(uncoveredExp)}`,
-          colorClass: 'text-rose-300',
-        },
-        {
-          label: 'Cumulative Spend',
+          label: 'Total Cost',
           value: `৳${formatNumber(cumExp)}`,
-          colorClass: 'text-white/75',
+          colorClass: 'text-rose-300',
         },
       ],
     };
@@ -332,7 +324,7 @@ function buildProfitLossPoints(
   let cumCost = 0;
   return data.map((d) => {
     cumOrderProfit += d.profit;
-    cumCost += d.expenses + d.cogs;
+    cumCost += d.expenses;
     const profit = Math.max(0, cumOrderProfit);
     const loss = Math.max(0, cumCost - profit);
     const net = profit - cumCost;
@@ -370,7 +362,7 @@ export function RevenueExpensesChart({
       idPrefix="rev-exp"
       points={points}
       primaryLabel="Total Revenue"
-      secondaryLabel="Remaining Expense"
+      secondaryLabel="Total Cost"
       primaryColor="#3b82f6"
       secondaryColor="#f43f5e"
       primaryDotClass="bg-brand-500"
