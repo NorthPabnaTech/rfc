@@ -6,6 +6,7 @@ import {
   ProductModel,
   QuestionModel,
   ReturnRequestModel,
+  SupplierOrderModel,
   UserModel,
 } from '@/database';
 import type { OrderRowDTO } from '@/types';
@@ -22,7 +23,7 @@ const REVENUE_STATUSES = [
   'completed',
 ];
 /** Orders whose money is actually in hand. */
-const REALIZED_STATUSES = ['delivered', 'completed'];
+const REALIZED_STATUSES = ['delivered', 'completed'] as const;
 
 export type DashboardData = {
   totals: {
@@ -59,7 +60,7 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
 
   const [
     salesAgg,
-    realizedAgg,
+    realizedOrders,
     orders,
     products,
     customers,
@@ -75,18 +76,10 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
       { $match: { status: { $in: REVENUE_STATUSES } } },
       { $group: { _id: null, total: { $sum: '$total' } } },
     ]),
-    OrderModel.aggregate<{ total: number; profit: number }>([
-      { $match: { status: { $in: REALIZED_STATUSES } } },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$total' },
-          profit: {
-            $sum: { $subtract: [{ $subtract: ['$total', '$shippingFee'] }, '$supplierCost'] },
-          },
-        },
-      },
-    ]),
+    OrderModel.find(
+      { status: { $in: REALIZED_STATUSES } },
+      'total shippingFee supplierCost refundedAmount returnedItems',
+    ).lean(),
     OrderModel.countDocuments(),
     ProductModel.countDocuments(),
     UserModel.countDocuments({ role: 'customer' }),
@@ -138,6 +131,32 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
     listAdminOrders({ page: 1 }),
   ]);
 
+  const realizedIds = realizedOrders.map((o) => o._id);
+  const realizedSupplierOrders = realizedIds.length
+    ? await SupplierOrderModel.find(
+        { order: { $in: realizedIds }, status: { $ne: 'cancelled' } },
+        'packagingCost',
+      ).lean()
+    : [];
+  const totalPackaging = realizedSupplierOrders.reduce((s, so) => s + (so.packagingCost ?? 0), 0);
+
+  let realizedSales = 0;
+  let realizedShipping = 0;
+  let realizedCogs = 0;
+  for (const o of realizedOrders) {
+    const returnedCost = (o.returnedItems ?? []).reduce(
+      (s, ri) => s + ri.supplierPrice * ri.quantity,
+      0,
+    );
+    const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
+    const orderRefund =
+      o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : returnedTotal;
+    realizedSales += Math.max(0, o.total - orderRefund);
+    realizedShipping += o.shippingFee ?? 0;
+    realizedCogs += Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+  }
+  const realizedProfit = Math.max(0, realizedSales - realizedShipping - realizedCogs - totalPackaging);
+
   const byStatus = Object.fromEntries(statusRows.map((r) => [r._id, r.n]));
   const dailyMap = new Map(daily.map((d) => [d._id, d]));
   const revenueByDay = Array.from({ length: days }, (_, i) => {
@@ -151,8 +170,8 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
   return {
     totals: {
       sales: salesAgg[0]?.total ?? 0,
-      realizedSales: realizedAgg[0]?.total ?? 0,
-      profit: realizedAgg[0]?.profit ?? 0,
+      realizedSales,
+      profit: realizedProfit,
       orders,
       products,
       customers,

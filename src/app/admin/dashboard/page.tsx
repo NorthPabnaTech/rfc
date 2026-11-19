@@ -86,7 +86,9 @@ export default async function DashboardPage() {
 
         <section className="bg-panel hairline rounded-xl2 p-5">
           <h2 className="text-ink text-[14px] font-semibold">Profit (delivered orders)</h2>
-          <p className="text-subtle text-[12px]">Sales minus delivery fees and supplier cost</p>
+          <p className="text-subtle text-[12px]">
+            Sales minus delivery fees, supplier cost, and packaging
+          </p>
           <p className="text-ink mt-4 text-[34px] leading-none font-semibold">
             ৳{formatNumber(d.totals.profit)}
           </p>
