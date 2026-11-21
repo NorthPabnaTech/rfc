@@ -1,5 +1,7 @@
 'use client';
 
+import { isHeicFile } from '@lib/constants';
+
 export type CropRect = {
   x: number;
   y: number;
@@ -41,11 +43,10 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Decodes an image file while respecting EXIF orientation when supported by the
- * browser (`createImageBitmap(..., { imageOrientation: 'from-image' })`), with
- * an HTMLImageElement fallback.
+ * Decodes an image file using browser-native decoders (`createImageBitmap` with
+ * EXIF orientation, falling back to `HTMLImageElement`).
  */
-export async function decodeImageFile(file: File): Promise<DecodedImage> {
+async function decodeNativeImage(file: File): Promise<DecodedImage> {
   if (typeof createImageBitmap === 'function') {
     try {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -84,7 +85,67 @@ export async function decodeImageFile(file: File): Promise<DecodedImage> {
   }
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+/**
+ * Converts HEIC/HEIF files to a standard JPEG `File` so browsers without
+ * native HEIC decoding (Chrome, Edge, Firefox) can preview, crop, and encode them.
+ * Non-HEIC files are returned unchanged.
+ */
+export async function normalizeImageFileForBrowser(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file;
+
+  try {
+    const { default: heic2any } = await import('heic2any');
+    const converted = await heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.92,
+    });
+    const blob = Array.isArray(converted) ? converted[0] : converted;
+    if (!blob) throw new Error('Could not convert HEIC image.');
+    return new File([blob], replaceExtension(file.name, 'jpg'), {
+      type: 'image/jpeg',
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch (err) {
+    // Fallback for browsers with native HEIC support (Safari) or misnamed JPEG/PNG files
+    try {
+      const decoded = await decodeNativeImage(file);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = decoded.width;
+        canvas.height = decoded.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+        decoded.draw(ctx, 0, 0, decoded.width, decoded.height, 0, 0, decoded.width, decoded.height);
+        const blob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
+        if (!blob) throw new Error('Could not encode HEIC image.');
+        return new File([blob], replaceExtension(file.name, 'jpg'), {
+          type: 'image/jpeg',
+          lastModified: file.lastModified || Date.now(),
+        });
+      } finally {
+        decoded.cleanup();
+      }
+    } catch {
+      throw err instanceof Error ? err : new Error('Could not convert HEIC image.');
+    }
+  }
+}
+
+/**
+ * Decodes an image file (converting HEIC/HEIF to JPEG first if needed) while
+ * respecting EXIF orientation when supported by the browser.
+ */
+export async function decodeImageFile(file: File): Promise<DecodedImage> {
+  const browserFile = await normalizeImageFileForBrowser(file);
+  return decodeNativeImage(browserFile);
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+): Promise<Blob | null> {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), type, quality);
   });
@@ -110,8 +171,9 @@ export async function processImageFile(
     decoded?: DecodedImage;
   },
 ): Promise<ProcessedImageResult> {
+  const normalizedFile = options.decoded ? file : await normalizeImageFileForBrowser(file);
   const ownDecoded = !options.decoded;
-  const decoded = options.decoded ?? (await decodeImageFile(file));
+  const decoded = options.decoded ?? (await decodeNativeImage(normalizedFile));
 
   try {
     const srcX = options.crop ? Math.max(0, Math.round(options.crop.x)) : 0;
@@ -178,19 +240,20 @@ export async function processImageFile(
       isUncropped &&
       decoded.width <= options.maxWidth &&
       decoded.height <= options.maxHeight &&
-      blob.size >= file.size
+      !isHeicFile(normalizedFile) &&
+      blob.size >= normalizedFile.size
     ) {
       return {
-        file,
+        file: normalizedFile,
         width: decoded.width,
         height: decoded.height,
         originalSize: file.size,
-        optimizedSize: file.size,
+        optimizedSize: normalizedFile.size,
         skippedCompression: true,
       };
     }
 
-    const optimizedFile = new File([blob], replaceExtension(file.name, outExt), {
+    const optimizedFile = new File([blob], replaceExtension(normalizedFile.name, outExt), {
       type: outType,
       lastModified: Date.now(),
     });

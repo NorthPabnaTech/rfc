@@ -14,7 +14,7 @@ import { ConfirmDialog, Spinner } from '@components/shared';
 import { Callout } from '@components/shared/callout';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
-import { ACCEPTED_IMAGE_TYPES } from '@lib/constants';
+import { ACCEPTED_IMAGE_EXTENSIONS_ATTR, isAcceptedImageFile } from '@lib/constants';
 import { toast } from '@lib/toast';
 import { type ProfileInput, profileSchema } from '@lib/validators/auth';
 
@@ -40,8 +40,8 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
   const onPick = (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP or AVIF.' });
+    if (!isAcceptedImageFile(file)) {
+      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP, AVIF or HEIC.' });
       return;
     }
     setPendingAvatar([file]);
@@ -113,7 +113,7 @@ export function ProfileForm({ profile }: { profile: ProfileDTO }) {
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={ACCEPTED_IMAGE_EXTENSIONS_ATTR}
             hidden
             onChange={(e) => void onPick(e.target.files)}
           />

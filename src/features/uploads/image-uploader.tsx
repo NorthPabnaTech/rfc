@@ -10,8 +10,9 @@ import { Icon } from '@components/icon/icon';
 import { Spinner } from '@components/shared';
 import { Button } from '@components/ui/button';
 import {
-  ACCEPTED_IMAGE_TYPES,
+  ACCEPTED_IMAGE_EXTENSIONS_ATTR,
   type BannerPosition,
+  isAcceptedImageFile,
   MAX_UPLOAD_BYTES,
   type UploadPurpose,
 } from '@lib/constants';
@@ -87,13 +88,13 @@ export function ImageUploader({
   const handleFiles = (list: FileList | null) => {
     if (!list?.length) return;
     let files = Array.from(list);
-    const bad = files.find(
-      (f) => !ACCEPTED_IMAGE_TYPES.includes(f.type) || f.size > MAX_SOURCE_BYTES,
-    );
-    if (bad) {
-      toast.error('Unsupported image', { description: 'Use JPG, PNG, WebP or AVIF under 25 MB.' });
-      files = files.filter((f) => f !== bad);
+    const valid = files.filter((f) => isAcceptedImageFile(f) && f.size <= MAX_SOURCE_BYTES);
+    if (valid.length < files.length) {
+      toast.error('Unsupported image', {
+        description: 'Use JPG, PNG, WebP, AVIF or HEIC under 25 MB.',
+      });
     }
+    files = valid;
     if (files.length > remaining) {
       toast.warning(`Only ${remaining} more image(s) allowed`);
       files = files.slice(0, Math.max(0, remaining));
@@ -267,12 +268,12 @@ export function ImageUploader({
             {uploading ? 'Uploading…' : 'Click or drop images to upload'}
           </p>
           <p className="text-subtle text-[11.5px]">
-            JPG, PNG, WebP, AVIF · auto-optimized before upload · {remaining} more allowed
+            JPG, PNG, WebP, AVIF, HEIC · auto-optimized before upload · {remaining} more allowed
           </p>
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept={ACCEPTED_IMAGE_EXTENSIONS_ATTR}
             multiple={max > 1}
             hidden
             onChange={(e) => void handleFiles(e.target.files)}
@@ -282,12 +283,7 @@ export function ImageUploader({
 
       {canPickFromLibrary && remaining > 0 && !disabled && (
         <div className="flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setPickerOpen(true)}
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
             <Icon name="image" size={14} /> Choose from Media Library
           </Button>
           <MediaPickerDialog

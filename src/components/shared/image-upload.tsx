@@ -3,6 +3,8 @@
 import * as React from 'react';
 
 import { Icon } from '@components/icon/icon';
+import { ACCEPTED_IMAGE_EXTENSIONS_ATTR, isAcceptedImageFile } from '@lib/constants';
+import { normalizeImageFileForBrowser } from '@lib/image-processor';
 import { cn } from '@lib/utils';
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -27,12 +29,17 @@ export function ImageUpload({ value, onChange, onBlur, id, disabled, className, 
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = React.useState(false);
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     const file = files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange?.(reader.result as string);
-    reader.readAsDataURL(file);
+    if (!file || (!file.type.startsWith('image/') && !isAcceptedImageFile(file))) return;
+    try {
+      const browserFile = await normalizeImageFileForBrowser(file);
+      const reader = new FileReader();
+      reader.onload = () => onChange?.(reader.result as string);
+      reader.readAsDataURL(browserFile);
+    } catch {
+      // Ignore unreadable files
+    }
   };
 
   if (value) {
@@ -77,7 +84,7 @@ export function ImageUpload({ value, onChange, onBlur, id, disabled, className, 
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        if (!disabled) handleFiles(e.dataTransfer.files);
+        if (!disabled) void handleFiles(e.dataTransfer.files);
       }}
       onBlur={onBlur}
       className={cn(
@@ -95,10 +102,10 @@ export function ImageUpload({ value, onChange, onBlur, id, disabled, className, 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_EXTENSIONS_ATTR}
         disabled={disabled}
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => void handleFiles(e.target.files)}
       />
     </div>
   );

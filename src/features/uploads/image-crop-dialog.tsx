@@ -18,6 +18,7 @@ import {
   type CropRect,
   type DecodedImage,
   decodeImageFile,
+  normalizeImageFileForBrowser,
   processImageFile,
 } from '@lib/image-processor';
 import { getUploadImageProfile } from '@lib/image-upload-config';
@@ -99,6 +100,7 @@ function ImageCropSession({
 
   const [loaded, setLoaded] = React.useState<{
     file: File;
+    normalizedFile: File;
     decoded: DecodedImage;
     sourceUrl: string;
   } | null>(null);
@@ -138,21 +140,29 @@ function ImageCropSession({
     if (!currentFile) return;
     let cancelled = false;
     let decodedRef: DecodedImage | null = null;
-    const url = URL.createObjectURL(currentFile);
+    let objectUrl = '';
 
-    void decodeImageFile(currentFile)
-      .then((res) => {
+    void normalizeImageFileForBrowser(currentFile)
+      .then(async (browserFile) => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(browserFile);
+        objectUrl = url;
+        const res = await decodeImageFile(browserFile);
         if (cancelled) {
           res.cleanup();
           URL.revokeObjectURL(url);
+          objectUrl = '';
           return;
         }
         decodedRef = res;
         setLoadError(null);
-        setLoaded({ file: currentFile, decoded: res, sourceUrl: url });
+        setLoaded({ file: currentFile, normalizedFile: browserFile, decoded: res, sourceUrl: url });
       })
       .catch((err) => {
-        URL.revokeObjectURL(url);
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = '';
+        }
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : 'Unable to load image.');
           setLoaded(null);
@@ -161,7 +171,7 @@ function ImageCropSession({
 
     return () => {
       cancelled = true;
-      URL.revokeObjectURL(url);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       decodedRef?.cleanup();
     };
   }, [currentFile]);
@@ -220,16 +230,8 @@ function ImageCropSession({
       return baseFrame;
     }
     if (freeBox) {
-      const x = clamp(
-        freeBox.x,
-        imageBounds.x,
-        imageBounds.x + imageBounds.width - MIN_CROP_PX,
-      );
-      const y = clamp(
-        freeBox.y,
-        imageBounds.y,
-        imageBounds.y + imageBounds.height - MIN_CROP_PX,
-      );
+      const x = clamp(freeBox.x, imageBounds.x, imageBounds.x + imageBounds.width - MIN_CROP_PX);
+      const y = clamp(freeBox.y, imageBounds.y, imageBounds.y + imageBounds.height - MIN_CROP_PX);
       const w = clamp(freeBox.width, MIN_CROP_PX, imageBounds.x + imageBounds.width - x);
       const h = clamp(freeBox.height, MIN_CROP_PX, imageBounds.y + imageBounds.height - y);
       return { x, y, width: w, height: h };
@@ -324,16 +326,8 @@ function ImageCropSession({
       });
     } else if (drag.type === 'moveBox') {
       const b = drag.origBox;
-      const nextX = clamp(
-        b.x + dx,
-        imageBounds.x,
-        imageBounds.x + imageBounds.width - b.width,
-      );
-      const nextY = clamp(
-        b.y + dy,
-        imageBounds.y,
-        imageBounds.y + imageBounds.height - b.height,
-      );
+      const nextX = clamp(b.x + dx, imageBounds.x, imageBounds.x + imageBounds.width - b.width);
+      const nextY = clamp(b.y + dy, imageBounds.y, imageBounds.y + imageBounds.height - b.height);
       setFreeBox({ x: nextX, y: nextY, width: b.width, height: b.height });
     } else {
       const b = drag.origBox;
@@ -384,11 +378,11 @@ function ImageCropSession({
   };
 
   const handleConfirmCurrent = async (useUncroppedOriginal: boolean) => {
-    if (!currentFile || !decoded) return;
+    if (!currentFile || !decoded || !loaded) return;
     setSubmitting(true);
     setProgressText('Optimizing image…');
     try {
-      const processed = await processImageFile(currentFile, {
+      const processed = await processImageFile(loaded.normalizedFile, {
         crop: useUncroppedOriginal ? undefined : computeNaturalCrop(),
         maxWidth: profile.maxWidth,
         maxHeight: profile.maxHeight,
@@ -415,10 +409,10 @@ function ImageCropSession({
   };
 
   const handleOptimizeAllRemaining = async () => {
-    if (!currentFile || !decoded) return;
+    if (!currentFile || !decoded || !loaded) return;
     setSubmitting(true);
     try {
-      const currentProcessed = await processImageFile(currentFile, {
+      const currentProcessed = await processImageFile(loaded.normalizedFile, {
         crop: computeNaturalCrop(),
         maxWidth: profile.maxWidth,
         maxHeight: profile.maxHeight,

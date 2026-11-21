@@ -6,7 +6,7 @@ import { type UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 
 import type { ImageAsset } from '@/database';
 import {
-  ACCEPTED_IMAGE_TYPES,
+  isAcceptedImageFile,
   MAX_UPLOAD_BYTES,
   UPLOAD_FOLDERS,
   type UploadPurpose,
@@ -38,8 +38,8 @@ const MAX_EDGE: Record<UploadPurpose, number> = {
 };
 
 export function assertValidImage(file: File): void {
-  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-    throw new AppError('Only JPG, PNG, WebP or AVIF images are allowed.');
+  if (!isAcceptedImageFile(file)) {
+    throw new AppError('Only JPG, PNG, WebP, AVIF or HEIC images are allowed.');
   }
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new AppError(`Each image must be under ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`);

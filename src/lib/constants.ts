@@ -218,14 +218,7 @@ export const STOCK_ADJUSTMENT_REASONS = [
   'Other',
 ] as const;
 
-export const EXPENSE_PAYMENT_METHODS = [
-  'cash',
-  'bkash',
-  'nagad',
-  'bank',
-  'card',
-  'other',
-] as const;
+export const EXPENSE_PAYMENT_METHODS = ['cash', 'bkash', 'nagad', 'bank', 'card', 'other'] as const;
 export type ExpensePaymentMethod = (typeof EXPENSE_PAYMENT_METHODS)[number];
 export const EXPENSE_PAYMENT_METHOD_LABELS: Record<ExpensePaymentMethod, string> = {
   cash: 'Cash',
@@ -369,6 +362,24 @@ export const SUPPLIER_ORDER_STATUS_LABELS: Record<SupplierOrderStatus, string> =
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+export const HEIC_IMAGE_TYPES = [
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+];
+export const ACCEPTED_IMAGE_EXTENSIONS_ATTR = 'image/*,.heic,.heif';
+
+export function isHeicFile(file: { name: string; type: string }): boolean {
+  const mime = file.type.toLowerCase();
+  if (HEIC_IMAGE_TYPES.includes(mime)) return true;
+  return /\.(heic|heif)$/i.test(file.name);
+}
+
+export function isAcceptedImageFile(file: { name: string; type: string }): boolean {
+  const mime = file.type.toLowerCase();
+  return ACCEPTED_IMAGE_TYPES.includes(mime) || isHeicFile(file);
+}
 
 export const PAGE_SIZE = 24;
 export const ADMIN_PAGE_SIZE = 10;
