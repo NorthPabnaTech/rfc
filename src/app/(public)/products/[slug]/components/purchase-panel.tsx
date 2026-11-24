@@ -46,16 +46,26 @@ export function PurchasePanel({
   const add = useCart((s) => s.add);
   const setOpen = useCart((s) => s.setOpen);
   const [selected, setSelected] = React.useState<Record<string, string>>(() =>
-    // Pre-select options that have a single value.
+    // Pre-select options that have a single available (non-disabled) value.
     Object.fromEntries(
-      product.variations.filter((v) => v.values.length === 1).map((v) => [v.name, v.values[0]!]),
+      product.variations
+        .map((v) => {
+          const disabled = v.disabledValues ?? [];
+          const enabled = v.values.filter((val) => !disabled.includes(val));
+          return enabled.length === 1 ? ([v.name, enabled[0]!] as const) : null;
+        })
+        .filter((entry): entry is readonly [string, string] => entry !== null),
     ),
   );
   const [qty, setQty] = React.useState(1);
   const [showErrors, setShowErrors] = React.useState(false);
 
   const missing = product.variations.filter((v) => !selected[v.name]);
-  const soldOut = product.stockStatus === 'out_of_stock';
+  const allOptionValuesDisabled = product.variations.some((v) => {
+    const disabled = v.disabledValues ?? [];
+    return v.values.length > 0 && v.values.every((val) => disabled.includes(val));
+  });
+  const soldOut = product.stockStatus === 'out_of_stock' || allOptionValuesDisabled;
 
   const addToCart = (goToCheckout: boolean) => {
     if (missing.length) {
@@ -97,21 +107,26 @@ export function PurchasePanel({
             </legend>
             <div className="flex flex-wrap gap-2">
               {v.values.map((val) => {
-                const on = selected[v.name] === val;
+                const isDisabled = (v.disabledValues ?? []).includes(val);
+                const on = selected[v.name] === val && !isDisabled;
                 return (
                   <button
                     key={val}
                     type="button"
+                    disabled={isDisabled}
                     aria-pressed={on}
+                    title={isDisabled ? 'Out of stock' : undefined}
                     onClick={() => setSelected((s) => ({ ...s, [v.name]: val }))}
                     className={cn(
                       'min-w-12 rounded-full border px-4 py-2.5 text-sm font-medium transition',
-                      on
-                        ? 'bg-noir border-noir text-white'
-                        : cn(
-                            'text-ink hover:border-ink bg-white',
-                            err ? 'border-[var(--status-danger-fg)]' : 'border-line-2/70',
-                          ),
+                      isDisabled
+                        ? 'border-line bg-well text-subtle cursor-not-allowed line-through opacity-50'
+                        : on
+                          ? 'bg-noir border-noir text-white'
+                          : cn(
+                              'text-ink hover:border-ink bg-white',
+                              err ? 'border-[var(--status-danger-fg)]' : 'border-line-2/70',
+                            ),
                     )}
                   >
                     {val}

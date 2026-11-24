@@ -49,7 +49,7 @@ const campaignSchema = new Schema<Campaign>(
       default: null,
     },
     discountType: { type: String, enum: DISCOUNT_TYPES, required: true, default: 'percentage' },
-    discountValue: { type: Number, required: true, min: 1 },
+    discountValue: { type: Number, required: true, min: 0 },
     minOrderAmount: { type: Number, default: 0, min: 0 },
     scope: { type: String, enum: CAMPAIGN_SCOPES, required: true, default: 'all' },
     products: [{ type: Schema.Types.ObjectId, ref: 'Product' }],

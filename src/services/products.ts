@@ -212,7 +212,11 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
     sku: p.sku,
     variations: p.variations
       .filter((v) => v.values.length)
-      .map((v) => ({ name: v.name, values: [...v.values] })),
+      .map((v) => ({
+        name: v.name,
+        values: [...v.values],
+        disabledValues: v.disabledValues?.length ? [...v.disabledValues] : [],
+      })),
     specifications: p.specifications.map((s) => ({ label: s.label, value: s.value })),
     category: ref(p.category),
     subCategory: ref(p.subCategory),

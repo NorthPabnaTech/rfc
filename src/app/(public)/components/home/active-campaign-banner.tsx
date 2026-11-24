@@ -16,9 +16,15 @@ export function ActiveCampaignBanner({ campaigns }: { campaigns: CampaignDTO[] }
   if (!campaign) return null;
 
   const discountLabel =
-    campaign.discountType === 'percentage'
-      ? `${campaign.discountValue}% OFF`
-      : `৳${formatNumber(campaign.discountValue)} OFF`;
+    campaign.discountType === 'free_delivery'
+      ? 'FREE DELIVERY'
+      : campaign.discountType === 'half_delivery'
+        ? '50% OFF DELIVERY'
+        : campaign.discountType === 'delivery_discount'
+          ? `৳${formatNumber(campaign.discountValue)} OFF DELIVERY`
+          : campaign.discountType === 'percentage'
+            ? `${campaign.discountValue}% OFF`
+            : `৳${formatNumber(campaign.discountValue)} OFF`;
 
   const ctaHref =
     campaign.scope === 'products' && campaign.products.length === 1 && campaign.products[0]

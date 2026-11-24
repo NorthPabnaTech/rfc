@@ -21,6 +21,7 @@ import {
 } from '@components/ui/dialog';
 import { Dropdown, type DropdownEntry } from '@components/ui/dropdown';
 import { Input } from '@components/ui/input';
+import { Select } from '@components/ui/select';
 import { Switch } from '@components/ui/switch';
 import { Textarea } from '@components/ui/textarea';
 import { TimePicker } from '@components/ui/time-picker';
@@ -193,7 +194,10 @@ export function CampaignsManager({
           type: f.type,
           couponCode: f.type === 'coupon' ? f.couponCode : '',
           discountType: f.discountType,
-          discountValue: Number(f.discountValue),
+          discountValue:
+            f.discountType === 'free_delivery' || f.discountType === 'half_delivery'
+              ? 0
+              : Number(f.discountValue),
           minOrderAmount: Number(f.minOrderAmount || 0),
           scope: f.scope,
           productIds: f.scope === 'products' ? f.productIds : [],
@@ -264,9 +268,15 @@ export function CampaignsManager({
       cell: (c) => (
         <div>
           <span className="text-ink font-semibold">
-            {c.discountType === 'percentage'
-              ? `${c.discountValue}% OFF`
-              : `৳${formatNumber(c.discountValue)} OFF`}
+            {c.discountType === 'free_delivery'
+              ? 'Free Delivery'
+              : c.discountType === 'half_delivery'
+                ? '50% Off Delivery'
+                : c.discountType === 'delivery_discount'
+                  ? `৳${formatNumber(c.discountValue)} Off Delivery`
+                  : c.discountType === 'percentage'
+                    ? `${c.discountValue}% OFF`
+                    : `৳${formatNumber(c.discountValue)} OFF`}
           </span>
           {c.minOrderAmount > 0 && (
             <p className="text-subtle text-[11px]">Min ৳{formatNumber(c.minOrderAmount)}</p>
@@ -498,48 +508,61 @@ export function CampaignsManager({
                   )}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div
+                  className={cn(
+                    'grid gap-3',
+                    editing.form.discountType === 'free_delivery' ||
+                      editing.form.discountType === 'half_delivery'
+                      ? 'sm:grid-cols-2'
+                      : 'sm:grid-cols-3',
+                  )}
+                >
                   <div className="space-y-1.5">
                     <label className="text-ink text-xs font-semibold">Discount type</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['percentage', 'fixed'] as const).map((dt) => (
-                        <button
-                          key={dt}
-                          type="button"
-                          onClick={() =>
-                            setEditing({ ...editing, form: { ...editing.form, discountType: dt } })
-                          }
-                          className={cn(
-                            'rounded-xl border px-2.5 py-2 text-xs font-semibold transition',
-                            editing.form.discountType === dt
-                              ? 'border-brand bg-brand-soft text-brand-ink'
-                              : 'border-line bg-white text-muted hover:text-ink',
-                          )}
-                        >
-                          {dt === 'percentage' ? '% Percent' : '৳ Fixed'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-ink text-xs font-semibold">
-                      {editing.form.discountType === 'percentage' ? 'Discount (%)' : 'Amount (৳)'} *
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={editing.form.discountType === 'percentage' ? 100 : undefined}
-                      required
-                      value={editing.form.discountValue}
-                      onChange={(e) =>
+                    <Select
+                      value={editing.form.discountType}
+                      onValueChange={(v) =>
                         setEditing({
                           ...editing,
-                          form: { ...editing.form, discountValue: e.target.value },
+                          form: { ...editing.form, discountType: v as DiscountType },
                         })
                       }
+                      items={[
+                        { value: 'percentage', label: '% Percentage' },
+                        { value: 'fixed', label: '৳ Fixed amount' },
+                        { value: 'free_delivery', label: 'Free Delivery (100% off)' },
+                        { value: 'half_delivery', label: 'Half Delivery (50% off)' },
+                        { value: 'delivery_discount', label: 'Delivery Discount (৳ off)' },
+                      ]}
                     />
                   </div>
+
+                  {editing.form.discountType !== 'free_delivery' &&
+                    editing.form.discountType !== 'half_delivery' && (
+                    <div className="space-y-1.5">
+                      <label className="text-ink text-xs font-semibold">
+                        {editing.form.discountType === 'percentage'
+                          ? 'Discount (%)'
+                          : editing.form.discountType === 'delivery_discount'
+                            ? 'Delivery discount (৳)'
+                            : 'Amount (৳)'}{' '}
+                        *
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={editing.form.discountType === 'percentage' ? 100 : undefined}
+                        required
+                        value={editing.form.discountValue}
+                        onChange={(e) =>
+                          setEditing({
+                            ...editing,
+                            form: { ...editing.form, discountValue: e.target.value },
+                          })
+                        }
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-ink text-xs font-semibold">Min amount (৳)</label>
@@ -757,9 +780,15 @@ export function CampaignsManager({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={getStatus(viewing).tone}>{getStatus(viewing).label}</Badge>
                 <Badge tone="brand">
-                  {viewing.discountType === 'percentage'
-                    ? `${viewing.discountValue}% OFF`
-                    : `৳${formatNumber(viewing.discountValue)} OFF`}
+                  {viewing.discountType === 'free_delivery'
+                    ? 'Free Delivery'
+                    : viewing.discountType === 'half_delivery'
+                      ? '50% Off Delivery'
+                      : viewing.discountType === 'delivery_discount'
+                        ? `৳${formatNumber(viewing.discountValue)} Off Delivery`
+                        : viewing.discountType === 'percentage'
+                          ? `${viewing.discountValue}% OFF`
+                          : `৳${formatNumber(viewing.discountValue)} OFF`}
                 </Badge>
                 {viewing.type === 'coupon' && viewing.couponCode ? (
                   <button

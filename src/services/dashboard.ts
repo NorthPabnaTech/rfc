@@ -135,10 +135,20 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
   const realizedSupplierOrders = realizedIds.length
     ? await SupplierOrderModel.find(
         { order: { $in: realizedIds }, status: { $ne: 'cancelled' } },
-        'packagingCost',
+        'order packagingCost deliveryCharge deliveryChargePaidByCustomer',
       ).lean()
     : [];
   const totalPackaging = realizedSupplierOrders.reduce((s, so) => s + (so.packagingCost ?? 0), 0);
+  const resellerDeliveryByOrderId = new Map<string, number>();
+  for (const so of realizedSupplierOrders) {
+    if (so.deliveryChargePaidByCustomer === false) {
+      const oid = String(so.order);
+      resellerDeliveryByOrderId.set(
+        oid,
+        (resellerDeliveryByOrderId.get(oid) ?? 0) + (so.deliveryCharge ?? 0),
+      );
+    }
+  }
 
   let realizedSales = 0;
   let realizedShipping = 0;
@@ -151,11 +161,15 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
     const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
     const orderRefund =
       o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : returnedTotal;
+    const resellerDelivery = resellerDeliveryByOrderId.get(String(o._id)) ?? 0;
     realizedSales += Math.max(0, o.total - orderRefund);
-    realizedShipping += o.shippingFee ?? 0;
+    realizedShipping += resellerDelivery > 0 ? resellerDelivery : (o.shippingFee ?? 0);
     realizedCogs += Math.max(0, (o.supplierCost ?? 0) - returnedCost);
   }
-  const realizedProfit = Math.max(0, realizedSales - realizedShipping - realizedCogs - totalPackaging);
+  const realizedProfit = Math.max(
+    0,
+    realizedSales - realizedShipping - realizedCogs - totalPackaging,
+  );
 
   const byStatus = Object.fromEntries(statusRows.map((r) => [r._id, r.n]));
   const dailyMap = new Map(daily.map((d) => [d._id, d]));

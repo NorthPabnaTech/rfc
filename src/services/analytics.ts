@@ -141,13 +141,20 @@ export async function getAnalysisDashboard(opts: {
   const supplierOrders = deliveredOrderIds.length
     ? await SupplierOrderModel.find(
         { order: { $in: deliveredOrderIds }, status: { $ne: 'cancelled' } },
-        'order packagingCost',
+        'order packagingCost deliveryCharge deliveryChargePaidByCustomer',
       ).lean()
     : [];
   const packagingByOrderId = new Map<string, number>();
+  const resellerDeliveryByOrderId = new Map<string, number>();
   for (const so of supplierOrders) {
     const oid = String(so.order);
     packagingByOrderId.set(oid, (packagingByOrderId.get(oid) ?? 0) + (so.packagingCost ?? 0));
+    if (so.deliveryChargePaidByCustomer === false) {
+      resellerDeliveryByOrderId.set(
+        oid,
+        (resellerDeliveryByOrderId.get(oid) ?? 0) + (so.deliveryCharge ?? 0),
+      );
+    }
   }
 
   let fromStr = resolved.fromStr;
@@ -255,7 +262,8 @@ export async function getAnalysisDashboard(opts: {
 
     const netOrderRev = Math.max(0, o.total - orderRefund);
     const netOrderCogs = Math.max(0, (o.supplierCost ?? 0) - returnedCost);
-    const orderShipping = o.shippingFee ?? 0;
+    const resellerDelivery = resellerDeliveryByOrderId.get(String(o._id)) ?? 0;
+    const orderShipping = resellerDelivery > 0 ? resellerDelivery : (o.shippingFee ?? 0);
     const orderPackaging = packagingByOrderId.get(String(o._id)) ?? 0;
 
     grossRevenue += o.total;

@@ -123,12 +123,13 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
     order.shippingAddress.division,
     order.shippingAddress.city,
   );
-  const deliveryPaidByCustomer = (order.shippingFee ?? 0) > 0;
+  const orderShippingFee = order.shippingFee ?? 0;
   const itemPrices = computeDiscountedItemPrices(
     order.items.map((i) => ({ id: String(i._id), lineTotal: i.lineTotal })),
     order.subtotal,
     order.discount ?? 0,
   );
+  let remainingShippingToAllocate = orderShippingFee;
 
   for (const item of order.items) {
     const product = productById.get(String(item.product));
@@ -144,10 +145,21 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
       : (product.supplierDeliveryCharges?.outsideDhaka ??
         supplier.deliveryCharges?.outsideDhaka ??
         130);
+    const deliveryPaidByCustomer = orderShippingFee >= deliveryCharge && deliveryCharge > 0;
+    const deliveryPaidUpfront = deliveryPaidByCustomer && order.paymentStatus === 'paid';
     const costPrice = product.supplierPrice * item.quantity;
     const packagingCost = (product.supplierPackagingCost ?? 0) * item.quantity;
-    const sellingPrice =
+    const baseSellingPrice =
       itemPrices.get(String(item._id))?.netSellingPrice ?? item.lineTotal;
+    // When a partial delivery discount was given (0 < shippingFee < deliveryCharge),
+    // reseller pays deliveryCharge on Business Koro and collects the discounted shippingFee
+    // inside sellingPrice so the customer pays the exact checkout total.
+    const allocatedShipping =
+      !deliveryPaidByCustomer && remainingShippingToAllocate > 0
+        ? remainingShippingToAllocate
+        : 0;
+    if (allocatedShipping > 0) remainingShippingToAllocate = 0;
+    const sellingPrice = baseSellingPrice + allocatedShipping;
     const expectedProfit =
       sellingPrice - costPrice - packagingCost - (deliveryPaidByCustomer ? 0 : deliveryCharge);
 
@@ -181,7 +193,7 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
           packagingCost,
           deliveryCharge,
           deliveryChargePaidByCustomer: deliveryPaidByCustomer,
-          deliveryChargePaidUpfront: false,
+          deliveryChargePaidUpfront: deliveryPaidUpfront,
           expectedProfit,
           status: 'awaiting_confirmation',
           statusHistory: [

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   DEFAULT_BUSINESS_SLUG,
+  PRODUCT_DELIVERY_DISCOUNT_TYPES,
   PRODUCT_STATUSES,
   PRODUCT_VISIBILITIES,
   STOCK_STATUSES,
@@ -120,6 +121,7 @@ export const productSchema = z
             .array(z.string().trim().min(1).max(60))
             .min(1, 'Add at least one value')
             .max(50),
+          disabledValues: z.array(z.string().trim().min(1).max(60)).max(50).optional().default([]),
         }),
       )
       .max(5)
@@ -138,6 +140,9 @@ export const productSchema = z
     status: z.enum(PRODUCT_STATUSES).default('published'),
     isFeatured: z.boolean().default(false),
     isComboOffer: z.boolean().default(false),
+    freeDelivery: z.boolean().default(false),
+    deliveryDiscountType: z.enum(PRODUCT_DELIVERY_DISCOUNT_TYPES).default('none'),
+    deliveryDiscountValue: z.coerce.number().min(0).default(0),
   })
   .refine((v) => v.salePrice == null || v.salePrice < v.price, {
     path: ['salePrice'],

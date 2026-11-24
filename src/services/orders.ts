@@ -36,7 +36,11 @@ import { AppError } from '@lib/errors';
 import { signOrderPaymentToken } from '@lib/payments/paymently';
 import type { CartLineInput } from '@lib/validators/order';
 
-import { calculateCampaignDiscount } from './campaigns';
+import {
+  calculateCampaignDiscount,
+  computeDeliveryDiscountAmount,
+  type DeliveryOffer,
+} from './campaigns';
 import { ensureDefaultExpenseCategories, recordSystemExpense } from './expenses';
 import { deductOrderStock,restoreOrderStock } from './inventory';
 import { toImage, toOrder, toReturn } from './mappers';
@@ -50,7 +54,25 @@ import { createSupplierOrdersForOrder } from './supplier-orders';
 
 /* ─── Pricing ────────────────────────────────────────────────────────────── */
 
-type PricedLine = CartQuoteLine & { item?: Omit<OrderItem, '_id'> };
+type PricedLine = CartQuoteLine & {
+  deliveryOffer?: DeliveryOffer;
+  item?: Omit<OrderItem, '_id'>;
+};
+
+function applyDeliveryDiscount(
+  baseShipping: number,
+  priced: PricedLine[],
+  campaignOffer?: DeliveryOffer,
+): number {
+  if (baseShipping <= 0) return 0;
+  let bestDiscount = campaignOffer ? computeDeliveryDiscountAmount(baseShipping, campaignOffer) : 0;
+  for (const line of priced) {
+    if (!line.available || !line.deliveryOffer) continue;
+    const d = computeDeliveryDiscountAmount(baseShipping, line.deliveryOffer);
+    if (d > bestDiscount) bestDiscount = d;
+  }
+  return Math.max(0, baseShipping - bestDiscount);
+}
 
 /**
  * Prices cart lines from the database — the client's prices are never
@@ -118,10 +140,16 @@ async function priceLines(
     let issue: string | undefined;
     const options = p.variations
       .filter((x) => x.values.length)
-      .map((x) => ({ name: x.name, values: [...x.values] }));
+      .map((x) => ({
+        name: x.name,
+        values: [...x.values],
+        disabledValues: x.disabledValues ?? [],
+      }));
     for (const v of options) {
       const chosen = line.variant[v.name];
       if (!chosen || !v.values.includes(chosen)) issue = `Please choose a ${v.name}.`;
+      else if (v.disabledValues.includes(chosen))
+        issue = `${chosen} (${v.name}) is currently out of stock.`;
       else variant[v.name] = chosen;
     }
     if (p.stockStatus === 'out_of_stock') issue = 'This product is out of stock.';
@@ -146,6 +174,13 @@ async function priceLines(
     const unitPrice = p.effectivePrice;
     const lineTotal = unitPrice * line.quantity;
     const image = toImage(p.images[0]);
+    const deliveryOffer: DeliveryOffer =
+      p.deliveryDiscountType && p.deliveryDiscountType !== 'none'
+        ? { type: p.deliveryDiscountType, value: p.deliveryDiscountValue ?? 0 }
+        : p.freeDelivery
+          ? { type: 'free', value: 0 }
+          : { type: 'none', value: 0 };
+
     return {
       productId: line.productId,
       name: p.name,
@@ -158,6 +193,7 @@ async function priceLines(
       lineTotal,
       available: !issue,
       issue,
+      deliveryOffer,
       item: {
         product: p._id,
         name: p.name,
@@ -200,14 +236,15 @@ export async function quoteCart(
 ): Promise<CartQuote> {
   const priced = await priceLines(lines);
   const subtotal = priced.filter((l) => l.available).reduce((sum, l) => sum + l.lineTotal, 0);
-  const shippingFee = await shippingFor(zone, subtotal);
   const { freeShippingThreshold } = await getSettings();
-  const { discount, appliedCampaign, couponError } = await calculateCampaignDiscount(
+  const { discount, deliveryOffer, appliedCampaign, couponError } = await calculateCampaignDiscount(
     priced,
     couponCode,
   );
+  const baseShipping = await shippingFor(zone, subtotal);
+  const shippingFee = applyDeliveryDiscount(baseShipping, priced, deliveryOffer);
   return {
-    lines: priced.map(({ item: _item, ...rest }) => rest),
+    lines: priced.map(({ item: _item, deliveryOffer: _do, ...rest }) => rest),
     subtotal,
     shippingFee,
     discount,
@@ -230,6 +267,7 @@ type NewOrder = {
   paymentMethod?: PaymentMethod;
   status?: Extract<OrderStatus, 'pending' | 'confirmed'>;
   shippingFeeOverride?: number;
+  deliveryOffer?: DeliveryOffer;
   discount?: number;
   couponCode?: string | null;
   campaignId?: string | null;
@@ -254,8 +292,9 @@ async function createOrder(
 
   const items = priced.map((l) => l.item!);
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
+  const baseShipping = await shippingFor(input.shippingAddress.zone, subtotal);
   const shippingFee =
-    input.shippingFeeOverride ?? (await shippingFor(input.shippingAddress.zone, subtotal));
+    input.shippingFeeOverride ?? applyDeliveryDiscount(baseShipping, priced, input.deliveryOffer);
   const discount = Math.min(input.discount ?? 0, subtotal + shippingFee);
   const supplierCost = items.reduce((s, i) => s + i.supplierPrice * i.quantity, 0);
   const status = input.status ?? 'pending';
@@ -348,7 +387,7 @@ export async function placeWebsiteOrder(input: {
   saveAddress?: boolean;
 }) {
   const priced = await priceLines(input.lines);
-  const { discount, appliedCampaign, couponError } = await calculateCampaignDiscount(
+  const { discount, deliveryOffer, appliedCampaign, couponError } = await calculateCampaignDiscount(
     priced,
     input.couponCode,
   );
@@ -363,6 +402,7 @@ export async function placeWebsiteOrder(input: {
     shippingAddress: input.address,
     platform: 'website',
     paymentMethod: input.paymentMethod ?? 'cod',
+    deliveryOffer,
     discount,
     couponCode: appliedCampaign?.couponCode ?? null,
     campaignId: appliedCampaign?.id ?? null,

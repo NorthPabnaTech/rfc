@@ -31,6 +31,7 @@ import { Callout, FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { Textarea } from '@components/ui/textarea';
 import { handleActionResult } from '@lib/action-client';
+import { toast } from '@lib/toast';
 import {
   DEFAULT_BUSINESS_SLUG,
   PRODUCT_VISIBILITIES,
@@ -98,6 +99,9 @@ const EMPTY: ProductInput = {
   status: 'published',
   isFeatured: false,
   isComboOffer: false,
+  freeDelivery: false,
+  deliveryDiscountType: 'none',
+  deliveryDiscountValue: 0,
 };
 
 function toFormValues(p: Partial<AdminProductDTO>): ProductInput {
@@ -135,19 +139,30 @@ export function ProductForm({
   });
   const { isSubmitting } = form.formState;
 
-  const [categoryId, supplierUrl, supplierPrice, price, salePrice, selectedBusiness, trackInventory] =
-    useWatch({
-      control: form.control,
-      name: [
-        'category',
-        'supplierProductUrl',
-        'supplierPrice',
-        'price',
-        'salePrice',
-        'business',
-        'trackInventory',
-      ],
-    });
+  const [
+    categoryId,
+    supplierUrl,
+    supplierPrice,
+    price,
+    salePrice,
+    selectedBusiness,
+    trackInventory,
+    deliveryDiscountType,
+    variationsWatch,
+  ] = useWatch({
+    control: form.control,
+    name: [
+      'category',
+      'supplierProductUrl',
+      'supplierPrice',
+      'price',
+      'salePrice',
+      'business',
+      'trackInventory',
+      'deliveryDiscountType',
+      'variations',
+    ],
+  });
   const selectedBizObj = businesses.find((b) => b.slug === selectedBusiness);
   const isInternalBusiness = selectedBizObj ? !selectedBizObj.isPublicStorefront : false;
 
@@ -270,16 +285,76 @@ export function ProductForm({
                         className="bg-surface grid gap-3 rounded-xl p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-start"
                       >
                         <FormInput name={[f.name, 'name']} label="Option" placeholder="Size" />
-                        <FormItem name={[f.name, 'values']} label="Values">
-                          {(field, _s, meta) => (
-                            <ChipInput
-                              value={(field.value as string[]) ?? []}
-                              onChange={field.onChange}
-                              placeholder="S, M, L…"
-                              aria-invalid={meta.invalid}
-                            />
-                          )}
-                        </FormItem>
+                        <div className="space-y-2">
+                          <FormItem name={[f.name, 'values']} label="Values">
+                            {(field, _s, meta) => (
+                              <ChipInput
+                                value={(field.value as string[]) ?? []}
+                                onChange={(nextValues) => {
+                                  field.onChange(nextValues);
+                                  const currentDisabled =
+                                    form.getValues(`variations.${f.name}.disabledValues`) ?? [];
+                                  const pruned = currentDisabled.filter((d) =>
+                                    nextValues.includes(d),
+                                  );
+                                  if (pruned.length !== currentDisabled.length) {
+                                    form.setValue(`variations.${f.name}.disabledValues`, pruned, {
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                }}
+                                placeholder="S, M, L…"
+                                aria-invalid={meta.invalid}
+                              />
+                            )}
+                          </FormItem>
+                          {(() => {
+                            const row = variationsWatch?.[f.name];
+                            const vals = row?.values ?? [];
+                            const disabled = row?.disabledValues ?? [];
+                            if (vals.length === 0) return null;
+                            return (
+                              <div className="space-y-1">
+                                <p className="text-subtle text-[11px]">
+                                  Click a variant to toggle Out of Stock / Disabled:
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {vals.map((val) => {
+                                    const isOff = disabled.includes(val);
+                                    return (
+                                      <button
+                                        key={val}
+                                        type="button"
+                                        onClick={() => {
+                                          const next = isOff
+                                            ? disabled.filter((d) => d !== val)
+                                            : [...disabled, val];
+                                          form.setValue(
+                                            `variations.${f.name}.disabledValues`,
+                                            next,
+                                            { shouldDirty: true },
+                                          );
+                                        }}
+                                        className={
+                                          isOff
+                                            ? 'border-danger/40 bg-danger/10 text-danger rounded-full border px-2.5 py-0.5 text-[11px] font-medium line-through transition'
+                                            : 'border-line bg-well text-ink hover:border-brand rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition'
+                                        }
+                                        title={
+                                          isOff
+                                            ? 'Click to mark In Stock'
+                                            : 'Click to mark Out of Stock (disabled)'
+                                        }
+                                      >
+                                        {val} {isOff ? '(Out of stock)' : ''}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                         {/* Label-height spacer keeps the button level with the inputs. */}
                         <div className="flex flex-col gap-1.5">
                           <span aria-hidden className="type-label invisible hidden sm:block">
@@ -302,7 +377,7 @@ export function ProductForm({
                         type="button"
                         variant="secondary"
                         size="sm"
-                        onClick={() => add({ name: '', values: [] })}
+                        onClick={() => add({ name: '', values: [], disabledValues: [] })}
                       >
                         <Icon name="plus" size={14} /> Add option
                       </Button>
@@ -498,8 +573,71 @@ export function ProductForm({
                 name="isComboOffer"
                 label="Show in Combo offers"
               />
+              <FormSelect
+                name="deliveryDiscountType"
+                label="Delivery charge offer"
+                hint="Discounted delivery is handled from your profit (and sent as deliveryChargePaidByCustomer: false to Business Koro)."
+                items={[
+                  { value: 'none', label: 'No delivery offer (Customer pays full)' },
+                  { value: 'free', label: 'Free Delivery (100% off)' },
+                  { value: 'half', label: 'Half Delivery (50% off)' },
+                  { value: 'fixed', label: 'Fixed Delivery Discount (৳ off)' },
+                ]}
+              />
+              {deliveryDiscountType === 'fixed' && (
+                <FormInput
+                  name="deliveryDiscountValue"
+                  type="number"
+                  min={1}
+                  label="Delivery discount amount (৳)"
+                  hint="Amount deducted from the delivery fee (e.g. 30 makes ৳70 delivery → ৳40)."
+                />
+              )}
             </FormSection>
           </Panel>
+
+          {product?.slug && (
+            <Panel>
+              <FormSection
+                title="Ad Landing Page (1-Page Order)"
+                icon="external"
+                description="Use this direct link in Facebook / TikTok ads so customers can view details and order on a single page."
+              >
+                <div className="bg-well flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-xl px-3 py-2 text-xs">
+                  <span
+                    className="text-ink min-w-0 flex-1 truncate font-mono"
+                    title={`/order/${product.slug}`}
+                  >
+                    /order/{product.slug}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={async () => {
+                        const url = `${window.location.origin}/order/${product.slug}`;
+                        try {
+                          await navigator.clipboard.writeText(url);
+                          toast.success('Ad landing link copied');
+                        } catch {
+                          toast.error('Could not copy link');
+                        }
+                      }}
+                    >
+                      <Icon name="copy" size={13} />
+                      Copy
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" asChild>
+                      <Link href={`/order/${product.slug}`} target="_blank">
+                        Open
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </FormSection>
+            </Panel>
+          )}
 
           <Panel>
             <FormSection title="Organization" icon="folder">

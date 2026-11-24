@@ -87,9 +87,11 @@ function externalStatusTone(ext: string): 'ok' | 'warn' | 'danger' | 'info' | 'n
 export function SupplierFulfillmentCard({
   supplierOrders,
   productMeta,
+  orderStatus,
 }: {
   supplierOrders: SupplierOrderDTO[];
   productMeta: Record<string, SupplierOrderProductMeta>;
+  orderStatus?: string;
 }) {
   if (!supplierOrders.length) return null;
 
@@ -112,6 +114,7 @@ export function SupplierFulfillmentCard({
             key={so.id}
             so={so}
             meta={productMeta[so.productId]}
+            orderStatus={orderStatus}
           />
         ))}
       </div>
@@ -122,9 +125,11 @@ export function SupplierFulfillmentCard({
 function SupplierOrderItemCard({
   so,
   meta,
+  orderStatus,
 }: {
   so: SupplierOrderDTO;
   meta?: SupplierOrderProductMeta;
+  orderStatus?: string;
 }) {
   const router = useRouter();
   const [sellingPrice, setSellingPrice] = React.useState(String(so.sellingPrice));
@@ -137,7 +142,8 @@ function SupplierOrderItemCard({
   const [submitting, setSubmitting] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const canSubmit = so.status === 'awaiting_confirmation' || so.status === 'failed';
+  const isOrderCancelled = orderStatus === 'cancelled';
+  const canSubmit = !isOrderCancelled && (so.status === 'awaiting_confirmation' || so.status === 'failed');
   const variants = meta?.supplierVariants ?? [];
   const insideDhaka =
     so.customer.district.trim().toLowerCase() === 'dhaka' ||

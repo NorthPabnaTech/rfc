@@ -35,7 +35,7 @@ export type PickerProduct = {
   trackInventory: boolean;
   business: string;
   visibility: ProductVisibility;
-  variations: { name: string; values: string[] }[];
+  variations: { name: string; values: string[]; disabledValues?: string[] }[];
 };
 
 export type PickedLine = {
@@ -177,21 +177,27 @@ export function ProductPicker({
                   <div key={v.name}>
                     <p className="text-muted mb-1.5 text-[12.5px]">{v.name}</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {v.values.map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setVariant((s) => ({ ...s, [v.name]: val }))}
-                          className={cn(
-                            'rounded-full border px-3 py-1 text-[13px]',
-                            variant[v.name] === val
-                              ? 'bg-noir border-noir text-white'
-                              : 'border-line-2/70 hover:border-ink',
-                          )}
-                        >
-                          {val}
-                        </button>
-                      ))}
+                      {v.values.map((val) => {
+                        const isDisabled = (v.disabledValues ?? []).includes(val);
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => setVariant((s) => ({ ...s, [v.name]: val }))}
+                            className={cn(
+                              'rounded-full border px-3 py-1 text-[13px]',
+                              isDisabled
+                                ? 'border-line bg-well text-subtle cursor-not-allowed line-through opacity-50'
+                                : variant[v.name] === val
+                                  ? 'bg-noir border-noir text-white'
+                                  : 'border-line-2/70 hover:border-ink',
+                            )}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

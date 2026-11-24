@@ -18,7 +18,7 @@ export const campaignSchema = z
       .or(z.literal(''))
       .transform((v) => v || null),
     discountType: z.enum(DISCOUNT_TYPES).default('percentage'),
-    discountValue: z.coerce.number().min(1, 'Discount must be at least 1'),
+    discountValue: z.coerce.number().min(0, 'Discount cannot be negative').default(0),
     minOrderAmount: z.coerce.number().min(0).default(0),
     scope: z.enum(CAMPAIGN_SCOPES).default('all'),
     productIds: z.array(objectId).default([]),
@@ -43,6 +43,17 @@ export const campaignSchema = z
           message: 'Use 3–32 letters, numbers, dashes or underscores.',
         });
       }
+    }
+    if (
+      val.discountType !== 'free_delivery' &&
+      val.discountType !== 'half_delivery' &&
+      val.discountValue < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['discountValue'],
+        message: 'Discount must be at least 1.',
+      });
     }
     if (val.discountType === 'percentage' && val.discountValue > 100) {
       ctx.addIssue({

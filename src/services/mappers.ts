@@ -223,7 +223,11 @@ export function toAdminProduct(p: Product): AdminProductDTO {
     visibility: p.visibility || 'public',
     sku: p.sku,
     images: p.images.map(toImage).filter((i): i is ImageDTO => !!i),
-    variations: p.variations.map((v) => ({ name: v.name, values: [...v.values] })),
+    variations: p.variations.map((v) => ({
+      name: v.name,
+      values: [...v.values],
+      disabledValues: v.disabledValues?.length ? [...v.disabledValues] : [],
+    })),
     specifications: p.specifications.map((s) => ({ label: s.label, value: s.value })),
     seo: {
       metaTitle: p.seo?.metaTitle,
@@ -233,6 +237,9 @@ export function toAdminProduct(p: Product): AdminProductDTO {
     status: p.status,
     isFeatured: p.isFeatured,
     isComboOffer: p.isComboOffer ?? false,
+    freeDelivery: p.freeDelivery || p.deliveryDiscountType === 'free',
+    deliveryDiscountType: p.deliveryDiscountType ?? (p.freeDelivery ? 'free' : 'none'),
+    deliveryDiscountValue: p.deliveryDiscountValue ?? 0,
   };
 }
 

@@ -169,11 +169,42 @@ export async function deleteCampaign(id: string): Promise<void> {
   if (!res) throw new AppError('Campaign not found.', 404);
 }
 
+export type DeliveryOffer = {
+  type: 'none' | 'free' | 'half' | 'fixed';
+  value: number;
+};
+
+export function computeDeliveryDiscountAmount(
+  baseShipping: number,
+  offer: DeliveryOffer,
+): number {
+  if (baseShipping <= 0 || offer.type === 'none') return 0;
+  if (offer.type === 'free') return baseShipping;
+  if (offer.type === 'half') return Math.round(baseShipping / 2);
+  return Math.max(0, Math.min(baseShipping, offer.value));
+}
+
+function toDeliveryOffer(c: Campaign): DeliveryOffer {
+  if (c.discountType === 'free_delivery') return { type: 'free', value: 0 };
+  if (c.discountType === 'half_delivery') return { type: 'half', value: 0 };
+  if (c.discountType === 'delivery_discount') return { type: 'fixed', value: c.discountValue };
+  return { type: 'none', value: 0 };
+}
+
+function deliveryOfferRank(offer: DeliveryOffer): number {
+  if (offer.type === 'free') return 1_000_000;
+  if (offer.type === 'half') return 500_000;
+  if (offer.type === 'fixed') return offer.value;
+  return 0;
+}
+
 export async function calculateCampaignDiscount(
   lines: Array<{ productId: string; lineTotal: number; available: boolean }>,
   couponCode?: string | null,
 ): Promise<{
   discount: number;
+  freeDelivery: boolean;
+  deliveryOffer: DeliveryOffer;
   appliedCampaign: AppliedCampaignDTO | null;
   couponError: string | null;
 }> {
@@ -187,7 +218,13 @@ export async function calculateCampaignDiscount(
 
   const availableLines = lines.filter((l) => l.available);
   if (availableLines.length === 0) {
-    return { discount: 0, appliedCampaign: null, couponError: null };
+    return {
+      discount: 0,
+      freeDelivery: false,
+      deliveryOffer: { type: 'none', value: 0 },
+      appliedCampaign: null,
+      couponError: null,
+    };
   }
 
   const totalSubtotal = availableLines.reduce((s, l) => s + l.lineTotal, 0);
@@ -198,11 +235,30 @@ export async function calculateCampaignDiscount(
         ? availableLines
         : availableLines.filter((l) => c.products.some((pid) => String(pid) === l.productId));
     if (eligibleLines.length === 0) {
-      return { hasEligible: false, minNotMet: false, discount: 0 };
+      return {
+        hasEligible: false,
+        minNotMet: false,
+        discount: 0,
+        deliveryOffer: { type: 'none', value: 0 } as DeliveryOffer,
+      };
     }
     const eligibleSubtotal = eligibleLines.reduce((s, l) => s + l.lineTotal, 0);
     if ((c.minOrderAmount ?? 0) > 0 && totalSubtotal < c.minOrderAmount) {
-      return { hasEligible: true, minNotMet: true, discount: 0 };
+      return {
+        hasEligible: true,
+        minNotMet: true,
+        discount: 0,
+        deliveryOffer: { type: 'none', value: 0 } as DeliveryOffer,
+      };
+    }
+    const deliveryOffer = toDeliveryOffer(c);
+    if (deliveryOffer.type !== 'none') {
+      return {
+        hasEligible: true,
+        minNotMet: false,
+        discount: 0,
+        deliveryOffer,
+      };
     }
     const raw =
       c.discountType === 'percentage'
@@ -212,6 +268,7 @@ export async function calculateCampaignDiscount(
       hasEligible: true,
       minNotMet: false,
       discount: Math.max(0, Math.min(raw, eligibleSubtotal)),
+      deliveryOffer: { type: 'none', value: 0 } as DeliveryOffer,
     };
   };
 
@@ -221,6 +278,8 @@ export async function calculateCampaignDiscount(
     if (!match) {
       return {
         discount: 0,
+        freeDelivery: false,
+        deliveryOffer: { type: 'none', value: 0 },
         appliedCampaign: null,
         couponError: 'Invalid or expired coupon code.',
       };
@@ -229,6 +288,8 @@ export async function calculateCampaignDiscount(
     if (!res.hasEligible) {
       return {
         discount: 0,
+        freeDelivery: false,
+        deliveryOffer: { type: 'none', value: 0 },
         appliedCampaign: null,
         couponError: 'This coupon does not apply to the items in your cart.',
       };
@@ -236,34 +297,66 @@ export async function calculateCampaignDiscount(
     if (res.minNotMet) {
       return {
         discount: 0,
+        freeDelivery: false,
+        deliveryOffer: { type: 'none', value: 0 },
         appliedCampaign: null,
         couponError: `Minimum order of ৳${match.minOrderAmount} required for this coupon.`,
       };
     }
     return {
       discount: res.discount,
+      freeDelivery: res.deliveryOffer.type === 'free',
+      deliveryOffer: res.deliveryOffer,
       appliedCampaign: toApplied(match),
       couponError: null,
     };
   }
 
-  // Automatic offer: pick the active 'offer' campaign giving the highest discount.
+  // Automatic offer: pick the active 'offer' campaign giving the highest product discount,
+  // and also the best active 'offer' granting a delivery discount.
   let best: { campaign: Campaign; discount: number } | null = null;
+  let bestDelivery: { campaign: Campaign; offer: DeliveryOffer } | null = null;
   for (const c of active) {
     if (c.type !== 'offer') continue;
     const res = evaluate(c);
+    if (
+      res.deliveryOffer.type !== 'none' &&
+      (!bestDelivery || deliveryOfferRank(res.deliveryOffer) > deliveryOfferRank(bestDelivery.offer))
+    ) {
+      bestDelivery = { campaign: c, offer: res.deliveryOffer };
+    }
     if (res.discount > 0 && (!best || res.discount > best.discount)) {
       best = { campaign: c, discount: res.discount };
     }
   }
 
+  const deliveryOffer = bestDelivery?.offer ?? { type: 'none', value: 0 };
+
   if (best) {
     return {
       discount: best.discount,
+      freeDelivery: deliveryOffer.type === 'free',
+      deliveryOffer,
       appliedCampaign: toApplied(best.campaign),
       couponError: null,
     };
   }
 
-  return { discount: 0, appliedCampaign: null, couponError: null };
+  if (bestDelivery) {
+    return {
+      discount: 0,
+      freeDelivery: deliveryOffer.type === 'free',
+      deliveryOffer,
+      appliedCampaign: toApplied(bestDelivery.campaign),
+      couponError: null,
+    };
+  }
+
+  return {
+    discount: 0,
+    freeDelivery: false,
+    deliveryOffer: { type: 'none', value: 0 },
+    appliedCampaign: null,
+    couponError: null,
+  };
 }

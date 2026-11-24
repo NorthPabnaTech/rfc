@@ -2,9 +2,11 @@ import { type Model, Schema, type Types } from 'mongoose';
 
 import {
   DEFAULT_BUSINESS_SLUG,
+  PRODUCT_DELIVERY_DISCOUNT_TYPES,
   PRODUCT_STATUSES,
   PRODUCT_TYPES,
   PRODUCT_VISIBILITIES,
+  type ProductDeliveryDiscountType,
   type ProductStatus,
   type ProductType,
   type ProductVisibility,
@@ -18,6 +20,7 @@ import { baseSchemaOptions, defineModel, type ImageAsset, imageAssetSchema } fro
 export interface ProductVariation {
   name: string;
   values: string[];
+  disabledValues?: string[];
 }
 
 export interface ProductSpecification {
@@ -98,6 +101,10 @@ export interface Product {
   isFeatured: boolean;
   /** A regular product (e.g. "5 pcs T-shirt combo") also listed under Combo offers. */
   isComboOffer: boolean;
+  /** When true, customer gets free delivery and the delivery charge is borne by the reseller. */
+  freeDelivery: boolean;
+  deliveryDiscountType: ProductDeliveryDiscountType;
+  deliveryDiscountValue: number;
   soldCount: number;
   ratingAverage: number;
   ratingCount: number;
@@ -109,6 +116,7 @@ const variationSchema = new Schema<ProductVariation>(
   {
     name: { type: String, required: true, trim: true, maxlength: 40 },
     values: [{ type: String, trim: true, maxlength: 60 }],
+    disabledValues: [{ type: String, trim: true, maxlength: 60 }],
   },
   { _id: false },
 );
@@ -194,6 +202,13 @@ const productSchema = new Schema<Product>(
     status: { type: String, enum: PRODUCT_STATUSES, default: 'published', index: true },
     isFeatured: { type: Boolean, default: false, index: true },
     isComboOffer: { type: Boolean, default: false, index: true },
+    freeDelivery: { type: Boolean, default: false },
+    deliveryDiscountType: {
+      type: String,
+      enum: PRODUCT_DELIVERY_DISCOUNT_TYPES,
+      default: 'none',
+    },
+    deliveryDiscountValue: { type: Number, default: 0, min: 0 },
     soldCount: { type: Number, default: 0 },
     ratingAverage: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },

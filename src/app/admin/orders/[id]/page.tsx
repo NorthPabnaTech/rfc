@@ -119,12 +119,13 @@ export default async function AdminOrderPage({
           <Card title={`Items (${order.items.length})`}>
             <OrderItemsList order={order} admin />
             <div className="border-line mt-2 border-t pt-4 sm:ml-auto sm:max-w-xs">
-              <OrderTotals order={order} admin />
+              <OrderTotals order={order} admin supplierOrders={normalizedSupplierOrders} />
             </div>
           </Card>
           <SupplierFulfillmentCard
             supplierOrders={normalizedSupplierOrders}
             productMeta={productMeta}
+            orderStatus={order.status}
           />
           {order.returnedItems && order.returnedItems.length > 0 && (
             <Card title="Returned items">

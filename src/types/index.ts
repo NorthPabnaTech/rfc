@@ -5,6 +5,7 @@
  */
 import type {
   BannerPosition,
+  DiscountType,
   ExpensePaymentMethod,
   ImageSourceType,
   NotificationType,
@@ -12,6 +13,7 @@ import type {
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  ProductDeliveryDiscountType,
   ProductStatus,
   ProductVisibility,
   ReturnStatus,
@@ -148,7 +150,7 @@ export type ProductDetailDTO = ProductCardDTO & {
   description?: string;
   images: ImageDTO[];
   sku?: string;
-  variations: { name: string; values: string[] }[];
+  variations: { name: string; values: string[]; disabledValues?: string[] }[];
   specifications: { label: string; value: string }[];
   category: { id: string; name: string; slug: string } | null;
   subCategory: { id: string; name: string; slug: string } | null;
@@ -226,12 +228,15 @@ export type AdminProductDTO = {
   visibility: ProductVisibility;
   sku?: string;
   images: ImageDTO[];
-  variations: { name: string; values: string[] }[];
+  variations: { name: string; values: string[]; disabledValues?: string[] }[];
   specifications: { label: string; value: string }[];
   seo: { metaTitle?: string; metaDescription?: string; keywords: string[] };
   status: ProductStatus;
   isFeatured: boolean;
   isComboOffer: boolean;
+  freeDelivery: boolean;
+  deliveryDiscountType: ProductDeliveryDiscountType;
+  deliveryDiscountValue: number;
 };
 
 /* ─── Promotions ───────────────────────────────────────────────────────── */
@@ -401,7 +406,7 @@ export type AppliedCampaignDTO = {
   title: string;
   type: 'offer' | 'coupon';
   couponCode?: string | null;
-  discountType: 'percentage' | 'fixed';
+  discountType: DiscountType;
   discountValue: number;
 };
 
@@ -431,7 +436,7 @@ export type CampaignDTO = {
   description?: string;
   type: 'offer' | 'coupon';
   couponCode?: string | null;
-  discountType: 'percentage' | 'fixed';
+  discountType: DiscountType;
   discountValue: number;
   minOrderAmount: number;
   scope: 'all' | 'products';

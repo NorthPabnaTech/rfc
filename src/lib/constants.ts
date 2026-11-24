@@ -268,8 +268,17 @@ export const BANNER_POSITION_HINTS: Record<BannerPosition, string> = {
 export const CAMPAIGN_TYPES = ['offer', 'coupon'] as const;
 export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
 
-export const DISCOUNT_TYPES = ['percentage', 'fixed'] as const;
+export const DISCOUNT_TYPES = [
+  'percentage',
+  'fixed',
+  'free_delivery',
+  'half_delivery',
+  'delivery_discount',
+] as const;
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];
+
+export const PRODUCT_DELIVERY_DISCOUNT_TYPES = ['none', 'free', 'half', 'fixed'] as const;
+export type ProductDeliveryDiscountType = (typeof PRODUCT_DELIVERY_DISCOUNT_TYPES)[number];
 
 export const CAMPAIGN_SCOPES = ['all', 'products'] as const;
 export type CampaignScope = (typeof CAMPAIGN_SCOPES)[number];

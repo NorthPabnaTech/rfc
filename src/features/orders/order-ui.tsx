@@ -1,6 +1,6 @@
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
-import type { OrderDTO } from '@/types';
+import type { OrderDTO, SupplierOrderDTO } from '@/types';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
 import { StatusBadge } from '@components/shared/status-badge';
 import {
@@ -223,8 +223,24 @@ export function OrderItemsList({ order, admin = false }: { order: OrderDTO; admi
   );
 }
 
-export function OrderTotals({ order, admin = false }: { order: OrderDTO; admin?: boolean }) {
-  const profit = order.total - order.shippingFee - (order.supplierCost ?? 0);
+export function OrderTotals({
+  order,
+  admin = false,
+  supplierOrders,
+}: {
+  order: OrderDTO;
+  admin?: boolean;
+  supplierOrders?: SupplierOrderDTO[];
+}) {
+  const activeSupplierOrders = (supplierOrders ?? []).filter((so) => so.status !== 'cancelled');
+  const resellerDelivery = activeSupplierOrders.reduce(
+    (s, so) => s + (!so.deliveryChargePaidByCustomer ? so.deliveryCharge : 0),
+    0,
+  );
+  const packagingCost = activeSupplierOrders.reduce((s, so) => s + (so.packagingCost ?? 0), 0);
+  const deliveryCost = resellerDelivery > 0 ? resellerDelivery : order.shippingFee;
+  const deliverySubsidy = Math.max(0, resellerDelivery - order.shippingFee);
+  const profit = order.total - deliveryCost - (order.supplierCost ?? 0) - packagingCost;
   return (
     <dl className="space-y-2 text-sm">
       <Row label="Subtotal" value={<Taka amount={order.subtotal} />} />
@@ -248,6 +264,12 @@ export function OrderTotals({ order, admin = false }: { order: OrderDTO; admin?:
       {admin && order.supplierCost !== undefined && (
         <>
           <Row label="Supplier cost" value={<Taka amount={order.supplierCost} />} />
+          {deliverySubsidy > 0 && (
+            <Row label="Delivery discount (you pay)" value={<Taka amount={deliverySubsidy} />} />
+          )}
+          {packagingCost > 0 && (
+            <Row label="Packaging cost" value={<Taka amount={packagingCost} />} />
+          )}
           <Row
             label="Est. profit"
             value={
