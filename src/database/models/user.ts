@@ -11,7 +11,8 @@ export interface User {
   email?: string;
   /** Unique when set; customers sign in with it. */
   phone?: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
   role: UserRole;
   avatar?: ImageAsset;
   isActive: boolean;
@@ -37,7 +38,8 @@ const userSchema = new Schema<User>(
     email: { type: String, trim: true, lowercase: true, maxlength: 160 },
     phone: { type: String, trim: true, maxlength: 20 },
     // Never returned by default; select('+passwordHash') where a check needs it.
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: { type: String, select: false },
+    googleId: { type: String, trim: true },
     role: { type: String, enum: USER_ROLES, default: 'customer', index: true },
     avatar: imageAssetSchema,
     isActive: { type: Boolean, default: true },
@@ -60,6 +62,10 @@ userSchema.index(
 userSchema.index(
   { phone: 1 },
   { unique: true, partialFilterExpression: { phone: { $type: 'string' } } },
+);
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: 'string' } } },
 );
 userSchema.index(
   { passwordResetTokenHash: 1 },

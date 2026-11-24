@@ -195,12 +195,12 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             <span className="text-ink">
               Have an account? Sign in to track orders and save addresses.
             </span>
-            <Link
-              href="/login?next=/checkout"
+            <a
+              href="/api/auth/google?next=/checkout"
               className="text-ink font-semibold underline underline-offset-2"
             >
               Sign in
-            </Link>
+            </a>
           </div>
         )}
 

@@ -73,10 +73,10 @@ export function WishlistLink() {
 export function UserMenu({ user }: { user: HeaderUser }) {
   if (!user) {
     return (
-      <Link href="/login" className={action} aria-label="Sign in or register">
+      <a href="/api/auth/google" className={action} aria-label="Sign in with Google">
         <Icon name="user" size={22} />
-        <ActionLabel top="Welcome" bottom="Sign in / Register" />
-      </Link>
+        <ActionLabel top="Welcome" bottom="Sign in" />
+      </a>
     );
   }
 

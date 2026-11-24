@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'nextjs-toploader/app';
 
 import { loginAction } from '@/actions/auth';
@@ -43,14 +42,6 @@ export function LoginForm({ next }: { next?: string }) {
         autoComplete="current-password"
         required
       />
-      <div className="flex justify-end">
-        <Link
-          href="/forgot-password"
-          className="type-helper text-accent hover:text-accent-hover font-semibold"
-        >
-          Forgot password?
-        </Link>
-      </div>
       <Button
         type="submit"
         variant="noir"

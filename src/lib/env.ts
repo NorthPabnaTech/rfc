@@ -32,6 +32,9 @@ const schema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(1).optional(),
+  // Google OAuth (optional; enables "Continue with Google" on /login & /register).
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 

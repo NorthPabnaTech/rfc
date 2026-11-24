@@ -273,12 +273,12 @@ export default async function ProductPage({ params }: Props) {
                           <ReviewForm productId={product.id} slug={product.slug} />
                         ) : eligibility.reason === 'signin' ? (
                           <p className="text-muted text-sm">
-                            <Link
-                              href={`/login?next=/products/${product.slug}%23reviews`}
+                            <a
+                              href={`/api/auth/google?next=/products/${product.slug}%23reviews`}
                               className="text-ink font-semibold underline"
                             >
                               Sign in
-                            </Link>{' '}
+                            </a>{' '}
                             to review products you’ve purchased.
                           </p>
                         ) : eligibility.reason === 'reviewed' ? (
@@ -351,12 +351,12 @@ export default async function ProductPage({ params }: Props) {
                       <AskQuestionForm productId={product.id} slug={product.slug} />
                     ) : (
                       <p className="text-muted text-sm">
-                        <Link
-                          href={`/login?next=/products/${product.slug}`}
+                        <a
+                          href={`/api/auth/google?next=/products/${product.slug}`}
                           className="text-ink font-semibold underline"
                         >
                           Sign in
-                        </Link>{' '}
+                        </a>{' '}
                         to ask a question about this product.
                       </p>
                     )}
