@@ -10,6 +10,12 @@ import { z } from 'zod';
 const schema = z.object({
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   MONGODB_DB: z.string().min(1).default('rfc_gadget'),
+  MONGODB_URI_TEST: z.string().min(1).optional(),
+  MONGODB_DB_TEST: z.string().min(1).default('rfc_gadget_test'),
+  USE_TEST_DB: z
+    .enum(['true', 'false', '1', '0'])
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
   CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
   CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
@@ -47,7 +53,21 @@ if (!parsed.success) {
   throw new Error(`Invalid server environment variables:\n${issues}`);
 }
 
+const useTestDb =
+  Boolean(parsed.data.USE_TEST_DB) || parsed.data.NODE_ENV === 'test';
+const activeDbName = useTestDb ? parsed.data.MONGODB_DB_TEST : parsed.data.MONGODB_DB;
+const activeDbUri = useTestDb
+  ? (parsed.data.MONGODB_URI_TEST ?? parsed.data.MONGODB_URI)
+  : parsed.data.MONGODB_URI;
+const isTestDb =
+  useTestDb ||
+  /(^|[_-])(test|dev|staging|local)([_-]|$)/i.test(activeDbName) ||
+  parsed.data.NODE_ENV !== 'production';
+
 export const serverEnv = {
   ...parsed.data,
   IS_PROD: parsed.data.NODE_ENV === 'production',
+  ACTIVE_MONGODB_URI: activeDbUri,
+  ACTIVE_MONGODB_DB: activeDbName,
+  IS_TEST_DB: isTestDb,
 } as const;

@@ -39,19 +39,19 @@ function isSrvLookupFailure(error: unknown): boolean {
 
 async function connect(): Promise<typeof mongoose> {
   const options = {
-    dbName: serverEnv.MONGODB_DB,
+    dbName: serverEnv.ACTIVE_MONGODB_DB,
     maxPoolSize: 10,
     serverSelectionTimeoutMS: 10_000,
   };
   try {
-    return await mongoose.connect(serverEnv.MONGODB_URI, options);
+    return await mongoose.connect(serverEnv.ACTIVE_MONGODB_URI, options);
   } catch (error) {
     if (!isSrvLookupFailure(error)) throw error;
     console.warn(
       `[db] SRV lookup failed via ${dns.getServers().join(', ')}; retrying with public DNS resolvers.`,
     );
     dns.setServers(PUBLIC_DNS);
-    return mongoose.connect(serverEnv.MONGODB_URI, options);
+    return mongoose.connect(serverEnv.ACTIVE_MONGODB_URI, options);
   }
 }
 

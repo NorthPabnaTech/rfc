@@ -188,3 +188,41 @@ export function isOwnCloudinaryAsset(image: ImageAsset, purpose: UploadPurpose):
     image.publicId.startsWith(`${UPLOAD_FOLDERS[purpose]}/`)
   );
 }
+
+export type CloudinaryUsageSnapshot = {
+  plan: string;
+  lastUpdated: string | null;
+  storageUsedBytes: number;
+  storageLimitBytes: number | null;
+  creditsUsed: number | null;
+  creditsLimit: number | null;
+  bandwidthUsedBytes: number;
+  transformationsUsed: number;
+  objectsCount: number;
+};
+
+type RawCloudinaryUsage = {
+  plan?: string;
+  last_updated?: string;
+  storage?: { usage?: number; limit?: number; credits_usage?: number };
+  credits?: { usage?: number; limit?: number };
+  bandwidth?: { usage?: number };
+  transformations?: { usage?: number };
+  objects?: { usage?: number };
+  resources?: number;
+};
+
+export async function getCloudinaryUsage(): Promise<CloudinaryUsageSnapshot> {
+  const raw = (await cloudinary.api.usage()) as RawCloudinaryUsage;
+  return {
+    plan: raw.plan ?? 'Free',
+    lastUpdated: raw.last_updated ?? null,
+    storageUsedBytes: raw.storage?.usage ?? 0,
+    storageLimitBytes: raw.storage?.limit && raw.storage.limit > 0 ? raw.storage.limit : null,
+    creditsUsed: typeof raw.credits?.usage === 'number' ? raw.credits.usage : null,
+    creditsLimit: raw.credits?.limit && raw.credits.limit > 0 ? raw.credits.limit : null,
+    bandwidthUsedBytes: raw.bandwidth?.usage ?? 0,
+    transformationsUsed: raw.transformations?.usage ?? 0,
+    objectsCount: raw.objects?.usage ?? raw.resources ?? 0,
+  };
+}
