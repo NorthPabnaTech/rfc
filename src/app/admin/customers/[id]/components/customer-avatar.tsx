@@ -15,6 +15,10 @@ export function CustomerAvatar({ name, avatarUrl }: { name: string; avatarUrl?: 
           alt=""
           fill
           sizes="56px"
+          // Avatars can be Google profile photos (any host), so skip the
+          // optimizer; Google's CDN also rejects requests that send a Referer.
+          unoptimized
+          referrerPolicy="no-referrer"
           className="object-cover"
           onError={() => setFailed(true)}
         />

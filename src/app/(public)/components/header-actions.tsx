@@ -130,6 +130,7 @@ export function UserMenu({ user }: { user: HeaderUser }) {
           <img
             src={user.avatarUrl}
             alt=""
+            referrerPolicy="no-referrer"
             className="size-[26px] rounded-full object-cover ring-1 ring-white/30"
           />
         ) : (

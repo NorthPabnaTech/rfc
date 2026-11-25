@@ -6,8 +6,8 @@ import { useRouter } from 'nextjs-toploader/app';
 
 import { toggleResellerActiveAction } from '@/actions/resellers';
 import { Taka } from '@/features/products/price';
-import { ConfirmDialog, StatusBadge, TableFrame } from '@components/shared';
 import { Icon } from '@components/icon/icon';
+import { ConfirmDialog, StatusBadge, TableFrame } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { Dropdown } from '@components/ui/dropdown';
 import { toast } from '@lib/toast';
@@ -75,6 +75,7 @@ export function ResellersTable({ items }: { items: ResellerRow[] }) {
                         <img
                           src={r.avatarUrl}
                           alt=""
+                          referrerPolicy="no-referrer"
                           className="size-9 shrink-0 rounded-full object-cover"
                         />
                       ) : (

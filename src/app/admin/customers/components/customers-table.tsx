@@ -30,8 +30,13 @@ export function CustomersTable({ data }: { data: Paginated<CustomerRowDTO> }) {
       cell: (c) => (
         <div className="flex items-center gap-3">
           {c.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- small Cloudinary avatar
-            <img src={c.avatarUrl} alt="" className="size-9 rounded-full object-cover" />
+            // eslint-disable-next-line @next/next/no-img-element -- small avatar (Cloudinary or Google)
+            <img
+              src={c.avatarUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="size-9 rounded-full object-cover"
+            />
           ) : (
             <span className="bg-brand-gradient text-brand-contrast grid size-9 place-items-center rounded-full text-sm font-bold">
               {c.name.charAt(0).toUpperCase()}
