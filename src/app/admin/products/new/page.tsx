@@ -4,6 +4,7 @@ import { listBusinesses } from '@/services/businesses';
 import { listCategories, listSuppliers, listTags } from '@/services/catalog';
 import { getSupplierImportDraft } from '@/services/supplier-sync';
 import { Callout, PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { param, type SearchParams } from '@lib/search-params';
 import { objectId } from '@lib/validators/common';
 
@@ -16,6 +17,7 @@ export default async function NewProductPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const supplierId = param(sp, 'supplierId');
   const externalProductId = param(sp, 'externalProductId');

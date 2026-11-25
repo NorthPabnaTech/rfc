@@ -1,14 +1,16 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
+import { listResellerOrders, placeResellerOrder } from '@/services/resellers';
 import {
   requireReseller,
   resellerError,
   resellerJson,
   resellerOptionsResponse,
 } from '@lib/auth/reseller-auth';
+import { RESELLER_DELIVERY_PAYMENT_MODES, RESELLER_MAX_LINE_QUANTITY } from '@lib/constants';
 import { AppError } from '@lib/errors';
-import { listResellerOrders, placeResellerOrder } from '@/services/resellers';
+import { objectId } from '@lib/validators/common';
 
 const createOrderSchema = z.object({
   customer: z.object({
@@ -27,14 +29,25 @@ const createOrderSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string().trim().min(1),
-        quantity: z.number().int().min(1).max(100),
-        sellingPrice: z.number().min(1),
-        variant: z.record(z.string(), z.string()).optional(),
+        productId: objectId,
+        quantity: z
+          .number()
+          .int('Quantity must be a whole number.')
+          .min(1)
+          .max(RESELLER_MAX_LINE_QUANTITY),
+        sellingPrice: z.number().int('Selling price must be a whole number.').min(1).max(10_000_000),
+        variant: z.record(z.string().max(60), z.string().max(120)).optional(),
+        /** Optional: the base reseller price the seller saw. A mismatch → 409. */
+        expectedResellerPrice: z.number().finite().min(0).optional(),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(50),
   customerNote: z.string().trim().max(1000).optional(),
+  /** Default `with_product`: courier collects delivery with the product. */
+  deliveryPaymentMode: z.enum(RESELLER_DELIVERY_PAYMENT_MODES).default('with_product'),
+  // Any client-sent charges / zone (deliveryCharge, packagingCost, zone…) are
+  // ignored: z.object strips unknown keys and the server computes them.
 });
 
 export function OPTIONS() {

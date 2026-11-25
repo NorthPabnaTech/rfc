@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { signResellerToken } from '@lib/auth/reseller-auth';
+import { findOrCreateGoogleReseller } from '@/services/resellers';
+import {
+  DEFAULT_RESELLER_CALLBACK_URL,
+  isAllowedResellerRedirect,
+  signResellerToken,
+} from '@lib/auth/reseller-auth';
 import { serverEnv } from '@lib/env';
 import { AppError } from '@lib/errors';
-import { findOrCreateGoogleReseller } from '@/services/resellers';
 
 const STATE_COOKIE = 'rfc_reseller_google_state';
 const REDIRECT_COOKIE = 'rfc_reseller_google_redirect';
@@ -18,10 +22,11 @@ function redirectWithError(target: string, code: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const cookieRedirect = req.cookies.get(REDIRECT_COOKIE)?.value;
   const targetRedirect =
-    req.cookies.get(REDIRECT_COOKIE)?.value ||
-    process.env.RESELLER_SITE_CALLBACK_URL ||
-    'http://localhost:3001/auth/callback';
+    cookieRedirect && isAllowedResellerRedirect(cookieRedirect)
+      ? cookieRedirect
+      : DEFAULT_RESELLER_CALLBACK_URL;
 
   if (!serverEnv.GOOGLE_CLIENT_ID || !serverEnv.GOOGLE_CLIENT_SECRET) {
     return redirectWithError(targetRedirect, 'google_not_configured');
@@ -63,11 +68,15 @@ export async function GET(req: NextRequest) {
     const profile = (await profileRes.json()) as {
       sub?: string;
       email?: string;
+      email_verified?: boolean;
       name?: string;
       picture?: string;
     };
     if (!profileRes.ok || !profile.sub || !profile.email) {
       return redirectWithError(targetRedirect, 'google_profile_failed');
+    }
+    if (profile.email_verified !== true) {
+      return redirectWithError(targetRedirect, 'google_email_unverified');
     }
 
     const reseller = await findOrCreateGoogleReseller({
@@ -76,7 +85,7 @@ export async function GET(req: NextRequest) {
       name: profile.name,
       avatarUrl: profile.picture,
     });
-    const token = await signResellerToken(String(reseller._id));
+    const token = await signResellerToken(reseller);
 
     const successUrl = new URL(targetRedirect);
     successUrl.searchParams.set('token', token);

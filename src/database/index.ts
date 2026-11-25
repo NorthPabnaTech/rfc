@@ -27,7 +27,8 @@ export {
 } from './models/product';
 export { type PushSubscription, PushSubscriptionModel } from './models/push-subscription';
 export { type Question, QuestionModel } from './models/question';
-export { type Reseller, type ResellerDocument, type ResellerPayoutDetails, ResellerModel } from './models/reseller';
+export { hitRateLimit } from './models/rate-limit';
+export { type Reseller, type ResellerDocument, ResellerModel,type ResellerPayoutDetails } from './models/reseller';
 export {
   type ResellerChangeLog,
   type ResellerChangeLogDocument,

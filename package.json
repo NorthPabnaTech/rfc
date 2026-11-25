@@ -18,6 +18,7 @@
     "quality:check": "prettier --check . && eslint . && tsc --noEmit",
     "prepare": "husky",
     "test:smoke": "tsx --conditions=react-server --env-file=.env.local scripts/smoke-test.ts",
+    "test:reseller": "tsx --conditions=react-server --env-file=.env.local scripts/reseller-money-test.ts",
     "seed:demo": "tsx --conditions=react-server --env-file=.env.local scripts/seed-demo.ts",
     "sync:locations": "tsx scripts/sync-bd-locations.ts"
   },

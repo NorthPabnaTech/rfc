@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 
+import { getResellerWithdrawalFeeTiers } from '@/services/resellers';
 import {
   requireReseller,
   resellerJson,
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireReseller(req);
   if (auth.error) return auth.error;
   const r = auth.reseller;
+  const withdrawalFeeTiers = await getResellerWithdrawalFeeTiers();
 
   return resellerJson({
     ok: true,
@@ -25,6 +27,8 @@ export async function GET(req: NextRequest) {
       totalProfitEarned: r.totalProfitEarned,
       minDeposit: MIN_RESELLER_DEPOSIT,
       minWithdrawal: MIN_RESELLER_WITHDRAWAL,
+      /** Display only — the server computes the actual fee on POST /wallet/withdraw. */
+      withdrawalFeeTiers,
     },
   });
 }

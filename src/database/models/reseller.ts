@@ -30,6 +30,8 @@ export interface Reseller {
   payoutDetails?: ResellerPayoutDetails;
   lastLoginAt?: Date;
   passwordChangedAt?: Date;
+  /** Bumped on logout / suspension; tokens carrying an older version are rejected. */
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -62,6 +64,7 @@ const resellerSchema = new Schema<Reseller>(
     },
     lastLoginAt: Date,
     passwordChangedAt: Date,
+    tokenVersion: { type: Number, default: 0, min: 0 },
   },
   baseSchemaOptions,
 );

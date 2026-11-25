@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { getAdminResellerCounts, listAdminResellers } from '@/services/resellers';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
@@ -15,6 +16,7 @@ export default async function AdminResellersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const rawStatus = param(sp, 'status');
   const status = rawStatus === 'active' || rawStatus === 'inactive' ? rawStatus : undefined;

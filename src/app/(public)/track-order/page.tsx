@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 
 import { trackOrder } from '@/services/orders';
+import { enforceRateLimit, requestIp } from '@/services/rate-limit';
 import type { OrderDTO } from '@/types';
+import { AppError } from '@lib/errors';
 import { param, type SearchParams } from '@lib/search-params';
 import { trackOrderSchema } from '@lib/validators/order';
 
@@ -32,9 +34,19 @@ export default async function TrackOrderPage({
     if (!parsed.success) {
       initialError = parsed.error.issues[0]?.message ?? 'Invalid tracking link parameters.';
     } else {
-      initialOrder = await trackOrder(parsed.data.orderNumber, parsed.data.phone);
-      if (!initialOrder) {
-        initialError = 'No order found with that number and phone.';
+      try {
+        await enforceRateLimit(
+          'trackOrder',
+          `ip:${await requestIp()}`,
+          `order:${parsed.data.orderNumber}`,
+        );
+        initialOrder = await trackOrder(parsed.data.orderNumber, parsed.data.phone);
+        if (!initialOrder) {
+          initialError = 'No order found with that number and phone.';
+        }
+      } catch (error) {
+        if (!(error instanceof AppError)) throw error;
+        initialError = error.message;
       }
     }
   }

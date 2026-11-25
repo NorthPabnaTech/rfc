@@ -6,6 +6,7 @@ import {
   PRODUCT_STATUSES,
   PRODUCT_VISIBILITIES,
   STOCK_STATUSES,
+  SUPPLIER_API_KEY_ENV_PATTERN,
   SUPPLIER_PROVIDERS,
   SUPPLIER_STATUSES,
   SUPPLIER_TYPES,
@@ -31,8 +32,12 @@ export const supplierSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((v) => v || undefined),
-  apiBaseUrl: optionalUrl,
-  apiKeyEnvVar: optionalText(100),
+  apiBaseUrl: optionalUrl.refine((v) => !v || v.startsWith('https://'), {
+    message: 'API base URL must use https://',
+  }),
+  apiKeyEnvVar: optionalText(100).refine((v) => !v || SUPPLIER_API_KEY_ENV_PATTERN.test(v), {
+    message: 'Must be a supplier key variable, e.g. BUSINESS_KORO_API_KEY or SUPPLIER_XYZ_API_KEY',
+  }),
   apiDomain: optionalText(200),
   syncEnabled: z.boolean().default(true),
   syncIntervalMinutes: z.coerce.number().int().min(5).max(1440).default(30),

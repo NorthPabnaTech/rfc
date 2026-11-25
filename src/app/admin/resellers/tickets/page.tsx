@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 
 import { getAdminTicketCounts, listAdminSupportTickets } from '@/services/resellers';
 import { PageHeader } from '@components/shared';
-import { TICKET_STATUSES, TICKET_STATUS_LABELS, type TicketStatus } from '@lib/constants';
+import { requireAdminPage } from '@lib/auth/current-user';
+import { TICKET_STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from '@lib/constants';
 import { param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../../components/list-toolbar';
@@ -16,6 +17,7 @@ export default async function AdminResellerTicketsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const rawStatus = param(sp, 'status') as TicketStatus | undefined;
   const status = rawStatus && TICKET_STATUSES.includes(rawStatus) ? rawStatus : undefined;

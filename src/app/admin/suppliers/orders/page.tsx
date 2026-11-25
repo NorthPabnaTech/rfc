@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { listSuppliers } from '@/services/catalog';
 import { listAllSupplierOrders } from '@/services/supplier-orders';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
   SUPPLIER_ORDER_STATUS_LABELS,
   SUPPLIER_ORDER_STATUSES,
@@ -20,6 +21,7 @@ export default async function SupplierOrdersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const statusParam = param(sp, 'status');
   const status = SUPPLIER_ORDER_STATUSES.find((s) => s === statusParam) as

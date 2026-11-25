@@ -19,6 +19,7 @@ import {
   listSupplierOrdersForOrder,
 } from '@/services/supplier-orders';
 import { Callout, PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { ORDER_PLATFORM_LABELS, PAYMENT_METHOD_LABELS } from '@lib/constants';
 import { param, type SearchParams } from '@lib/search-params';
 import { formatStoreDateTime } from '@lib/utils';
@@ -41,6 +42,7 @@ export default async function AdminOrderPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   if (!objectId.safeParse(id).success) notFound();
   const [order, supplierOrders] = await Promise.all([

@@ -6,6 +6,7 @@ import { CustomerAvatar } from '@/app/admin/customers/[id]/components/customer-a
 import { Taka } from '@/features/products/price';
 import { getAdminResellerDetail } from '@/services/resellers';
 import { PageHeader, StatCard, StatCardGrid, StatusBadge, TableFrame } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
   ORDER_STATUS_LABELS,
   WALLET_TX_STATUS_LABELS,
@@ -23,6 +24,7 @@ export default async function AdminResellerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
   if (!objectId.safeParse(id).success) notFound();
 

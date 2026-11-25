@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-import { SupportTicketModel, connectDB } from '@/database';
+import { connectDB,SupportTicketModel } from '@/database';
 import {
   requireReseller,
   resellerError,

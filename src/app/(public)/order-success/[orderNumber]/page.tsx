@@ -9,6 +9,7 @@ import { getSettings } from '@/services/settings';
 import { Icon } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
 import { getCurrentUser } from '@lib/auth/current-user';
+import { hasOrderAccess } from '@lib/order-access';
 
 import { PaymentlyVerifier } from './paymently-verifier';
 
@@ -29,6 +30,12 @@ export default async function OrderSuccessPage({
     getCurrentUser(),
   ]);
   if (!initialOrder) notFound();
+  // Order numbers are sequential: only the browser that placed the order, the
+  // owning account or an admin may see it (name, total, payment token).
+  const canView =
+    (user && (user.role === 'admin' || user.id === initialOrder.userId)) ||
+    (await hasOrderAccess(initialOrder.orderNumber));
+  if (!canView) notFound();
   let order = initialOrder;
 
   let serverVerifyError: string | undefined;

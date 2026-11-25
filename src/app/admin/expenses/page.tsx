@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { listBusinesses } from '@/services/businesses';
 import { listExpenseCategories, listExpenses } from '@/services/expenses';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { EXPENSE_PAYMENT_METHOD_LABELS, EXPENSE_PAYMENT_METHODS } from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
@@ -16,6 +17,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const paymentMethod = EXPENSE_PAYMENT_METHODS.find(
     (m) => m === param(sp, 'paymentMethod'),

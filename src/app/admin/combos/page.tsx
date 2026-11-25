@@ -5,12 +5,14 @@ import { listAdminCombos } from '@/services/combos';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { requireAdminPage } from '@lib/auth/current-user';
 
 import { CombosTable } from './components/combos-table';
 
 export const metadata: Metadata = { title: 'Combo offers' };
 
 export default async function CombosPage() {
+  await requireAdminPage();
   const combos = await listAdminCombos();
   return (
     <>

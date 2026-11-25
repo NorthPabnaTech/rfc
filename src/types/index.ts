@@ -362,6 +362,10 @@ export type OrderDTO = {
     expectedResellerProfit: number;
     profitCredited: boolean;
     upfrontRefunded: boolean;
+    deliveryPaymentMode?: 'with_product' | 'advance';
+    codAmount?: number;
+    codCollected?: number;
+    profitCreditedAmount?: number;
   };
   refundedAmount?: number;
   returnedItems?: ReturnedOrderItemDTO[];
@@ -557,6 +561,7 @@ export type SettingsDTO = {
     whatsapp?: string;
     youtube?: string;
   };
+  resellerWithdrawalFeeTiers: { minAmount: number; fee: number }[];
 };
 
 export type NotificationDTO = {

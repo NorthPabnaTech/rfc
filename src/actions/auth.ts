@@ -1,10 +1,11 @@
 'use server';
 
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { SITE } from '@/config/site';
 import { deletePushSubscription } from '@/services/notifications';
+import { enforceRateLimit, requestIp } from '@/services/rate-limit';
 import {
   authenticate,
   registerCustomer,
@@ -14,6 +15,7 @@ import {
 import { createSession, deleteSession } from '@lib/auth/session';
 import { type ActionResult, runAction } from '@lib/errors';
 import { PUSH_COOKIE } from '@lib/realtime/channels';
+import { safeRedirectPath } from '@lib/safe-redirect';
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -24,9 +26,7 @@ import { objectId } from '@lib/validators/common';
 
 /** Only allow same-site relative redirects after login (no open redirects). */
 function safeNext(next: unknown, fallback: string): string {
-  return typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')
-    ? next
-    : fallback;
+  return safeRedirectPath(next) ?? fallback;
 }
 
 export async function loginAction(
@@ -35,6 +35,11 @@ export async function loginAction(
 ): Promise<ActionResult<{ redirectTo: string }>> {
   return runAction(async () => {
     const { identifier, password } = loginSchema.parse(input);
+    await enforceRateLimit(
+      'login',
+      `ip:${await requestIp()}`,
+      `id:${identifier.email ?? identifier.phone}`,
+    );
     const user = await authenticate(identifier, password);
     await createSession(user);
     const fallback = user.role === 'admin' ? '/admin' : '/account';
@@ -42,16 +47,13 @@ export async function loginAction(
   });
 }
 
-async function getRequestOrigin(): Promise<string> {
-  const h = await headers();
-  const origin = h.get('origin');
-  if (origin && /^https?:\/\//i.test(origin)) return origin;
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  if (host) {
-    const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
-    return `${proto}://${host}`;
-  }
-  return SITE.url;
+/**
+ * Base URL for links in emails (verify / reset). Always the configured site
+ * URL, never request headers: Origin / Host / X-Forwarded-Host are
+ * attacker-controlled and would let a reset token be mailed to their domain.
+ */
+function getLinkOrigin(): string {
+  return SITE.url.replace(/\/+$/, '');
 }
 
 export async function registerAction(
@@ -59,7 +61,8 @@ export async function registerAction(
 ): Promise<ActionResult<{ email: string }>> {
   return runAction(async () => {
     const data = registerSchema.parse(input);
-    const origin = await getRequestOrigin();
+    await enforceRateLimit('register', `ip:${await requestIp()}`, `email:${data.email}`);
+    const origin = getLinkOrigin();
     const user = await registerCustomer(data, origin);
     return { email: user.email };
   });
@@ -68,7 +71,8 @@ export async function registerAction(
 export async function forgotPasswordAction(input: unknown): Promise<ActionResult> {
   return runAction(async () => {
     const { email } = forgotPasswordSchema.parse(input);
-    const origin = await getRequestOrigin();
+    await enforceRateLimit('forgotPassword', `ip:${await requestIp()}`, `email:${email}`);
+    const origin = getLinkOrigin();
     await requestPasswordReset(email, origin);
     return undefined;
   });

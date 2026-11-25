@@ -7,6 +7,7 @@ import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
 import { getDashboardData } from '@/services/dashboard';
 import { PageHeader, StatCard, StatCardGrid } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
   ORDER_PLATFORM_LABELS,
   ORDER_STATUS_LABELS,
@@ -20,6 +21,7 @@ import { BarList, RevenueChart } from './components/revenue-chart';
 export const metadata: Metadata = { title: 'Dashboard' };
 
 export default async function DashboardPage() {
+  await requireAdminPage();
   const d = await getDashboardData(30);
   const last30 = d.revenueByDay.reduce((s, x) => s + x.revenue, 0);
   const last30Orders = d.revenueByDay.reduce((s, x) => s + x.orders, 0);

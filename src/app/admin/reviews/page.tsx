@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { listAdminReviews } from '@/services/engagement';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
@@ -14,6 +15,7 @@ export default async function ReviewsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const visibility = param(sp, 'visibility');
   const rating = Number(param(sp, 'rating'));

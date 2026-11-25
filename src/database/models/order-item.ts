@@ -32,6 +32,10 @@ export interface OrderItem {
   unitPrice: number;
   /** Supplier cost per unit at order time — used for profit reporting. */
   supplierPrice: number;
+  /** Reseller orders only: base reseller price per unit (supplierPrice + platformMargin) at order time. */
+  resellerPrice?: number;
+  /** Reseller orders only: platform margin per unit at order time. */
+  platformMargin?: number;
   lineTotal: number;
   /** Absent for combos (each component has its own supplier). */
   supplier?: Types.ObjectId | null;
@@ -63,6 +67,8 @@ export const orderItemSchema = new Schema<OrderItem>({
   quantity: { type: Number, required: true, min: 1, max: 999 },
   unitPrice: { type: Number, required: true, min: 0 },
   supplierPrice: { type: Number, required: true, min: 0 },
+  resellerPrice: { type: Number, min: 0 },
+  platformMargin: { type: Number },
   lineTotal: { type: Number, required: true, min: 0 },
   supplier: { type: Schema.Types.ObjectId, ref: 'Supplier', default: null },
   supplierName: String,

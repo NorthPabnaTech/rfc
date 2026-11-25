@@ -25,6 +25,11 @@ export interface WalletTransaction {
   paymentMethod?: string;
   paymentReference?: string;
   gatewayTransactionId?: string;
+  /** Paymently invoice that funded this deposit — unique, so it credits once. */
+  invoiceId?: string;
+  /** Withdrawals: fee kept by the platform, and what is actually paid out. */
+  fee?: number;
+  netAmount?: number;
   payoutMethod?: string;
   payoutAccount?: string;
   note?: string;
@@ -51,6 +56,9 @@ const walletTransactionSchema = new Schema<WalletTransaction>(
     paymentMethod: { type: String, trim: true, maxlength: 40 },
     paymentReference: { type: String, trim: true, maxlength: 120 },
     gatewayTransactionId: { type: String, trim: true, maxlength: 120 },
+    invoiceId: { type: String, trim: true, maxlength: 120 },
+    fee: { type: Number, min: 0 },
+    netAmount: { type: Number, min: 0 },
     payoutMethod: { type: String, trim: true, maxlength: 40 },
     payoutAccount: { type: String, trim: true, maxlength: 200 },
     note: { type: String, trim: true, maxlength: 500 },
@@ -63,6 +71,26 @@ const walletTransactionSchema = new Schema<WalletTransaction>(
 walletTransactionSchema.index({ txNumber: 1 }, { unique: true });
 walletTransactionSchema.index({ reseller: 1, createdAt: -1 });
 walletTransactionSchema.index({ paymentReference: 1 }, { sparse: true });
+// Idempotency: a gateway invoice / transaction funds at most one deposit…
+walletTransactionSchema.index(
+  { invoiceId: 1 },
+  { unique: true, partialFilterExpression: { invoiceId: { $type: 'string' } } },
+);
+walletTransactionSchema.index(
+  { gatewayTransactionId: 1 },
+  { unique: true, partialFilterExpression: { gatewayTransactionId: { $type: 'string' } } },
+);
+// …and an order is charged, credited with profit and refunded at most once.
+for (const type of ['order_deduction', 'order_profit', 'order_refund'] as const) {
+  walletTransactionSchema.index(
+    { order: 1, type: 1 },
+    {
+      unique: true,
+      name: `order_1_${type}_unique`,
+      partialFilterExpression: { type, order: { $type: 'objectId' } },
+    },
+  );
+}
 
 export const WalletTransactionModel: Model<WalletTransaction> = defineModel<WalletTransaction>(
   'WalletTransaction',

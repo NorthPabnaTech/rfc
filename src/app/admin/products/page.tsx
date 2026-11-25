@@ -7,6 +7,7 @@ import { listAdminProducts } from '@/services/products';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
   PRODUCT_STATUSES,
   PRODUCT_VISIBILITIES,
@@ -25,6 +26,7 @@ export default async function AdminProductsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const status = param(sp, 'status');
   const stock = param(sp, 'stock');

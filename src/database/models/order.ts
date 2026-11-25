@@ -10,6 +10,8 @@ import {
   PAYMENT_STATUSES,
   type PaymentMethod,
   type PaymentStatus,
+  RESELLER_DELIVERY_PAYMENT_MODES,
+  type ResellerDeliveryPaymentMode,
 } from '@lib/constants';
 
 import { type AddressSnapshot, addressSnapshotSchema } from './address';
@@ -54,6 +56,14 @@ export interface Order {
     expectedResellerProfit: number;
     profitCredited: boolean;
     upfrontRefunded: boolean;
+    /** Who pays delivery: collected with the product (COD) or paid in advance to the reseller. */
+    deliveryPaymentMode?: ResellerDeliveryPaymentMode;
+    /** What the courier should collect from the customer, fixed at order time. */
+    codAmount?: number;
+    /** What the courier actually collected (set when the order is delivered). */
+    codCollected?: number;
+    /** Profit actually credited to the wallet on delivery. */
+    profitCreditedAmount?: number;
   };
   customer: { name: string; phone: string; email?: string };
   shippingAddress: AddressSnapshot;
@@ -140,6 +150,10 @@ const orderSchema = new Schema<Order>(
           expectedResellerProfit: { type: Number, required: true },
           profitCredited: { type: Boolean, default: false },
           upfrontRefunded: { type: Boolean, default: false },
+          deliveryPaymentMode: { type: String, enum: RESELLER_DELIVERY_PAYMENT_MODES },
+          codAmount: { type: Number, min: 0 },
+          codCollected: { type: Number, min: 0 },
+          profitCreditedAmount: { type: Number },
         },
         { _id: false },
       ),

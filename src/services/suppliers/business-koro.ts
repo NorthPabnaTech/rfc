@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { Supplier } from '@/database';
 import type { SupplierCatalogProductDTO, SupplierCatalogVariantDTO } from '@/types';
-import type { SupplierOrderStatus } from '@lib/constants';
+import { SUPPLIER_API_KEY_ENV_PATTERN, type SupplierOrderStatus } from '@lib/constants';
 import { AppError } from '@lib/errors';
 
 import { assertRateLimit, sleep } from './rate-limiter';
@@ -58,8 +58,20 @@ type RawProductsResponse = {
   deliveryCharges?: { insideDhaka?: number; outsideDhaka?: number };
 };
 
-function readApiKey(supplier: Pick<Supplier, 'apiKeyEnvVar'>): string {
+/** The env var holding this supplier's key — only supplier-key names are allowed. */
+function apiKeyEnvName(supplier: Pick<Supplier, 'apiKeyEnvVar'>): string {
   const envName = supplier.apiKeyEnvVar?.trim() || DEFAULT_ENV_VAR;
+  if (!SUPPLIER_API_KEY_ENV_PATTERN.test(envName)) {
+    throw new AppError(
+      `"${envName}" is not an allowed supplier API key variable (use BUSINESS_KORO_…_API_KEY or SUPPLIER_…_API_KEY).`,
+      400,
+    );
+  }
+  return envName;
+}
+
+function readApiKey(supplier: Pick<Supplier, 'apiKeyEnvVar'>): string {
+  const envName = apiKeyEnvName(supplier);
   const key = process.env[envName]?.trim();
   if (!key) {
     throw new AppError(
@@ -83,7 +95,12 @@ function buildHeaders(supplier: Supplier): Record<string, string> {
 }
 
 function baseUrl(supplier: Supplier): string {
-  return (supplier.apiBaseUrl?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  const url = (supplier.apiBaseUrl?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  // The API key travels in a header: never send it over plain http.
+  if (!url.startsWith('https://')) {
+    throw new AppError('Supplier API base URL must use https://.', 400);
+  }
+  return url;
 }
 
 function mapProduct(
@@ -220,7 +237,7 @@ export const BusinessKoroAdapter: SupplierAdapter = {
 
   isConfigured(supplier) {
     const envName = supplier.apiKeyEnvVar?.trim() || DEFAULT_ENV_VAR;
-    return Boolean(process.env[envName]?.trim());
+    return SUPPLIER_API_KEY_ENV_PATTERN.test(envName) && Boolean(process.env[envName]?.trim());
   },
 
   async fetchProducts(supplier, opts = {}): Promise<SupplierProductsPage> {

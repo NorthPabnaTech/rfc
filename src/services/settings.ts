@@ -24,6 +24,10 @@ function toSettings(s: Partial<Settings>): SettingsDTO {
     whatsappDefaultMessage:
       s.whatsappDefaultMessage ?? DEFAULT_SETTINGS.whatsappDefaultMessage,
     social: { ...(s.social ?? {}) },
+    resellerWithdrawalFeeTiers: (s.resellerWithdrawalFeeTiers ?? []).map((t) => ({
+      minAmount: t.minAmount,
+      fee: t.fee,
+    })),
   };
 }
 

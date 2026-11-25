@@ -276,12 +276,14 @@ export async function updateOrderStatusAction(input: unknown): Promise<ActionRes
       returnItems,
       customerPaidDelivery,
       returnDeliveryExpenseAmount,
+      codCollected,
     } = updateOrderStatusSchema.parse(input);
     await updateOrderStatus(orderId, status, admin.id, note, {
       refundAmount,
       returnItems,
       customerPaidDelivery,
       returnDeliveryExpenseAmount,
+      codCollected,
     });
     revalidatePath('/admin', 'layout');
     revalidatePath('/account/orders', 'layout');

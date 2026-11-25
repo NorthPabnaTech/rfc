@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 
 import { listBusinesses } from '@/services/businesses';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 
 import { BusinessesManager } from './components/businesses-manager';
 
 export const metadata: Metadata = { title: 'Businesses & Stores' };
 
 export default async function BusinessesPage() {
+  await requireAdminPage();
   const businesses = await listBusinesses();
   return (
     <>

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
+import { replySupportTicket } from '@/services/resellers';
 import {
   requireReseller,
   resellerError,
@@ -8,7 +9,6 @@ import {
   resellerOptionsResponse,
 } from '@lib/auth/reseller-auth';
 import { AppError } from '@lib/errors';
-import { replySupportTicket } from '@/services/resellers';
 
 const replySchema = z.object({
   message: z.string().trim().min(1).max(4000),

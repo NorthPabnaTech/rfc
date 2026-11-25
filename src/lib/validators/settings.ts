@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MIN_RESELLER_WITHDRAWAL } from '@lib/constants';
+
 import { money, optionalText, optionalUrl, requiredText } from './common';
 
 export const settingsSchema = z.object({
@@ -35,5 +37,39 @@ export const settingsSchema = z.object({
     whatsapp: optionalText(40),
     youtube: optionalUrl,
   }),
+  resellerWithdrawalFeeTiers: z
+    .array(
+      z.object({
+        minAmount: money('From amount'),
+        fee: money('Fee').refine((v) => v < MIN_RESELLER_WITHDRAWAL, {
+          message: `Fee must be less than the minimum withdrawal (৳${MIN_RESELLER_WITHDRAWAL}).`,
+        }),
+      }),
+    )
+    .max(10)
+    .default([])
+    .superRefine((tiers, ctx) => {
+      const seen = new Set<number>();
+      tiers.forEach((t, i) => {
+        if (seen.has(t.minAmount)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [i, 'minAmount'],
+            message: 'Each tier needs a different “from” amount.',
+          });
+        }
+        seen.add(t.minAmount);
+        // The fee must leave something to pay out at the smallest amount the
+        // tier applies to.
+        const smallest = Math.max(t.minAmount, MIN_RESELLER_WITHDRAWAL);
+        if (t.fee >= smallest) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [i, 'fee'],
+            message: `Fee must be less than ৳${smallest}.`,
+          });
+        }
+      });
+    }),
 });
 export type SettingsInput = z.input<typeof settingsSchema>;

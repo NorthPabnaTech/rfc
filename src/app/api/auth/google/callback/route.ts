@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, UserModel } from '@/database';
 import { createSession } from '@lib/auth/session';
 import { serverEnv } from '@lib/env';
+import { safeRedirectPath } from '@lib/safe-redirect';
 
 const STATE_COOKIE = 'rfc_google_state';
 const NEXT_COOKIE = 'rfc_google_next';
@@ -72,17 +73,29 @@ export async function GET(req: NextRequest) {
     if (!profileRes.ok || !profile.sub || !profile.email) {
       return failRedirect(req, 'google_profile_failed');
     }
+    // Only trust the email for account linking when Google has verified it.
+    if (profile.email_verified !== true) {
+      return failRedirect(req, 'google_email_unverified');
+    }
 
     const email = profile.email.trim().toLowerCase();
     await connectDB();
 
-    let user = await UserModel.findOne({
-      $or: [{ googleId: profile.sub }, { email }],
-    });
+    let user =
+      (await UserModel.findOne({ googleId: profile.sub })) ??
+      (await UserModel.findOne({ email }));
 
     if (user) {
       if (!user.isActive) {
         return failRedirect(req, 'account_disabled');
+      }
+      if (user.googleId && user.googleId !== profile.sub) {
+        return failRedirect(req, 'google_account_mismatch');
+      }
+      // Admin accounts are never linked to Google automatically; they keep
+      // signing in with their password.
+      if (!user.googleId && user.role === 'admin') {
+        return failRedirect(req, 'google_admin_not_linked');
       }
       if (!user.googleId) user.googleId = profile.sub;
       user.isEmailVerified = true;
@@ -107,11 +120,7 @@ export async function GET(req: NextRequest) {
     await createSession({ id: String(user._id), role: user.role });
 
     const safeNext =
-      storedNext && storedNext.startsWith('/') && !storedNext.startsWith('//')
-        ? storedNext
-        : user.role === 'admin'
-          ? '/admin'
-          : '/account';
+      safeRedirectPath(storedNext) ?? (user.role === 'admin' ? '/admin' : '/account');
 
     const res = NextResponse.redirect(new URL(safeNext, req.url));
     res.cookies.delete(STATE_COOKIE);

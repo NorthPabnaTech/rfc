@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 
 import { getAdminWalletTxCounts, listAdminWalletTransactions } from '@/services/resellers';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
-  WALLET_TX_STATUSES,
   WALLET_TX_STATUS_LABELS,
-  WALLET_TX_TYPES,
+  WALLET_TX_STATUSES,
   WALLET_TX_TYPE_LABELS,
+  WALLET_TX_TYPES,
   type WalletTxStatus,
   type WalletTxType,
 } from '@lib/constants';
@@ -23,6 +24,7 @@ export default async function AdminResellerTransactionsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const rawStatus = param(sp, 'status') as WalletTxStatus | undefined;
   const rawType = param(sp, 'type') as WalletTxType | undefined;

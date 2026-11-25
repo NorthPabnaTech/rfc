@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { countOrdersByStatus, listAdminOrders } from '@/services/orders';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
@@ -16,6 +17,7 @@ export default async function AdminResellerOrdersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const status = ORDER_STATUSES.find((s) => s === param(sp, 'status'));
   const [data, counts] = await Promise.all([

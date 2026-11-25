@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { deleteMediaByPublicId, uploadAndRecordMedia } from '@/services/media';
+import { enforceRateLimit } from '@/services/rate-limit';
 import { getCurrentUser } from '@lib/auth/current-user';
 import { UPLOAD_FOLDERS, type UploadPurpose } from '@lib/constants';
 import { AppError } from '@lib/errors';
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     const purpose = purposeSchema.parse(form.get('purpose'));
     const rule = RULES[purpose];
     if (rule.adminOnly && user.role !== 'admin') throw new AppError('Not allowed.', 403);
+    if (user.role !== 'admin') await enforceRateLimit('upload', `user:${user.id}`);
 
     const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
     if (files.length === 0) throw new AppError('Choose at least one image.');

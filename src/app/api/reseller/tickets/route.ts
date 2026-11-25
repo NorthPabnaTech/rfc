@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { SupportTicketModel, connectDB } from '@/database';
+import { connectDB,SupportTicketModel } from '@/database';
+import { createSupportTicket } from '@/services/resellers';
 import {
   requireReseller,
   resellerError,
@@ -10,7 +11,6 @@ import {
 } from '@lib/auth/reseller-auth';
 import { TICKET_PRIORITIES } from '@lib/constants';
 import { AppError } from '@lib/errors';
-import { createSupportTicket } from '@/services/resellers';
 
 const createTicketSchema = z.object({
   subject: z.string().trim().min(3).max(200),

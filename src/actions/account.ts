@@ -7,6 +7,7 @@ import { cancelOrderByCustomer } from '@/services/orders';
 import { createReturnRequest } from '@/services/returns';
 import { changePassword, deleteAddress, saveAddress, updateProfile } from '@/services/users';
 import { requireUser } from '@lib/auth/current-user';
+import { createSession } from '@lib/auth/session';
 import { type ActionResult, runAction } from '@lib/errors';
 import { addressSchema, changePasswordSchema, profileSchema } from '@lib/validators/auth';
 import { objectId } from '@lib/validators/common';
@@ -30,7 +31,9 @@ export async function changePasswordAction(input: unknown): Promise<ActionResult
   return runAction(async () => {
     const user = await requireUser();
     const data = changePasswordSchema.parse(input);
-    await changePassword(user.id, data.currentPassword, data.newPassword);
+    const updated = await changePassword(user.id, data.currentPassword, data.newPassword);
+    // Other devices are signed out; keep this one signed in.
+    await createSession(updated);
     return undefined;
   }, 'Password changed');
 }

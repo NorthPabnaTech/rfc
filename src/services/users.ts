@@ -98,10 +98,13 @@ export async function verifyEmailToken(token: string) {
   user.lastLoginAt = new Date();
   await user.save();
 
-  if (user.phone) {
-    // Link earlier guest orders placed with the same phone number.
+  if (user.phone && user.email) {
+    // Link earlier guest orders only when both the phone AND the (now verified)
+    // email match. The phone number itself is never verified, so matching on
+    // phone alone would let anyone register with a victim's number and read
+    // their orders, address and contact details.
     await OrderModel.updateMany(
-      { user: null, 'customer.phone': user.phone },
+      { user: null, 'customer.phone': user.phone, 'customer.email': user.email },
       { $set: { user: user._id } },
     );
   }
@@ -267,7 +270,11 @@ export async function changePassword(userId: string, current: string, next: stri
     throw new AppError('Your current password is incorrect.');
   }
   user.passwordHash = await hashPassword(next);
+  // Signs out every other session (see getCurrentUser); the caller re-issues
+  // a fresh session for this device.
+  user.passwordChangedAt = new Date();
   await user.save();
+  return { id: String(user._id), role: user.role };
 }
 
 /* ─── Addresses ──────────────────────────────────────────────────────────── */

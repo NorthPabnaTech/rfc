@@ -5,6 +5,7 @@ import { ProductModel } from '@/database';
 import { getSupplierById } from '@/services/catalog';
 import { fetchSupplierCatalog } from '@/services/supplier-sync';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { objectId } from '@lib/validators/common';
 
 import { SupplierBrowser } from './components/supplier-browser';
@@ -16,6 +17,7 @@ export default async function SupplierDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
   if (!objectId.safeParse(id).success) notFound();
 

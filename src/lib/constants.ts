@@ -399,6 +399,71 @@ export const ADMIN_PAGE_SIZE = 10;
 
 export const MIN_RESELLER_DEPOSIT = 100;
 export const MIN_RESELLER_WITHDRAWAL = 50;
+/**
+ * A reseller's selling price may be at most this many times the reseller
+ * price. Stops absurd prices that would inflate profit credited on delivery.
+ */
+export const RESELLER_MAX_SELLING_MULTIPLIER = 5;
+/** Largest quantity of one line on a reseller order. */
+export const RESELLER_MAX_LINE_QUANTITY = 100;
+
+/**
+ * `with_product`: the courier collects the delivery charge together with the
+ * product price (COD = selling total + delivery).
+ * `advance`: the customer already paid the delivery charge to the reseller,
+ * so the courier collects only the selling total.
+ */
+export const RESELLER_DELIVERY_PAYMENT_MODES = ['with_product', 'advance'] as const;
+export type ResellerDeliveryPaymentMode = (typeof RESELLER_DELIVERY_PAYMENT_MODES)[number];
+
+/**
+ * One withdrawal fee tier: `fee` applies to withdrawals of at least
+ * `minAmount`. The tier with the highest matching `minAmount` wins.
+ */
+export type ResellerWithdrawalFeeTier = { minAmount: number; fee: number };
+
+/** Fee for withdrawing `amount`, from the admin-configured tiers. */
+export function resellerWithdrawalFee(
+  amount: number,
+  tiers: readonly ResellerWithdrawalFeeTier[] | undefined,
+): number {
+  let fee = 0;
+  let best = -Infinity;
+  for (const t of tiers ?? []) {
+    if (amount >= t.minAmount && t.minAmount > best) {
+      best = t.minAmount;
+      fee = t.fee;
+    }
+  }
+  return Math.max(0, fee);
+}
+
+/**
+ * Env vars a supplier record may name as its API key. Only supplier keys:
+ * an admin must never be able to point a supplier at e.g. `AUTH_SECRET` or
+ * `MONGODB_URI` and have it sent to an arbitrary host.
+ */
+export const SUPPLIER_API_KEY_ENV_PATTERN = /^(BUSINESS_KORO|SUPPLIER)_[A-Z0-9_]*API_KEY$/;
+
+/* ─── Abuse protection ───────────────────────────────────────────────────── */
+
+/** Fixed-window limits: at most `limit` attempts per `windowSeconds`. */
+export const RATE_LIMITS = {
+  /** Per IP and per account identifier (brute force). */
+  login: { limit: 10, windowSeconds: 15 * 60 },
+  register: { limit: 5, windowSeconds: 60 * 60 },
+  /** Per IP and per email (mail bombing). */
+  forgotPassword: { limit: 5, windowSeconds: 60 * 60 },
+  /** Per IP: fake COD orders lock stock and fill the supplier queue. */
+  placeOrder: { limit: 10, windowSeconds: 60 * 60 },
+  /** Per IP: order numbers are sequential, so phones must not be guessable. */
+  trackOrder: { limit: 20, windowSeconds: 15 * 60 },
+  /** Per user: Cloudinary quota. */
+  upload: { limit: 60, windowSeconds: 60 * 60 },
+  /** Reseller API, per IP. */
+  resellerAuth: { limit: 10, windowSeconds: 15 * 60 },
+} as const satisfies Record<string, { limit: number; windowSeconds: number }>;
+export type RateLimitBucket = keyof typeof RATE_LIMITS;
 
 export const WALLET_TX_TYPES = [
   'deposit',

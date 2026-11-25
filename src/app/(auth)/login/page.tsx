@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Callout } from '@components/shared/callout';
 import { getCurrentUser } from '@lib/auth/current-user';
 import { serverEnv } from '@lib/env';
+import { safeRedirectPath } from '@lib/safe-redirect';
 import { param, type SearchParams } from '@lib/search-params';
 
 import { GoogleAuthButton } from '../components/google-auth-button';
@@ -19,6 +20,9 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   account_disabled: 'Your account has been disabled. Please contact support.',
   google_auth_error: 'Google sign-in failed. Please try again.',
   google_not_configured: 'Google sign-in is not configured yet.',
+  google_email_unverified: 'Your Google email is not verified. Please verify it with Google first.',
+  google_account_mismatch: 'This email is linked to a different Google account.',
+  google_admin_not_linked: 'Admin accounts must sign in with their password.',
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -30,11 +34,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const user = await getCurrentUser();
   if (user)
     redirect(
-      next?.startsWith('/') && !next.startsWith('//')
-        ? next
-        : user.role === 'admin'
-          ? '/admin'
-          : '/account',
+      safeRedirectPath(next) ?? (user.role === 'admin' ? '/admin' : '/account'),
     );
 
   return (

@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type { HydratedDocument } from 'mongoose';
+
 import {
   connectDB,
   nextSequence,
@@ -12,15 +14,23 @@ import {
   SettingsModel,
   SupplierOrderModel,
   SupportTicketModel,
+  type WalletTransaction,
   WalletTransactionModel,
   withTransaction,
 } from '@/database';
+
+type WalletTransactionDocument = HydratedDocument<WalletTransaction>;
 import { hashPassword, verifyPassword } from '@lib/auth/password';
 import {
   MIN_RESELLER_DEPOSIT,
   MIN_RESELLER_WITHDRAWAL,
-  TICKET_STATUS_TRANSITIONS,
   type OrderStatus,
+  RESELLER_MAX_LINE_QUANTITY,
+  RESELLER_MAX_SELLING_MULTIPLIER,
+  type ResellerDeliveryPaymentMode,
+  resellerWithdrawalFee,
+  type ResellerWithdrawalFeeTier,
+  TICKET_STATUS_TRANSITIONS,
   type TicketPriority,
   type TicketStatus,
   type WalletTxStatus,
@@ -28,6 +38,7 @@ import {
 } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import { deliveryZoneFor } from '@lib/locations';
+import { type PaymentlyVerifyResult, verifyPaymentlyInvoice } from '@lib/payments/paymently';
 
 import { createSupplierOrdersForOrder } from './supplier-orders';
 
@@ -130,13 +141,17 @@ export async function findOrCreateGoogleReseller(profile: {
   await connectDB();
   const email = profile.email.trim().toLowerCase();
 
-  let reseller = await ResellerModel.findOne({
-    $or: [{ googleId: profile.googleId }, { email }],
-  });
+  // Callers must only pass a Google-verified email. Prefer the stable Google id.
+  let reseller =
+    (await ResellerModel.findOne({ googleId: profile.googleId })) ??
+    (await ResellerModel.findOne({ email }));
 
   if (reseller) {
     if (!reseller.isActive) {
       throw new AppError('Your reseller account has been deactivated by admin.', 403);
+    }
+    if (reseller.googleId && reseller.googleId !== profile.googleId) {
+      throw new AppError('This email is linked to a different Google account.', 409);
     }
     if (!reseller.googleId) reseller.googleId = profile.googleId;
     if (!reseller.avatarUrl && profile.avatarUrl) reseller.avatarUrl = profile.avatarUrl;
@@ -294,6 +309,9 @@ export async function listResellerTransactions(
       paymentReference: t.paymentReference ?? null,
       payoutMethod: t.payoutMethod ?? null,
       payoutAccount: t.payoutAccount ?? null,
+      invoiceId: t.invoiceId ?? null,
+      fee: t.fee ?? null,
+      netAmount: t.netAmount ?? null,
       note: t.note ?? null,
       createdAt: t.createdAt,
     })),
@@ -338,6 +356,125 @@ export async function createResellerDepositRequest(input: {
   return tx;
 }
 
+/** Gateway verification result used for wallet deposits (injectable for tests). */
+type DepositVerifier = (invoiceId: string) => Promise<PaymentlyVerifyResult>;
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === 11000;
+}
+
+/**
+ * Credits a wallet deposit paid through Paymently. The amount always comes
+ * from the gateway's server-to-server verification, never from the client.
+ *
+ * Credits only when the invoice is COMPLETED, `metadata.type` is
+ * `wallet_deposit`, `metadata.resellerId` is this reseller (when called on
+ * behalf of a signed-in reseller) and the paid amount equals
+ * `metadata.amount`. Idempotent: the unique `invoiceId` /
+ * `gatewayTransactionId` indexes let an invoice credit exactly once; a repeat
+ * call returns the existing deposit with `alreadyCredited: true`.
+ */
+export async function creditResellerDepositFromInvoice(
+  input: { invoiceId: string; resellerId?: string },
+  verify: DepositVerifier = verifyPaymentlyInvoice,
+): Promise<{ tx: WalletTransactionDocument; walletBalance: number; alreadyCredited: boolean }> {
+  await connectDB();
+  const invoiceId = input.invoiceId.trim();
+  if (!invoiceId) throw new AppError('Missing Paymently invoice ID.', 400);
+
+  const findExisting = async () => {
+    const existing = await WalletTransactionModel.findOne({ invoiceId, type: 'deposit' });
+    if (!existing) return null;
+    if (input.resellerId && String(existing.reseller) !== input.resellerId) {
+      throw new AppError('This payment belongs to another account.', 403);
+    }
+    const r = await ResellerModel.findById(existing.reseller, 'walletBalance').lean();
+    return { tx: existing, walletBalance: r?.walletBalance ?? 0, alreadyCredited: true };
+  };
+
+  const already = await findExisting();
+  if (already) return already;
+
+  const verified = await verify(invoiceId);
+  if (verified.status !== 'COMPLETED') {
+    throw new AppError(
+      verified.status === 'PENDING'
+        ? 'Payment is still pending confirmation.'
+        : verified.message || 'Payment was not completed.',
+      400,
+    );
+  }
+  const meta = verified.metadata ?? {};
+  if (meta.type !== 'wallet_deposit') {
+    throw new AppError('This payment is not a wallet deposit.', 400);
+  }
+  const metaResellerId = meta.resellerId != null ? String(meta.resellerId) : '';
+  if (!metaResellerId || (input.resellerId && metaResellerId !== input.resellerId)) {
+    throw new AppError('This payment belongs to another account.', 403);
+  }
+  const amount = Number(verified.amount);
+  const metaAmount = Number(meta.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount - metaAmount) > 0.01) {
+    throw new AppError('Paid amount does not match the deposit amount.', 400);
+  }
+  if (amount < MIN_RESELLER_DEPOSIT) {
+    throw new AppError(`Minimum add balance amount is ৳${MIN_RESELLER_DEPOSIT}.`, 400);
+  }
+
+  const reseller = await ResellerModel.findById(metaResellerId, 'isActive').lean();
+  if (!reseller) throw new AppError('Reseller account not found.', 404);
+  if (!reseller.isActive) throw new AppError('Reseller account is inactive.', 403);
+
+  const txNumber = await nextWalletTxNumber();
+  try {
+    return await withTransaction(async (session) => {
+      // Insert first: the unique invoice index makes a concurrent second
+      // credit fail here, before any balance is touched.
+      const [tx] = await WalletTransactionModel.create(
+        [
+          {
+            txNumber,
+            reseller: reseller._id,
+            type: 'deposit',
+            direction: 'credit',
+            amount,
+            balanceBefore: 0,
+            balanceAfter: 0,
+            status: 'completed',
+            invoiceId,
+            gatewayTransactionId: verified.transactionId || undefined,
+            paymentMethod: verified.paymentMethod?.slice(0, 40) || 'paymently',
+            paymentReference: invoiceId,
+            note: 'Wallet deposit via Paymently',
+            processedAt: new Date(),
+          },
+        ],
+        { session },
+      );
+      if (!tx) throw new AppError('Failed to record deposit.', 500);
+
+      const updated = await ResellerModel.findOneAndUpdate(
+        { _id: reseller._id },
+        { $inc: { walletBalance: amount, totalDeposited: amount } },
+        { new: true, session },
+      );
+      if (!updated) throw new AppError('Reseller account not found.', 404);
+
+      tx.balanceBefore = updated.walletBalance - amount;
+      tx.balanceAfter = updated.walletBalance;
+      await tx.save({ session });
+      return { tx, walletBalance: updated.walletBalance, alreadyCredited: false };
+    });
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      const existing = await findExisting();
+      if (existing) return existing;
+      throw new AppError('This payment was already used.', 409);
+    }
+    throw err;
+  }
+}
+
 export async function approveOrRejectResellerDeposit(
   txId: string,
   action: 'approve' | 'reject',
@@ -346,21 +483,22 @@ export async function approveOrRejectResellerDeposit(
 ) {
   await connectDB();
   return withTransaction(async (session) => {
-    const tx = await WalletTransactionModel.findOne({
-      _id: txId,
-      type: 'deposit',
-      status: 'pending',
-    }).session(session ?? null);
+    // Flip pending → final atomically first, so two concurrent clicks can't
+    // both credit the wallet.
+    const tx = await WalletTransactionModel.findOneAndUpdate(
+      { _id: txId, type: 'deposit', status: 'pending' },
+      {
+        $set: {
+          status: action === 'approve' ? 'completed' : 'rejected',
+          processedBy: adminId,
+          processedAt: new Date(),
+          ...(note ? { note } : {}),
+        },
+      },
+      { new: true, session },
+    );
     if (!tx) throw new AppError('Pending deposit transaction not found.', 404);
-
-    if (action === 'reject') {
-      tx.status = 'rejected';
-      tx.processedBy = adminId as never;
-      tx.processedAt = new Date();
-      if (note) tx.note = note;
-      await tx.save({ session });
-      return tx;
-    }
+    if (action === 'reject') return tx;
 
     const updatedReseller = await ResellerModel.findByIdAndUpdate(
       tx.reseller,
@@ -371,10 +509,6 @@ export async function approveOrRejectResellerDeposit(
 
     tx.balanceAfter = updatedReseller.walletBalance;
     tx.balanceBefore = updatedReseller.walletBalance - tx.amount;
-    tx.status = 'completed';
-    tx.processedBy = adminId as never;
-    tx.processedAt = new Date();
-    if (note) tx.note = note;
     await tx.save({ session });
     return tx;
   });
@@ -388,10 +522,18 @@ export async function requestResellerWithdrawal(input: {
   note?: string;
 }) {
   await connectDB();
-  if (!Number.isFinite(input.amount) || input.amount < MIN_RESELLER_WITHDRAWAL) {
-    throw new AppError(`Minimum withdrawal amount is ৳${MIN_RESELLER_WITHDRAWAL}.`, 400);
+  if (!Number.isInteger(input.amount) || input.amount < MIN_RESELLER_WITHDRAWAL) {
+    throw new AppError(
+      `Withdrawal must be a whole number of at least ৳${MIN_RESELLER_WITHDRAWAL}.`,
+      400,
+    );
   }
-  const amount = Math.round(input.amount);
+  const amount = input.amount;
+  const settings = await SettingsModel.findOne({}, 'resellerWithdrawalFeeTiers').lean();
+  const fee = resellerWithdrawalFee(amount, settings?.resellerWithdrawalFeeTiers);
+  if (fee >= amount) {
+    throw new AppError(`The withdrawal fee (৳${fee}) is not less than the amount.`, 400);
+  }
 
   return withTransaction(async (session) => {
     const updatedReseller = await ResellerModel.findOneAndUpdate(
@@ -415,6 +557,8 @@ export async function requestResellerWithdrawal(input: {
           balanceBefore: updatedReseller.walletBalance + amount,
           balanceAfter: updatedReseller.walletBalance,
           status: 'pending',
+          fee,
+          netAmount: amount - fee,
           payoutMethod: input.payoutMethod.trim(),
           payoutAccount: input.payoutAccount.trim(),
           note: input.note?.trim() || 'Withdrawal request',
@@ -435,11 +579,20 @@ export async function processResellerWithdrawal(
 ) {
   await connectDB();
   return withTransaction(async (session) => {
-    const tx = await WalletTransactionModel.findOne({
-      _id: txId,
-      type: 'withdrawal',
-      status: 'pending',
-    }).session(session ?? null);
+    // Flip pending → final atomically first: only one of two concurrent
+    // approve/reject calls wins, so a rejection refunds exactly once.
+    const tx = await WalletTransactionModel.findOneAndUpdate(
+      { _id: txId, type: 'withdrawal', status: 'pending' },
+      {
+        $set: {
+          status: action === 'approve' ? 'completed' : 'rejected',
+          processedBy: adminId,
+          processedAt: new Date(),
+          ...(note ? { note } : {}),
+        },
+      },
+      { new: true, session },
+    );
     if (!tx) throw new AppError('Pending withdrawal transaction not found.', 404);
 
     if (action === 'approve') {
@@ -448,11 +601,6 @@ export async function processResellerWithdrawal(
         { $inc: { totalWithdrawn: tx.amount } },
         { session },
       );
-      tx.status = 'completed';
-      tx.processedBy = adminId as never;
-      tx.processedAt = new Date();
-      if (note) tx.note = note;
-      await tx.save({ session });
       return tx;
     }
 
@@ -463,12 +611,6 @@ export async function processResellerWithdrawal(
       { new: true, session },
     );
     if (!updatedReseller) throw new AppError('Reseller not found.', 404);
-
-    tx.status = 'rejected';
-    tx.processedBy = adminId as never;
-    tx.processedAt = new Date();
-    if (note) tx.note = note;
-    await tx.save({ session });
 
     const refundTxNumber = await nextWalletTxNumber();
     await WalletTransactionModel.create(
@@ -512,14 +654,33 @@ export async function placeResellerOrder(
       quantity: number;
       sellingPrice: number;
       variant?: Record<string, string>;
+      /** The base reseller price the seller saw; a mismatch → 409 so they can re-confirm. */
+      expectedResellerPrice?: number;
     }[];
     customerNote?: string;
+    deliveryPaymentMode?: ResellerDeliveryPaymentMode;
   },
 ) {
   await connectDB();
   if (!input.items.length) {
     throw new AppError('At least one product is required.', 400);
   }
+  if (input.items.length > 50) {
+    throw new AppError('An order can have at most 50 lines.', 400);
+  }
+  for (const i of input.items) {
+    if (!Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > RESELLER_MAX_LINE_QUANTITY) {
+      throw new AppError(
+        `Quantity must be a whole number between 1 and ${RESELLER_MAX_LINE_QUANTITY}.`,
+        400,
+      );
+    }
+    if (!Number.isInteger(i.sellingPrice) || i.sellingPrice < 1) {
+      throw new AppError('Selling price must be a whole number of at least ৳1.', 400);
+    }
+  }
+  const deliveryPaymentMode: ResellerDeliveryPaymentMode =
+    input.deliveryPaymentMode ?? 'with_product';
 
   const [reseller, settings] = await Promise.all([
     ResellerModel.findById(resellerId),
@@ -549,6 +710,12 @@ export async function placeResellerOrder(
   let packagingCost = 0;
   let deliveryCharge = defaultShipping;
 
+  // Total quantity per product across lines, for the inventory check.
+  const qtyByProduct = new Map<string, number>();
+  for (const i of input.items) {
+    qtyByProduct.set(i.productId, (qtyByProduct.get(i.productId) ?? 0) + i.quantity);
+  }
+
   const orderItems = input.items.map((reqItem) => {
     const product = productMap.get(reqItem.productId);
     if (!product) {
@@ -557,11 +724,54 @@ export async function placeResellerOrder(
     if (product.stockStatus === 'out_of_stock') {
       throw new AppError(`"${product.name}" is currently out of stock.`, 400);
     }
-    const qty = Math.max(1, Math.floor(reqItem.quantity));
+    if (
+      product.trackInventory &&
+      (product.stockQuantity ?? 0) < (qtyByProduct.get(reqItem.productId) ?? 0)
+    ) {
+      throw new AppError(
+        (product.stockQuantity ?? 0) <= 0
+          ? `"${product.name}" is currently out of stock.`
+          : `Only ${product.stockQuantity} of "${product.name}" left in stock.`,
+        400,
+      );
+    }
+
+    // Keep only known options; every option needs a valid, in-stock value.
+    const variant: Record<string, string> = {};
+    for (const v of product.variations ?? []) {
+      if (!v.values.length) continue;
+      const chosen = reqItem.variant?.[v.name];
+      if (!chosen || !v.values.includes(chosen)) {
+        throw new AppError(`Please choose a valid ${v.name} for "${product.name}".`, 400);
+      }
+      if ((v.disabledValues ?? []).includes(chosen)) {
+        throw new AppError(`${chosen} (${v.name}) of "${product.name}" is out of stock.`, 400);
+      }
+      variant[v.name] = chosen;
+    }
+
+    const qty = reqItem.quantity;
+    // Always recomputed from the DB — the client's prices are never trusted.
     const unitResellerPrice = getResellerUnitPrice(product);
+    if (
+      reqItem.expectedResellerPrice != null &&
+      reqItem.expectedResellerPrice !== unitResellerPrice
+    ) {
+      throw new AppError(
+        `Price of "${product.name}" changed from ৳${reqItem.expectedResellerPrice} to ৳${unitResellerPrice}. Please review and place the order again.`,
+        409,
+      );
+    }
     if (reqItem.sellingPrice < unitResellerPrice) {
       throw new AppError(
         `Selling price for "${product.name}" (৳${reqItem.sellingPrice}) cannot be lower than reseller price (৳${unitResellerPrice}).`,
+        400,
+      );
+    }
+    const maxSellingPrice = unitResellerPrice * RESELLER_MAX_SELLING_MULTIPLIER;
+    if (reqItem.sellingPrice > maxSellingPrice) {
+      throw new AppError(
+        `Selling price for "${product.name}" (৳${reqItem.sellingPrice}) cannot be higher than ৳${maxSellingPrice}.`,
         400,
       );
     }
@@ -588,9 +798,13 @@ export async function placeResellerOrder(
       slug: product.slug,
       sku: product.sku,
       image: product.images?.[0]?.url,
-      variant: reqItem.variant,
+      variant,
+      // Snapshots taken now: later product price / cost / margin edits never
+      // change this order's money.
       unitPrice: reqItem.sellingPrice,
       supplierPrice: product.supplierPrice ?? 0,
+      resellerPrice: unitResellerPrice,
+      platformMargin: unitResellerPrice - (product.supplierPrice ?? 0),
       quantity: qty,
       lineTotal: lineSellingTotal,
       type: product.type,
@@ -606,6 +820,10 @@ export async function placeResellerOrder(
   }
 
   const expectedResellerProfit = resellerSellingTotal - resellerPriceTotal - packagingCost;
+  // What the courier collects: the delivery charge too, unless the customer
+  // already paid it to the reseller in advance.
+  const codAmount =
+    resellerSellingTotal + (deliveryPaymentMode === 'with_product' ? deliveryCharge : 0);
   const orderNumber = await nextOrderNumber();
 
   const savedOrder = await withTransaction(async (session) => {
@@ -667,6 +885,8 @@ export async function placeResellerOrder(
             expectedResellerProfit,
             profitCredited: false,
             upfrontRefunded: false,
+            deliveryPaymentMode,
+            codAmount,
           },
         },
       ],
@@ -706,8 +926,78 @@ export async function placeResellerOrder(
   return savedOrder;
 }
 
+type SettleSession = Parameters<typeof withTransaction>[0] extends (s: infer S) => unknown
+  ? S
+  : never;
+
+/**
+ * Profit to credit on delivery. Reads ONLY the order's snapshots (never the
+ * current product price). When the courier collected less than the COD
+ * amount fixed at order time, the shortfall comes out of the reseller's
+ * profit; collecting more never credits more than the expected profit.
+ */
+export function computeResellerDeliveryProfit(summary: {
+  expectedResellerProfit: number;
+  codAmount?: number;
+  codCollected?: number;
+}): number {
+  const shortfall =
+    summary.codAmount != null && summary.codCollected != null
+      ? Math.max(0, summary.codAmount - summary.codCollected)
+      : 0;
+  return Math.max(0, Math.round(summary.expectedResellerProfit - shortfall));
+}
+
+/**
+ * Writes one wallet ledger row and moves the balance by `amount` (positive =
+ * credit). The row goes in first: its unique (order, type) index makes a
+ * repeated settlement fail before the balance changes.
+ */
+async function postOrderLedger(
+  order: { _id: unknown; orderNumber: string; reseller?: unknown },
+  type: 'order_profit' | 'order_refund',
+  amount: number,
+  inc: Record<string, number>,
+  note: string,
+  session?: SettleSession,
+): Promise<void> {
+  const txNumber = await nextWalletTxNumber();
+  const [tx] = await WalletTransactionModel.create(
+    [
+      {
+        txNumber,
+        reseller: order.reseller as never,
+        type,
+        direction: 'credit',
+        amount,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        status: 'completed',
+        order: order._id as never,
+        orderNumber: order.orderNumber,
+        note,
+      },
+    ],
+    { session },
+  );
+  const updated = await ResellerModel.findByIdAndUpdate(
+    order.reseller,
+    { $inc: inc },
+    { new: true, session },
+  );
+  if (!updated) throw new AppError('Reseller not found.', 404);
+  if (tx) {
+    tx.balanceBefore = updated.walletBalance - amount;
+    tx.balanceAfter = updated.walletBalance;
+    await tx.save({ session });
+  }
+}
+
 /**
  * Called from `updateOrderStatus` when a reseller order is delivered or cancelled.
+ * Every amount comes from the order's own snapshots, and each settlement is
+ * guarded by an atomic flag flip on the order, so it happens exactly once even
+ * under concurrent status updates.
  */
 export async function settleResellerOrderOnStatusChange(
   order: {
@@ -720,47 +1010,63 @@ export async function settleResellerOrderOnStatusChange(
       expectedResellerProfit: number;
       profitCredited: boolean;
       upfrontRefunded: boolean;
+      codAmount?: number;
+      codCollected?: number;
+      profitCreditedAmount?: number;
     };
   },
   nextStatus: OrderStatus,
   prevStatus: OrderStatus,
-  session?: Parameters<typeof withTransaction>[0] extends (s: infer S) => unknown ? S : never,
+  session?: SettleSession,
+  opts?: { codCollected?: number },
 ): Promise<void> {
-  if (!order.reseller || !order.resellerSummary) return;
+  const summary = order.resellerSummary;
+  if (!order.reseller || !summary) return;
 
-  if (
-    (nextStatus === 'delivered' || nextStatus === 'completed') &&
-    !order.resellerSummary.profitCredited
-  ) {
-    const profit = Math.max(0, order.resellerSummary.expectedResellerProfit);
-    const sales = Math.max(0, order.resellerSummary.resellerSellingTotal);
-    const updatedReseller = await ResellerModel.findByIdAndUpdate(
-      order.reseller,
-      { $inc: { walletBalance: profit, totalProfitEarned: profit, totalSales: sales } },
-      { new: true, session },
+  if ((nextStatus === 'delivered' || nextStatus === 'completed') && !summary.profitCredited) {
+    const codCollected =
+      summary.codAmount != null ? (opts?.codCollected ?? summary.codAmount) : undefined;
+    // Explicit fields: `summary` may be a Mongoose subdocument, whose fields
+    // are getters that an object spread would drop.
+    const profit = computeResellerDeliveryProfit({
+      expectedResellerProfit: summary.expectedResellerProfit,
+      codAmount: summary.codAmount,
+      codCollected,
+    });
+    const sales = Math.max(0, summary.resellerSellingTotal);
+
+    const flip = await OrderModel.updateOne(
+      { _id: order._id as never, 'resellerSummary.profitCredited': { $ne: true } },
+      {
+        $set: {
+          'resellerSummary.profitCredited': true,
+          'resellerSummary.profitCreditedAmount': profit,
+          ...(codCollected != null ? { 'resellerSummary.codCollected': codCollected } : {}),
+        },
+      },
+      { session },
     );
-    if (updatedReseller && profit > 0) {
-      const txNumber = await nextWalletTxNumber();
-      await WalletTransactionModel.create(
-        [
-          {
-            txNumber,
-            reseller: order.reseller as never,
-            type: 'order_profit',
-            direction: 'credit',
-            amount: profit,
-            balanceBefore: updatedReseller.walletBalance - profit,
-            balanceAfter: updatedReseller.walletBalance,
-            status: 'completed',
-            order: order._id as never,
-            orderNumber: order.orderNumber,
-            note: `Profit credited for delivered order ${order.orderNumber}`,
-          },
-        ],
-        { session },
-      );
+    if (flip.modifiedCount === 1) {
+      if (profit > 0) {
+        await postOrderLedger(
+          order,
+          'order_profit',
+          profit,
+          { walletBalance: profit, totalProfitEarned: profit, totalSales: sales },
+          `Profit credited for delivered order ${order.orderNumber}`,
+          session,
+        );
+      } else {
+        await ResellerModel.updateOne(
+          { _id: order.reseller },
+          { $inc: { totalSales: sales } },
+          { session },
+        );
+      }
     }
-    order.resellerSummary.profitCredited = true;
+    summary.profitCredited = true;
+    summary.profitCreditedAmount = profit;
+    if (codCollected != null) summary.codCollected = codCollected;
   }
 
   if (
@@ -769,37 +1075,26 @@ export async function settleResellerOrderOnStatusChange(
     prevStatus !== 'delivered' &&
     prevStatus !== 'completed' &&
     prevStatus !== 'returned' &&
-    !order.resellerSummary.upfrontRefunded &&
-    order.resellerSummary.upfrontDeducted > 0
+    !summary.upfrontRefunded &&
+    summary.upfrontDeducted > 0
   ) {
-    const refund = order.resellerSummary.upfrontDeducted;
-    const updatedReseller = await ResellerModel.findByIdAndUpdate(
-      order.reseller,
-      { $inc: { walletBalance: refund } },
-      { new: true, session },
+    const refund = summary.upfrontDeducted;
+    const flip = await OrderModel.updateOne(
+      { _id: order._id as never, 'resellerSummary.upfrontRefunded': { $ne: true } },
+      { $set: { 'resellerSummary.upfrontRefunded': true } },
+      { session },
     );
-    if (updatedReseller) {
-      const txNumber = await nextWalletTxNumber();
-      await WalletTransactionModel.create(
-        [
-          {
-            txNumber,
-            reseller: order.reseller as never,
-            type: 'order_refund',
-            direction: 'credit',
-            amount: refund,
-            balanceBefore: updatedReseller.walletBalance - refund,
-            balanceAfter: updatedReseller.walletBalance,
-            status: 'completed',
-            order: order._id as never,
-            orderNumber: order.orderNumber,
-            note: `Delivery & packaging refunded for cancelled order ${order.orderNumber}`,
-          },
-        ],
-        { session },
+    if (flip.modifiedCount === 1) {
+      await postOrderLedger(
+        order,
+        'order_refund',
+        refund,
+        { walletBalance: refund },
+        `Delivery & packaging refunded for cancelled order ${order.orderNumber}`,
+        session,
       );
     }
-    order.resellerSummary.upfrontRefunded = true;
+    summary.upfrontRefunded = true;
   }
 }
 
@@ -966,6 +1261,8 @@ export async function listResellerOrders(
         name: i.name,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
+        sellingPrice: i.unitPrice,
+        resellerPrice: i.resellerPrice ?? null,
         lineTotal: i.lineTotal,
         image: i.image ?? null,
         variant: i.variant ?? null,
@@ -995,12 +1292,31 @@ export async function getResellerOrderDetail(resellerId: string, orderId: string
     paymentStatus: order.paymentStatus,
     customer: order.customer,
     shippingAddress: order.shippingAddress,
-    items: order.items,
+    // Explicit fields only: supplier cost, supplier links and platform margin
+    // are admin-only and must never reach the reseller.
+    items: order.items.map((i) => ({
+      _id: String(i._id),
+      product: String(i.product),
+      name: i.name,
+      slug: i.slug,
+      image: i.image ?? null,
+      sku: i.sku ?? null,
+      variant: i.variant ?? {},
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      sellingPrice: i.unitPrice,
+      resellerPrice: i.resellerPrice ?? null,
+      lineTotal: i.lineTotal,
+    })),
     subtotal: order.subtotal,
     shippingFee: order.shippingFee,
     total: order.total,
     resellerSummary: order.resellerSummary ?? null,
-    statusHistory: order.statusHistory,
+    statusHistory: order.statusHistory.map((h) => ({
+      status: h.status,
+      note: h.note ?? null,
+      at: h.at,
+    })),
     supplierTracking: supplierOrders.map((s) => ({
       productName: s.productName,
       status: s.status,
@@ -1117,11 +1433,27 @@ export async function getAdminResellerDetail(id: string) {
   return { reseller, orders, transactions, tickets, changeLogs };
 }
 
+export async function getResellerWithdrawalFeeTiers(): Promise<ResellerWithdrawalFeeTier[]> {
+  await connectDB();
+  const s = await SettingsModel.findOne({}, 'resellerWithdrawalFeeTiers').lean();
+  return (s?.resellerWithdrawalFeeTiers ?? [])
+    .map((t) => ({ minAmount: t.minAmount, fee: t.fee }))
+    .sort((a, b) => a.minAmount - b.minAmount);
+}
+
+/** Invalidates every token issued to this reseller so far. */
+export async function revokeResellerTokens(resellerId: string): Promise<void> {
+  await connectDB();
+  await ResellerModel.updateOne({ _id: resellerId }, { $inc: { tokenVersion: 1 } });
+}
+
 export async function toggleResellerActive(resellerId: string, isActive: boolean) {
   await connectDB();
   const updated = await ResellerModel.findByIdAndUpdate(
     resellerId,
-    { $set: { isActive } },
+    // Suspending also revokes existing tokens, so re-activating later doesn't
+    // bring old (possibly leaked) tokens back to life.
+    isActive ? { $set: { isActive } } : { $set: { isActive }, $inc: { tokenVersion: 1 } },
     { new: true },
   );
   if (!updated) throw new AppError('Reseller not found.', 404);

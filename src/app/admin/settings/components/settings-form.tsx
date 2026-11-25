@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { saveSettingsAction } from '@/actions/admin';
 import type { SettingsDTO } from '@/types';
 import { Form, FormCurrency, FormInput, FormSwitch, FormTextarea } from '@components/form';
+import { Icon } from '@components/icon/icon';
 import { FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
+import { MIN_RESELLER_WITHDRAWAL } from '@lib/constants';
 import { type SettingsInput, settingsSchema } from '@lib/validators/settings';
 
 export function SettingsForm({ settings }: { settings: SettingsDTO }) {
@@ -118,6 +120,54 @@ export function SettingsForm({ settings }: { settings: SettingsDTO }) {
               rows={3}
             />
           </div>
+        </FormSection>
+      </Panel>
+
+      <Panel>
+        <FormSection
+          title="Reseller withdrawal fees"
+          icon="money"
+          description={`Charged on reseller withdrawals; the tier with the highest “from” amount that fits applies. Every fee must be less than the minimum withdrawal (৳${MIN_RESELLER_WITHDRAWAL}). No tiers = no fee.`}
+        >
+          <Form.List name="resellerWithdrawalFeeTiers">
+            {(fields, { add, remove }) => (
+              <div className="space-y-3">
+                {fields.map((f) => (
+                  <div
+                    key={f.key}
+                    className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                  >
+                    <FormCurrency name={[f.name, 'minAmount']} label="From amount" required />
+                    <FormCurrency name={[f.name, 'fee']} label="Fee" required />
+                    <div className="flex flex-col gap-1.5">
+                      <span aria-hidden className="type-label invisible hidden sm:block">
+                        Remove
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove fee tier"
+                        onClick={() => remove(f.name)}
+                      >
+                        <Icon name="trash" size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {fields.length < 10 && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => add({ minAmount: MIN_RESELLER_WITHDRAWAL, fee: 0 })}
+                  >
+                    <Icon name="plus" size={14} /> Add fee tier
+                  </Button>
+                )}
+              </div>
+            )}
+          </Form.List>
         </FormSection>
       </Panel>
 

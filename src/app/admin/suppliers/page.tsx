@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 
 import { listSuppliers } from '@/services/catalog';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 
 import { SuppliersManager } from './components/suppliers-manager';
 
 export const metadata: Metadata = { title: 'Suppliers' };
 
 export default async function SuppliersPage() {
+  await requireAdminPage();
   const suppliers = await listSuppliers();
   return (
     <>

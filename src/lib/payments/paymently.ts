@@ -172,7 +172,9 @@ export function verifyWebhookSignature(headerApiKey: string | null): boolean {
 }
 
 function getTokenSecret(): string {
-  return process.env.AUTH_SECRET?.trim() || 'dev-payment-token-secret';
+  const secret = process.env.AUTH_SECRET?.trim();
+  if (!secret) throw new Error('AUTH_SECRET is required to sign payment tokens.');
+  return secret;
 }
 
 export function signOrderPaymentToken(orderId: string, orderNumber: string): string {

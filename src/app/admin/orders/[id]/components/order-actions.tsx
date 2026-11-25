@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { updateOrderMetaAction, updateOrderStatusAction } from '@/actions/admin';
 import { Taka } from '@/features/products/price';
 import type { OrderDTO } from '@/types';
+import { FieldMessage } from '@components/form/form-item';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog } from '@components/shared';
 import { Button } from '@components/ui/button';
@@ -89,9 +90,21 @@ export function OrderActions({ order }: { order: OrderDTO }) {
         ? 'Paid'
         : 'Refunded';
 
+  const codAmount = order.platform === 'reseller' ? order.resellerSummary?.codAmount : undefined;
+  const [codCollected, setCodCollected] = React.useState(
+    codAmount != null ? String(codAmount) : '',
+  );
+
   const move = async (status: OrderStatus) => {
     setBusy(true);
-    const res = await updateOrderStatusAction({ orderId: order.id, status, note });
+    const res = await updateOrderStatusAction({
+      orderId: order.id,
+      status,
+      note,
+      ...(status === 'delivered' && codAmount != null && codCollected.trim() !== ''
+        ? { codCollected: Number(codCollected) }
+        : {}),
+    });
     setBusy(false);
     setConfirm(null);
     if (handleActionResult(res)) {
@@ -124,6 +137,25 @@ export function OrderActions({ order }: { order: OrderDTO }) {
               rows={2}
               placeholder="Note (optional, e.g. courier, tracking #, or reason)"
             />
+            {effectiveStatus === 'delivered' && codAmount != null && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="cod-collected" className="type-label text-ink">
+                  COD collected by courier (৳)
+                </label>
+                <Input
+                  id="cod-collected"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={codCollected}
+                  onChange={(e) => setCodCollected(e.target.value)}
+                />
+                <FieldMessage>
+                  Expected ৳{codAmount}. If less was collected, the shortfall is deducted from the
+                  reseller&apos;s profit.
+                </FieldMessage>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {effectiveStatus && (
                 <Button

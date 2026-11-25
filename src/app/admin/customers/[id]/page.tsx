@@ -8,6 +8,7 @@ import { Taka } from '@/features/products/price';
 import { listCustomerOrders } from '@/services/orders';
 import { getCustomerDetail } from '@/services/users';
 import { PageHeader, StatCard, StatCardGrid } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { SHIPPING_ZONE_LABELS } from '@lib/constants';
 import { formatStoreDate, formatStoreDateTime } from '@lib/utils';
 import { objectId } from '@lib/validators/common';
@@ -18,6 +19,7 @@ import { CustomerStatusToggle } from './components/customer-status-toggle';
 export const metadata: Metadata = { title: 'Customer' };
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage();
   const { id } = await params;
   if (!objectId.safeParse(id).success) notFound();
   const [customer, orders] = await Promise.all([getCustomerDetail(id), listCustomerOrders(id)]);

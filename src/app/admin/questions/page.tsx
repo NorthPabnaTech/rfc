@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { listAdminQuestions } from '@/services/engagement';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
@@ -14,6 +15,7 @@ export default async function QuestionsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const state = param(sp, 'state');
   const data = await listAdminQuestions({

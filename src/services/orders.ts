@@ -49,8 +49,8 @@ import {
   notifyAdminsOrderPlaced,
   notifyCustomerOrderStatus,
 } from './notifications';
-import { getSettings } from './settings';
 import { settleResellerOrderOnStatusChange } from './resellers';
+import { getSettings } from './settings';
 import { createSupplierOrdersForOrder } from './supplier-orders';
 
 /* ─── Pricing ────────────────────────────────────────────────────────────── */
@@ -590,11 +590,13 @@ export async function getOrderConfirmation(orderNumber: string) {
   await connectDB();
   const doc = await OrderModel.findOne(
     { orderNumber },
-    'orderNumber total createdAt customer.name items.quantity status paymentMethod paymentStatus gatewayPaymentMethod paymentGateway',
+    'orderNumber total createdAt customer.name items.quantity status paymentMethod paymentStatus gatewayPaymentMethod paymentGateway user',
   ).lean();
   if (!doc) return null;
   return {
     id: String(doc._id),
+    /** Owner account id — for the page's access check only; never render it. */
+    userId: doc.user ? String(doc.user) : null,
     orderNumber: doc.orderNumber,
     total: doc.total,
     firstName: doc.customer.name.split(' ')[0] ?? '',
@@ -628,6 +630,8 @@ export async function updateOrderStatus(
     returnItems?: { orderItemId: string; quantity: number; restock: boolean }[];
     customerPaidDelivery?: boolean;
     returnDeliveryExpenseAmount?: number;
+    /** Reseller orders: what the courier actually collected (defaults to the COD amount). */
+    codCollected?: number;
   },
 ): Promise<void> {
   await connectDB();
@@ -783,7 +787,9 @@ export async function updateOrderStatus(
       }
     }
 
-    await settleResellerOrderOnStatusChange(order, next, prevStatus, session);
+    await settleResellerOrderOnStatusChange(order, next, prevStatus, session, {
+      codCollected: opts?.codCollected,
+    });
 
     await order.save({ session });
     return order;

@@ -6,6 +6,7 @@ import { countOrdersByStatus, listAdminOrders } from '@/services/orders';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { requireAdminPage } from '@lib/auth/current-user';
 import {
   ORDER_PLATFORM_LABELS,
   ORDER_PLATFORMS,
@@ -25,6 +26,7 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const status = ORDER_STATUSES.find((s) => s === param(sp, 'status'));
   const platform = ORDER_PLATFORMS.find((p) => p === param(sp, 'platform') && p !== 'reseller');

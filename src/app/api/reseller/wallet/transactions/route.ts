@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 
+import { listResellerTransactions } from '@/services/resellers';
 import {
   requireReseller,
   resellerError,
@@ -7,7 +8,6 @@ import {
   resellerOptionsResponse,
 } from '@lib/auth/reseller-auth';
 import type { WalletTxStatus, WalletTxType } from '@lib/constants';
-import { listResellerTransactions } from '@/services/resellers';
 
 export function OPTIONS() {
   return resellerOptionsResponse();

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { listMediaAssets } from '@/services/media';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { UPLOAD_FOLDERS, type UploadPurpose } from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
@@ -17,6 +18,7 @@ export default async function MediaLibraryPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const purposeParam = param(sp, 'purpose');
   const purpose = PURPOSES.find((p) => p === purposeParam);

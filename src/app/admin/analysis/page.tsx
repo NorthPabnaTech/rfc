@@ -4,6 +4,7 @@ import { getAnalysisDashboard } from '@/services/analytics';
 import { listBusinesses } from '@/services/businesses';
 import type { AnalysisPeriod } from '@/types';
 import { PageHeader, StatCard, StatCardGrid } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { param, type SearchParams } from '@lib/search-params';
 import { formatNumber } from '@lib/utils';
 
@@ -24,6 +25,7 @@ export default async function AnalysisPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const rawPeriod = param(sp, 'period');
   const period: AnalysisPeriod = VALID_PERIODS.find((p) => p === rawPeriod) ?? 'all';

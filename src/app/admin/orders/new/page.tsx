@@ -3,12 +3,14 @@ import type { Metadata } from 'next';
 import { listBusinesses } from '@/services/businesses';
 import { getSettings } from '@/services/settings';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 
 import { ManualOrderForm } from './components/manual-order-form';
 
 export const metadata: Metadata = { title: 'Create order' };
 
 export default async function NewOrderPage() {
+  await requireAdminPage();
   const [settings, businesses] = await Promise.all([
     getSettings(),
     listBusinesses({ activeOnly: true }),

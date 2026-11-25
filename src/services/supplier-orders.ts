@@ -146,7 +146,12 @@ export async function createSupplierOrdersForOrder(order: Order): Promise<void> 
         supplier.deliveryCharges?.outsideDhaka ??
         130);
     const deliveryPaidByCustomer = orderShippingFee >= deliveryCharge && deliveryCharge > 0;
-    const deliveryPaidUpfront = deliveryPaidByCustomer && order.paymentStatus === 'paid';
+    // Paid upfront: online payment, or a reseller order whose customer paid
+    // the delivery charge to the reseller in advance.
+    const deliveryPaidUpfront =
+      deliveryPaidByCustomer &&
+      (order.paymentStatus === 'paid' ||
+        order.resellerSummary?.deliveryPaymentMode === 'advance');
     const costPrice = product.supplierPrice * item.quantity;
     const packagingCost = (product.supplierPackagingCost ?? 0) * item.quantity;
     const baseSellingPrice =

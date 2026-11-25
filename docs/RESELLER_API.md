@@ -14,7 +14,7 @@ This document describes the REST API exposed by **RFC Gadget (`rfc-web`)** for y
 
 - **Base URL (Local Dev):** `http://localhost:3000/api/reseller`
 - **Base URL (Production):** `https://your-rfc-domain.com/api/reseller`
-- **CORS:** All `/api/reseller/*` endpoints support `OPTIONS` preflight and CORS headers. Set `RESELLER_ALLOWED_ORIGIN` in `rfc-web`'s `.env` (defaults to `*`).
+- **CORS:** All `/api/reseller/*` endpoints support `OPTIONS` preflight and CORS headers. Set `RESELLER_ALLOWED_ORIGIN` in `rfc-web`'s `.env` (CORS defaults to `*`). Google sign-in only redirects the token to origins in `RESELLER_ALLOWED_ORIGIN` / `RESELLER_SITE_CALLBACK_URL` (plus localhost in development).
 - **Authentication Header:**
   ```http
   Authorization: Bearer <token>
@@ -469,3 +469,42 @@ Use the `chart` array directly with Recharts / Chart.js on the Reseller Dashboar
   "message": "Thank you, please update me once dispatched."
 }
 ```
+
+---
+
+## Changelog — money & auth hardening
+
+**`POST /wallet/deposit`**
+- Paymently deposits: send `{ "invoiceId": "<paymently invoice_id>" }` only.
+  - The server verifies the invoice with Paymently and credits the amount the gateway returns.
+  - It credits only if all of these hold:
+    - status is `COMPLETED`;
+    - `metadata.type === "wallet_deposit"`;
+    - `metadata.resellerId` is the signed-in reseller (the `id` from `GET /auth/me`);
+    - the paid amount equals `metadata.amount`.
+  - Response: `201` for a new credit. If the invoice was already credited, the response is `200` with the existing deposit and `alreadyCredited: true`.
+  - Extra response fields: `invoiceId`, `walletBalance`, `alreadyCredited`.
+- `{ amount, paymentMethod, paymentReference, note }` without `invoiceId` still works, but it only creates a **pending** request that an admin must approve. `amount` must now be a whole number.
+- Create the Paymently invoice with:
+  - `metadata: { type: "wallet_deposit", resellerId, amount }`;
+  - `webhook_url: <rfc-web>/api/reseller/wallet/deposit/webhook`, so the wallet is credited even if the tab closes. It uses the same `UDDOKTA_PAY_API_KEY` account.
+
+**`POST /orders`**
+- `items[].quantity` and `items[].sellingPrice` must be whole numbers.
+- New optional `items[].expectedResellerPrice`. If it differs from the current reseller price, the server returns `409` with "Price of … changed from ৳X to ৳Y".
+- New `deliveryPaymentMode: "with_product" | "advance"`, default `with_product`. It replaces the free-text note: COD is selling total + delivery, or the selling total only when `advance`.
+- Any client-sent delivery or packaging charge or zone is ignored.
+- New `resellerSummary` fields: `deliveryPaymentMode`, `codAmount`, `codCollected`, `profitCreditedAmount`.
+- Order items now carry `sellingPrice` and `resellerPrice` (snapshots).
+- `GET /orders/:id` no longer returns supplier cost, supplier links, platform margin or admin ids in `items` and `statusHistory`.
+- Profit on delivery is `expectedResellerProfit − max(0, codAmount − codCollected)`, taken from the order's own snapshots.
+
+**`POST /wallet/withdraw`**
+- `amount` must be a whole number.
+- The fee comes from admin settings. The response includes `fee` and `netAmount`, and so do transaction rows.
+- `GET /wallet` returns `withdrawalFeeTiers` for display.
+
+**Auth**
+- New `POST /auth/logout`. It revokes all of the account's tokens.
+- Suspension also revokes tokens. Tokens carry a `ver` claim that is checked on every request.
+- Google sign-in endpoints are rate-limited per IP.

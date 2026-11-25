@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { listReturns } from '@/services/returns';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { RETURN_STATUS_LABELS, RETURN_STATUSES } from '@lib/constants';
 import { pageParam, param, type SearchParams } from '@lib/search-params';
 
@@ -15,6 +16,7 @@ export default async function ReturnsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const data = await listReturns({
     status: RETURN_STATUSES.find((s) => s === param(sp, 'status')),

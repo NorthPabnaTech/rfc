@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
+import { requestResellerWithdrawal } from '@/services/resellers';
 import {
   requireReseller,
   resellerError,
@@ -9,11 +10,11 @@ import {
 } from '@lib/auth/reseller-auth';
 import { MIN_RESELLER_WITHDRAWAL } from '@lib/constants';
 import { AppError } from '@lib/errors';
-import { requestResellerWithdrawal } from '@/services/resellers';
 
 const withdrawSchema = z.object({
   amount: z
     .number()
+    .int('Amount must be a whole number.')
     .min(MIN_RESELLER_WITHDRAWAL, `Minimum withdrawal is ৳${MIN_RESELLER_WITHDRAWAL}.`),
   payoutMethod: z.string().trim().min(2).max(40),
   payoutAccount: z.string().trim().min(4).max(200),
@@ -50,6 +51,8 @@ export async function POST(req: NextRequest) {
           id: String(tx._id),
           txNumber: tx.txNumber,
           amount: tx.amount,
+          fee: tx.fee ?? 0,
+          netAmount: tx.netAmount ?? tx.amount,
           status: tx.status,
           payoutMethod: tx.payoutMethod,
           payoutAccount: tx.payoutAccount,

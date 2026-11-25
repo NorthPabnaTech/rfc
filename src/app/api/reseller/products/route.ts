@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 
+import { listResellerCatalog } from '@/services/resellers';
 import {
   getOptionalReseller,
   resellerError,
   resellerJson,
   resellerOptionsResponse,
 } from '@lib/auth/reseller-auth';
-import { listResellerCatalog } from '@/services/resellers';
 
 export function OPTIONS() {
   return resellerOptionsResponse();

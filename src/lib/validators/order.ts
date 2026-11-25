@@ -90,6 +90,11 @@ export const updateOrderStatusSchema = z.object({
   returnItems: z.array(returnItemInputSchema).optional(),
   customerPaidDelivery: z.boolean().optional(),
   returnDeliveryExpenseAmount: money('Delivery expense amount').optional(),
+  /** Reseller orders marked delivered: amount the courier actually collected. */
+  codCollected: z
+    .union([money('COD collected'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
 });
 
 export const updateOrderMetaSchema = z.object({

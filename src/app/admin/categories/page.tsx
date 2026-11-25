@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 
 import { listCategories } from '@/services/catalog';
 import { PageHeader } from '@components/shared';
+import { requireAdminPage } from '@lib/auth/current-user';
 
 import { CategoriesManager } from './components/categories-manager';
 
 export const metadata: Metadata = { title: 'Categories' };
 
 export default async function CategoriesPage() {
+  await requireAdminPage();
   const categories = await listCategories();
   return (
     <>

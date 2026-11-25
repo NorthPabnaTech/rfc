@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
 
 import { serverEnv } from '@lib/env';
+import { safeRedirectPath } from '@lib/safe-redirect';
 
 const STATE_COOKIE = 'rfc_google_state';
 const NEXT_COOKIE = 'rfc_google_next';
@@ -12,8 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   const state = randomBytes(24).toString('hex');
-  const next = req.nextUrl.searchParams.get('next');
-  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '';
+  const safeNext = safeRedirectPath(req.nextUrl.searchParams.get('next')) ?? '';
 
   const redirectUri = `${req.nextUrl.origin}/api/auth/google/callback`;
   const params = new URLSearchParams({

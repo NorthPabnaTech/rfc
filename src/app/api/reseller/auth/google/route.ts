@@ -1,8 +1,13 @@
 import { randomBytes } from 'node:crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { clientIpFrom, enforceRateLimit } from '@/services/rate-limit';
+import { findOrCreateGoogleReseller } from '@/services/resellers';
 import {
+  DEFAULT_RESELLER_CALLBACK_URL,
+  isAllowedResellerRedirect,
   resellerError,
   resellerJson,
   resellerOptionsResponse,
@@ -10,23 +15,9 @@ import {
 } from '@lib/auth/reseller-auth';
 import { serverEnv } from '@lib/env';
 import { AppError } from '@lib/errors';
-import { findOrCreateGoogleReseller } from '@/services/resellers';
 
 const STATE_COOKIE = 'rfc_reseller_google_state';
 const REDIRECT_COOKIE = 'rfc_reseller_google_redirect';
-
-function isAllowedRedirectUri(uri: string): boolean {
-  try {
-    const parsed = new URL(uri);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-    const allowed = process.env.RESELLER_ALLOWED_ORIGIN;
-    if (!allowed || allowed === '*') return true;
-    const origins = allowed.split(',').map((o) => o.trim());
-    return origins.includes(parsed.origin);
-  } catch {
-    return false;
-  }
-}
 
 export function OPTIONS() {
   return resellerOptionsResponse();
@@ -39,12 +30,16 @@ export function OPTIONS() {
  */
 export async function GET(req: NextRequest) {
   const redirectUriParam =
-    req.nextUrl.searchParams.get('redirect_uri') ||
-    process.env.RESELLER_SITE_CALLBACK_URL ||
-    'http://localhost:3001/auth/callback';
+    req.nextUrl.searchParams.get('redirect_uri') || DEFAULT_RESELLER_CALLBACK_URL;
 
-  if (!isAllowedRedirectUri(redirectUriParam)) {
+  if (!isAllowedResellerRedirect(redirectUriParam)) {
     return resellerError('Invalid redirect_uri.', 400);
+  }
+  try {
+    await enforceRateLimit('resellerAuth', `ip:${clientIpFrom(req.headers)}`);
+  } catch (err) {
+    if (err instanceof AppError) return resellerError(err.message, err.status);
+    throw err;
   }
 
   if (!serverEnv.GOOGLE_CLIENT_ID || !serverEnv.GOOGLE_CLIENT_SECRET) {
@@ -93,6 +88,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await enforceRateLimit('resellerAuth', `ip:${clientIpFrom(req.headers)}`);
     const body = await req.json();
     const parsed = idTokenSchema.safeParse(body);
     if (!parsed.success) {
@@ -115,7 +111,8 @@ export async function POST(req: NextRequest) {
       !verifyRes.ok ||
       info.aud !== serverEnv.GOOGLE_CLIENT_ID ||
       !info.sub ||
-      !info.email
+      !info.email ||
+      String(info.email_verified) !== 'true'
     ) {
       return resellerError('Invalid Google token.', 401);
     }
@@ -126,7 +123,7 @@ export async function POST(req: NextRequest) {
       name: info.name,
       avatarUrl: info.picture,
     });
-    const token = await signResellerToken(String(reseller._id));
+    const token = await signResellerToken(reseller);
 
     return resellerJson({
       ok: true,

@@ -6,6 +6,7 @@ import { getAdminCombo } from '@/services/combos';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
+import { requireAdminPage } from '@lib/auth/current-user';
 import { objectId } from '@lib/validators/common';
 
 import { ComboForm } from '../../components/combo-form';
@@ -13,6 +14,7 @@ import { ComboForm } from '../../components/combo-form';
 export const metadata: Metadata = { title: 'Edit combo' };
 
 export default async function EditComboPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage();
   const { id } = await params;
   if (!objectId.safeParse(id).success) notFound();
   const combo = await getAdminCombo(id);

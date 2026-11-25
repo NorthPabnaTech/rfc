@@ -1,5 +1,7 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
+import type { ResellerWithdrawalFeeTier } from '@lib/constants';
+
 import { baseSchemaOptions, defineModel } from './shared';
 
 /**
@@ -29,6 +31,8 @@ export interface Settings {
     whatsapp?: string;
     youtube?: string;
   };
+  /** Reseller withdrawal fee tiers (empty = no fee). */
+  resellerWithdrawalFeeTiers: ResellerWithdrawalFeeTier[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +89,18 @@ const settingsSchema = new Schema<Settings>(
       tiktok: { type: String, trim: true },
       whatsapp: { type: String, trim: true },
       youtube: { type: String, trim: true },
+    },
+    resellerWithdrawalFeeTiers: {
+      type: [
+        new Schema<ResellerWithdrawalFeeTier>(
+          {
+            minAmount: { type: Number, required: true, min: 0 },
+            fee: { type: Number, required: true, min: 0 },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
   },
   baseSchemaOptions,
