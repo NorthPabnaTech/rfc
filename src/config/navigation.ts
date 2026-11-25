@@ -25,10 +25,7 @@ export const SELLER_NAV: NavGroup[] = [
   },
   {
     label: 'nav.groups.catalog',
-    items: [
-      { label: 'nav.products', href: '/seller/products', icon: 'box' },
-      { label: 'nav.categories', href: '/seller/categories', icon: 'layers' },
-    ],
+    items: [{ label: 'nav.products', href: '/seller/products', icon: 'box' }],
   },
   {
     label: 'nav.groups.sales',
@@ -41,27 +38,18 @@ export const SELLER_NAV: NavGroup[] = [
   {
     label: 'nav.groups.wallet',
     items: [
-      { label: 'nav.walletOverview', href: '/seller/wallet', icon: 'wallet', exact: true },
-      { label: 'nav.addBalance', href: '/seller/wallet/add-balance', icon: 'moneyAdd' },
-      { label: 'nav.withdraw', href: '/seller/wallet/withdraw', icon: 'moneySend' },
+      { label: 'nav.walletOverview', href: '/seller/wallet', icon: 'wallet' },
       { label: 'nav.transactions', href: '/seller/wallet/transactions', icon: 'exchange' },
       { label: 'nav.earnings', href: '/seller/wallet/earnings', icon: 'moneyBag' },
     ],
   },
   {
     label: 'nav.groups.support',
-    items: [
-      { label: 'nav.help', href: '/seller/support', icon: 'support', exact: true },
-      { label: 'nav.telegramSupport', href: '/seller/support/telegram', icon: 'telegram' },
-      { label: 'nav.telegramCommunity', href: '/seller/support/community', icon: 'users' },
-    ],
+    items: [{ label: 'nav.help', href: '/seller/support', icon: 'support' }],
   },
   {
     label: 'nav.groups.account',
-    items: [
-      { label: 'nav.profile', href: '/seller/profile', icon: 'userCircle' },
-      { label: 'nav.settings', href: '/seller/settings', icon: 'settings' },
-    ],
+    items: [{ label: 'nav.profile', href: '/seller/profile', icon: 'userCircle' }],
   },
 ];
 

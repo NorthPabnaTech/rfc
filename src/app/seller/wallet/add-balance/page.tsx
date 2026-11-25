@@ -2,11 +2,10 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useI18n } from '@/i18n/provider';
-import { useCurrentSeller, usePlatformStore, useWallet } from '@/stores/platform-store';
-import type { PaymentMethod } from '@/types/platform';
+import { useResellerAuth } from '@/stores/reseller-auth';
 import { Panel } from '@components/dashboard/panel';
 import { Icon } from '@components/icon/icon';
 import { Money } from '@components/platform/money';
@@ -14,11 +13,11 @@ import { StatusPill } from '@components/platform/status-pill';
 import { Callout, ConfirmDialog, PageHeader } from '@components/shared';
 import { CurrencyInput } from '@components/shared/numeric-format-input';
 import { Button } from '@components/ui/button';
-import { Input } from '@components/ui/input';
+import { resellerApi, type DepositResponse } from '@lib/api/reseller';
+import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
-import { BD_PHONE } from '@lib/validators/reseller';
 
-import { MethodPicker } from '../components/method-picker';
+import { useSellerTransactions, useSellerWallet } from '../../components/use-seller-data';
 
 const QUICK = [200, 500, 1000, 2000, 5000];
 
@@ -32,37 +31,144 @@ export default function AddBalancePage() {
 
 function AddBalance() {
   const { t, money, dateTime } = useI18n();
+  const router = useRouter();
   const params = useSearchParams();
-  const seller = useCurrentSeller();
-  const wallet = useWallet(seller?.id);
-  const { settings, addBalance, deposits } = usePlatformStore();
+  const reseller = useResellerAuth((s) => s.reseller);
+  const refreshMe = useResellerAuth((s) => s.refreshMe);
+  const { wallet, reload: reloadWallet } = useSellerWallet();
+  const { items: recentDeposits, reload: reloadTx } = useSellerTransactions({
+    page: 1,
+    limit: 5,
+    type: 'deposit',
+  });
+
   const [amount, setAmount] = React.useState<number | undefined>(
     Number(params.get('amount')) || undefined,
   );
-  const [method, setMethod] = React.useState<PaymentMethod>('bkash');
-  const [sender, setSender] = React.useState('');
-  const [trx, setTrx] = React.useState('');
   const [touched, setTouched] = React.useState(false);
-  const [confirm, setConfirm] = React.useState(false);
-  const [done, setDone] = React.useState<{ id: string; amount: number } | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [verifying, setVerifying] = React.useState(false);
+  const [cancelledOpen, setCancelledOpen] = React.useState(false);
+  const [done, setDone] = React.useState<DepositResponse | null>(null);
 
+  const paymentlyStatus = params.get('paymently');
+  const invoiceId = params.get('invoice_id');
+
+  React.useEffect(() => {
+    if (paymentlyStatus === 'cancelled') {
+      setCancelledOpen(true);
+      router.replace('/seller/wallet/add-balance');
+      return;
+    }
+    if (paymentlyStatus !== 'success' || !invoiceId) return;
+    const processedKey = `paymently_deposit_${invoiceId}`;
+    if (typeof window !== 'undefined' && sessionStorage.getItem(processedKey)) return;
+
+    let active = true;
+    setVerifying(true);
+    fetch('/api/payments/paymently/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceId }),
+    })
+      .then((r) => r.json())
+      .then(async (json) => {
+        if (!active) return;
+        if (!json.ok || !json.data) {
+          throw new Error(json.error || 'Could not verify payment.');
+        }
+        const v = json.data as {
+          status: string;
+          amount: number;
+          invoiceId: string;
+          transactionId?: string;
+          paymentMethod?: string;
+          senderNumber?: string;
+        };
+        if (v.status !== 'COMPLETED') {
+          throw new Error(`Payment is ${v.status.toLowerCase()}. Please wait or try again.`);
+        }
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(processedKey, '1');
+        }
+        const res = await resellerApi.deposit({
+          amount: v.amount,
+          paymentMethod: (v.paymentMethod || 'bkash').toLowerCase(),
+          paymentReference: v.transactionId || v.invoiceId,
+          note: [
+            'Paid via Paymently',
+            v.senderNumber ? `From ${v.senderNumber}` : '',
+            `Invoice ${v.invoiceId}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        });
+        if (!active) return;
+        setDone(res);
+        await Promise.all([refreshMe(), reloadWallet(), reloadTx()]);
+        toast.success(t('seller.wallet.addSuccess'));
+      })
+      .catch((err) => {
+        if (!active) return;
+        toast.error(err instanceof Error ? err.message : t('common.somethingWrong'));
+      })
+      .finally(() => {
+        if (active) setVerifying(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paymentlyStatus, invoiceId, refreshMe, reloadWallet, reloadTx, router, t]);
+
+  const minDeposit = wallet.minDeposit || 100;
   const value = amount ?? 0;
-  const errors = {
-    amount:
-      value < settings.minAddBalance
-        ? t('seller.wallet.minAdd', { amount: money(settings.minAddBalance) })
-        : null,
-    sender: method !== 'bank' && !BD_PHONE.test(sender) ? t('common.invalidPhone') : null,
-    trx: trx.trim().length < 4 ? t('common.required') : null,
+  const amountError =
+    value < minDeposit ? t('seller.wallet.minAdd', { amount: money(minDeposit) }) : null;
+
+  const startOnlinePayment = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/payments/paymently/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: value,
+          fullName: reseller?.name || 'Reseller',
+          email: reseller?.email || 'reseller@example.com',
+          resellerId: reseller?.id || '',
+        }),
+      });
+      const json = (await res.json()) as { ok?: boolean; paymentUrl?: string; error?: string };
+      if (!res.ok || !json.ok || !json.paymentUrl) {
+        throw new Error(json.error || 'Could not start online payment.');
+      }
+      window.location.href = json.paymentUrl;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('common.somethingWrong'));
+      setSubmitting(false);
+    }
   };
-  const valid = !errors.amount && !errors.sender && !errors.trx;
-  const mine = deposits.filter((d) => d.sellerId === seller?.id).slice(0, 5);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (valid) setConfirm(true);
+    if (amountError) return;
+    void startOnlinePayment();
   };
+
+  if (verifying) {
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <div className="skeleton mx-auto size-16 rounded-full" />
+        <h1 className="type-section-title text-ink mt-5">Verifying your Paymently payment…</h1>
+        <p className="type-body text-muted mt-1.5">
+          Please wait a moment while we confirm your transaction.
+        </p>
+      </div>
+    );
+  }
 
   if (done) {
     return (
@@ -72,29 +178,30 @@ function AddBalance() {
         </span>
         <h1 className="type-page-title text-ink mt-6">{t('seller.wallet.addSuccess')}</h1>
         <p className="type-body text-muted mt-2">
-          {t('seller.wallet.addSuccessDesc', { amount: money(done.amount) })}
+          Deposit request submitted for {money(done.amount)}. Once approved by admin, your wallet
+          balance will be credited automatically.
         </p>
         <div className="bg-panel border-line mt-6 space-y-2 rounded-2xl border p-4 text-left text-[13px]">
           <div className="flex justify-between">
             <span className="text-muted">{t('common.reference')}</span>
-            <span className="font-mono text-xs">{done.id}</span>
+            <span className="font-mono text-xs">{done.txNumber}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted">{t('common.method')}</span>
-            <span className="font-medium">{t(`payment.${method}`)}</span>
+            <span className="font-medium uppercase">{done.paymentMethod}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">TrxID</span>
+            <span className="font-mono text-xs">{done.paymentReference}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted">{t('common.status')}</span>
-            <StatusPill kind="deposit" value="completed" />
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">{t('seller.wallet.newBalance')}</span>
-            <Money value={wallet.available} className="text-ink font-bold" />
+            <StatusPill kind="deposit" value={done.status} />
           </div>
         </div>
         <div className="mt-6 flex justify-center gap-2">
           <Button variant="primary" asChild>
-            <Link href="/seller/orders/new">{t('nav.placeOrder')}</Link>
+            <Link href="/seller/wallet/transactions">{t('nav.transactions')}</Link>
           </Button>
           <Button variant="secondary" asChild>
             <Link href="/seller/wallet">{t('nav.walletOverview')}</Link>
@@ -118,30 +225,24 @@ function AddBalance() {
             <CurrencyInput
               value={amount}
               onValueChange={(v: number | undefined) => setAmount(v)}
-              className="h-12 text-lg font-bold"
-              aria-invalid={(touched && !!errors.amount) || undefined}
-              placeholder="0"
+              placeholder={`Min ${minDeposit}`}
             />
-            <p
-              className={cn(
-                'type-helper mt-1.5',
-                touched && errors.amount ? 'text-[var(--status-danger-fg)]' : 'text-muted',
-              )}
-            >
-              {t('seller.wallet.minAdd', { amount: money(settings.minAddBalance) })}
-            </p>
-            <p className="type-label text-ink mt-5 mb-2">{t('seller.wallet.quickAmounts')}</p>
-            <div className="flex flex-wrap gap-2">
+            {touched && amountError && (
+              <p className="mt-2 text-xs font-medium text-[var(--status-danger-fg)]">
+                {amountError}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
               {QUICK.map((q) => (
                 <button
                   key={q}
                   type="button"
                   onClick={() => setAmount(q)}
                   className={cn(
-                    'focus-ring num h-9 rounded-full border px-4 text-[13px] font-semibold transition-colors',
+                    'focus-ring num rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors',
                     amount === q
                       ? 'bg-brand border-brand text-white'
-                      : 'border-line bg-panel text-ink hover:bg-well',
+                      : 'bg-panel border-line text-muted hover:text-ink',
                   )}
                 >
                   {money(q)}
@@ -149,109 +250,75 @@ function AddBalance() {
               ))}
             </div>
           </Panel>
+
           <Panel title={t('seller.wallet.method')}>
-            <MethodPicker value={method} onChange={setMethod} />
-            <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
-              {method !== 'bank' && (
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="sender" className="type-label text-ink">
-                    {t('seller.wallet.senderNumber')} *
-                  </label>
-                  <Input
-                    id="sender"
-                    value={sender}
-                    onChange={(e) => setSender(e.target.value)}
-                    placeholder="01XXXXXXXXX"
-                    inputMode="tel"
-                    className="h-10 text-sm"
-                    aria-invalid={(touched && !!errors.sender) || undefined}
-                  />
-                  {touched && errors.sender && (
-                    <p className="type-helper text-[var(--status-danger-fg)]">{errors.sender}</p>
-                  )}
+            <div className="border-brand bg-brand-soft/60 flex items-center justify-between rounded-xl border p-4">
+              <div className="flex items-center gap-3">
+                <span className="bg-brand grid size-10 place-items-center rounded-xl text-white">
+                  <Icon name="wallet" size={18} />
+                </span>
+                <div>
+                  <p className="text-ink text-sm font-semibold">UddoktaPay</p>
+                  <p className="text-muted text-xs">
+                    bKash, Nagad, Rocket &amp; Cards (Instant Online Payment)
+                  </p>
                 </div>
-              )}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="trx" className="type-label text-ink">
-                  {t('seller.wallet.trxId')} *
-                </label>
-                <Input
-                  id="trx"
-                  value={trx}
-                  onChange={(e) => setTrx(e.target.value.toUpperCase())}
-                  placeholder="8N7A6D5E4F"
-                  className="h-10 font-mono text-sm"
-                  aria-invalid={(touched && !!errors.trx) || undefined}
-                />
-                <p
-                  className={cn(
-                    'type-helper',
-                    touched && errors.trx ? 'text-[var(--status-danger-fg)]' : 'text-muted',
-                  )}
-                >
-                  {touched && errors.trx ? errors.trx : t('seller.wallet.trxIdHint')}
-                </p>
               </div>
+              <span className="bg-brand rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                Active
+              </span>
             </div>
           </Panel>
+
+          <Button type="submit" variant="primary" size="lg" disabled={submitting}>
+            <Icon name="moneyAdd" size={17} />
+            {submitting ? t('common.loading') : 'Pay with UddoktaPay'}
+          </Button>
         </div>
-        <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-          <Panel title={t('seller.wallet.paymentSummary')}>
-            <dl className="space-y-2.5 text-[13px]">
-              <div className="flex justify-between">
+
+        <div className="space-y-5">
+          <Panel title={t('seller.order.summary')}>
+            <dl className="divide-line divide-y text-[13px]">
+              <div className="flex justify-between py-2.5">
                 <dt className="text-muted">{t('seller.wallet.available')}</dt>
                 <dd>
-                  <Money value={wallet.available} className="font-semibold" />
+                  <Money value={wallet.walletBalance} className="font-bold" />
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between py-2.5">
                 <dt className="text-muted">{t('seller.wallet.amount')}</dt>
                 <dd>
-                  <Money
-                    value={value}
-                    signed
-                    className="font-semibold text-[var(--status-ok-fg)]"
-                  />
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted">{t('common.method')}</dt>
-                <dd className="font-medium">{t(`payment.${method}`)}</dd>
-              </div>
-              <div className="border-line flex justify-between border-t pt-2.5">
-                <dt className="text-ink font-semibold">{t('seller.wallet.newBalance')}</dt>
-                <dd>
-                  <Money
-                    value={wallet.available + value}
-                    className="text-ink text-lg font-extrabold"
-                  />
+                  <Money value={value} className="font-semibold" />
                 </dd>
               </div>
             </dl>
-            <Button type="submit" variant="primary" size="lg" className="mt-5 w-full">
-              <Icon name="moneyAdd" size={17} />
-              {t('seller.wallet.addNow')} {value > 0 && money(value)}
-            </Button>
             <Callout
-              tone="neutral"
+              tone="info"
               compact
               className="mt-4"
-              description={t('seller.wallet.gatewayNote')}
+              description="Deposit requests are created as pending and credited automatically once approved by RFC Gadget admin."
             />
           </Panel>
-          {mine.length > 0 && (
-            <Panel title={t('seller.wallet.recent')}>
-              <ul className="divide-line -my-2 divide-y">
-                {mine.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between py-2.5 text-[13px]">
-                    <span>
-                      <span className="text-ink block font-medium">{t(`payment.${d.method}`)}</span>
-                      <span className="text-subtle num text-[11px]">{dateTime(d.createdAt)}</span>
-                    </span>
-                    <Money
-                      value={d.amount}
-                      signed
-                      className="font-semibold text-[var(--status-ok-fg)]"
+
+          {recentDeposits.length > 0 && (
+            <Panel title="Recent Deposits">
+              <ul className="space-y-2.5">
+                {recentDeposits.map((d) => (
+                  <li
+                    key={d.id}
+                    className="border-line flex items-center justify-between rounded-xl border p-3 text-xs"
+                  >
+                    <div>
+                      <p className="text-ink font-semibold">
+                        <Money value={d.amount} /> · {d.paymentMethod?.toUpperCase()}
+                      </p>
+                      <p className="text-subtle mt-0.5">
+                        {d.txNumber} · {dateTime(d.createdAt)}
+                      </p>
+                    </div>
+                    <StatusPill
+                      kind="deposit"
+                      value={d.status === 'rejected' ? 'failed' : d.status}
                     />
                   </li>
                 ))}
@@ -260,28 +327,15 @@ function AddBalance() {
           )}
         </div>
       </form>
+
       <ConfirmDialog
-        open={confirm}
-        onOpenChange={setConfirm}
-        tone="info"
-        icon="moneyAdd"
-        title={t('seller.wallet.addTitle')}
-        description={`${t('seller.wallet.youPay')}: ${money(value)} · ${t(`payment.${method}`)}`}
-        bullets={[
-          { icon: 'receipt', text: `${t('seller.wallet.trxId')}: ${trx}` },
-          {
-            icon: 'wallet',
-            text: `${t('seller.wallet.newBalance')}: ${money(wallet.available + value)}`,
-          },
-        ]}
-        confirmLabel={t('common.confirm')}
-        cancelLabel={t('common.cancel')}
-        onConfirm={() => {
-          if (!seller) return;
-          const res = addBalance(seller.id, value, method, trx);
-          setConfirm(false);
-          if (res.ok) setDone({ id: res.data, amount: value });
-        }}
+        open={cancelledOpen}
+        onOpenChange={setCancelledOpen}
+        tone="danger"
+        title="Payment Cancelled"
+        description="Your online payment via UddoktaPay was cancelled. No amount was deducted."
+        confirmLabel="OK"
+        onConfirm={() => setCancelledOpen(false)}
       />
     </div>
   );

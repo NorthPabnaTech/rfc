@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { PLATFORM } from '@config/platform';
@@ -13,52 +14,33 @@ type Props = {
   className?: string;
 };
 
-const SIZES = { sm: 28, md: 34, lg: 42 } as const;
+const MARK_RATIO = 863 / 381;
+const SIZES = {
+  sm: { mark: 22, word: 'text-[13px] tracking-[0.22em] -mr-[0.22em]' },
+  md: { mark: 26, word: 'text-[15px] tracking-[0.24em] -mr-[0.24em]' },
+  lg: { mark: 36, word: 'text-[20px] tracking-[0.26em] -mr-[0.26em]' },
+} as const;
 
-/**
- * Platform mark: an open box with an upward "growth" arrow — reselling
- * without holding stock. Ocean → sky gradient body with an orange arrow.
- */
-export function PlatformMark({ size = 34, className }: { size?: number; className?: string }) {
+export function PlatformMark({
+  size = 26,
+  tone = 'light',
+  className,
+}: {
+  size?: number;
+  tone?: 'light' | 'dark' | 'auto';
+  className?: string;
+}) {
+  const width = Math.round(size * MARK_RATIO);
   return (
-    <svg
-      width={size}
+    <Image
+      src={tone === 'dark' ? '/brand/rfc-mark-dark.png' : '/brand/rfc-mark-light.png'}
+      alt={PLATFORM.name}
+      width={width}
       height={size}
-      viewBox="0 0 40 40"
-      fill="none"
-      aria-hidden="true"
-      className={cn('shrink-0', className)}
-    >
-      <defs>
-        <linearGradient id="pm-body" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#8ecae6" />
-          <stop offset="0.55" stopColor="#219ebc" />
-          <stop offset="1" stopColor="#136780" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="36" height="36" rx="11" fill="url(#pm-body)" />
-      <path
-        d="M11 17.5 20 13l9 4.5v9L20 31l-9-4.5v-9Z"
-        fill="#fff"
-        fillOpacity="0.16"
-        stroke="#fff"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11 17.5 20 22l9-4.5M20 22v9"
-        stroke="#fff"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24.5 12.5 30 7m0 0h-4.6M30 7v4.6"
-        stroke="#ffb703"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      priority
+      className={cn('block shrink-0', className)}
+      style={{ width, height: size }}
+    />
   );
 }
 
@@ -69,22 +51,21 @@ export function PlatformLogo({
   href = '/',
   className,
 }: Props) {
-  const px = SIZES[size];
-  const [first, ...rest] = splitName(PLATFORM.name);
+  const s = SIZES[size];
+  const word = PLATFORM.name.replace(/^RFC\s*/i, '').trim() || 'HUB';
   const lockup = (
-    <span className={cn('inline-flex items-center gap-2.5', className)}>
-      <PlatformMark size={px} />
+    <span className={cn('inline-flex items-center gap-2', className)}>
+      <PlatformMark size={s.mark} tone={tone} />
       {!markOnly && (
-        <span
-          className={cn(
-            'leading-none font-extrabold tracking-tight',
-            size === 'sm' ? 'text-[16px]' : size === 'lg' ? 'text-[24px]' : 'text-[19px]',
-            tone === 'light' ? 'text-white' : 'text-ink',
-          )}
-        >
-          {first}
-          <span className={tone === 'light' ? 'text-brand-200' : 'text-brand-500'}>
-            {rest.join('')}
+        <span className="cap-trim block">
+          <span
+            className={cn(
+              'font-display block leading-none font-semibold uppercase',
+              s.word,
+              tone === 'light' ? 'text-brand-300' : 'text-brand-600',
+            )}
+          >
+            {word}
           </span>
         </span>
       )}
@@ -96,11 +77,4 @@ export function PlatformLogo({
       {lockup}
     </Link>
   );
-}
-
-/** "ResellHub" → ["Resell", "Hub"] (split at the last capital) for two-tone type. */
-function splitName(name: string): string[] {
-  const idx = name.slice(1).search(/[A-Z](?=[^A-Z]*$)/);
-  if (idx < 0) return [name];
-  return [name.slice(0, idx + 1), name.slice(idx + 1)];
 }

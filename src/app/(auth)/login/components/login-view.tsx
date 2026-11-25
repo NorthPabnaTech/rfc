@@ -2,140 +2,75 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'nextjs-toploader/app';
 
 import { useI18n } from '@/i18n/provider';
-import { usePlatformStore } from '@/stores/platform-store';
-import type { Role } from '@/types/platform';
-import { Form, FormCheckbox, FormInput, FormPassword } from '@components/form';
-import { Icon, type IconRegistryKey } from '@components/icon/icon';
 import { Callout } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { toast } from '@lib/toast';
-import { cn } from '@lib/utils';
-import { loginSchema } from '@lib/validators/reseller';
+import { resellerApi } from '@lib/api/reseller';
+
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+      />
+    </svg>
+  );
+}
 
 export function LoginView() {
   const { t } = useI18n();
-  const login = usePlatformStore((s) => s.login);
-  const router = useRouter();
-  const [role, setRole] = React.useState<Role>('seller');
-  const schema = React.useMemo(() => loginSchema(t), [t]);
+  const [redirecting, setRedirecting] = React.useState(false);
 
-  const enter = (r: Role) => {
-    login(r);
-    router.push(r === 'admin' ? '/admin' : '/seller');
+  const handleGoogleLogin = () => {
+    setRedirecting(true);
+    const callbackUrl = `${window.location.origin}/auth/callback`;
+    window.location.href = resellerApi.getGoogleAuthUrl(callbackUrl);
   };
-
-  const roles: { value: Role; icon: IconRegistryKey; title: string; desc: string }[] = [
-    { value: 'seller', icon: 'store', title: t('auth.demoSeller'), desc: t('auth.demoSellerDesc') },
-    {
-      value: 'admin',
-      icon: 'shieldCheck',
-      title: t('auth.demoAdmin'),
-      desc: t('auth.demoAdminDesc'),
-    },
-  ];
 
   return (
     <div>
       <h1 className="type-page-title text-ink">{t('auth.welcomeBack')}</h1>
-      <p className="type-body text-muted mt-1.5">{t('auth.loginSubtitle')}</p>
+      <p className="type-body text-muted mt-1.5">
+        Sign in with your Google account to access your reseller dashboard and prices.
+      </p>
 
-      {/* Development preview: demo role selector */}
-      <div className="border-brand-200 bg-brand-soft/50 mt-7 rounded-2xl border border-dashed p-4 dark:border-white/15">
-        <div className="flex items-center gap-2">
-          <Icon name="sparkles" size={16} className="text-brand-ink" />
-          <span className="type-label text-ink">{t('auth.demoTitle')}</span>
-        </div>
-        <p className="type-helper text-muted mt-1">{t('auth.demoHint')}</p>
-        <div
-          className="mt-3 grid gap-2.5 sm:grid-cols-2"
-          role="radiogroup"
-          aria-label={t('auth.demoTitle')}
+      <div className="mt-8 space-y-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="h-12 w-full gap-3 text-[15px] font-semibold"
+          onClick={handleGoogleLogin}
+          disabled={redirecting}
         >
-          {roles.map((r) => (
-            <button
-              key={r.value}
-              type="button"
-              role="radio"
-              aria-checked={role === r.value}
-              onClick={() => setRole(r.value)}
-              className={cn(
-                'focus-ring bg-panel rounded-xl border p-3 text-left transition-colors',
-                role === r.value
-                  ? 'border-brand ring-brand ring-1'
-                  : 'border-line hover:border-line-2',
-              )}
-            >
-              <span className="flex items-center gap-2">
-                <Icon
-                  name={r.icon}
-                  size={18}
-                  className={role === r.value ? 'text-accent' : 'text-muted'}
-                />
-                <span className="type-label text-ink">{r.title}</span>
-              </span>
-              <span className="type-caption text-muted mt-1 block">{r.desc}</span>
-            </button>
-          ))}
-        </div>
-        <Button variant="primary" className="mt-3 w-full" onClick={() => enter(role)}>
-          {t('auth.continueAs', {
-            role: role === 'admin' ? t('auth.demoAdmin') : t('auth.demoSeller'),
-          })}
-          <Icon name="chevRight" size={16} />
+          <GoogleMark />
+          {redirecting ? 'Redirecting to Google...' : 'Continue with Google'}
         </Button>
+
+        <Callout
+          tone="info"
+          compact
+          description="Resellers sign in exclusively with Google. New reseller accounts are created automatically on your first Google sign-in."
+        />
       </div>
 
-      <div className="text-subtle my-6 flex items-center gap-3 text-xs">
-        <span className="bg-line h-px flex-1" />
-        {t('auth.or')}
-        <span className="bg-line h-px flex-1" />
-      </div>
-
-      <Form
-        schema={schema}
-        initialValues={{ email: '', password: '', remember: true }}
-        onFinish={() => {
-          toast.info(t('auth.demoNotice'));
-        }}
-        className="flex flex-col gap-y-5"
-      >
-        <FormInput
-          name="email"
-          label={t('common.email')}
-          type="email"
-          placeholder="you@example.com"
-          required
-          autoComplete="email"
-        />
-        <FormPassword
-          name="password"
-          label={t('auth.password')}
-          required
-          autoComplete="current-password"
-        />
-        <div className="flex items-center justify-between gap-3">
-          <FormCheckbox name="remember" label={t('auth.remember')} />
-          <Link
-            href="/forgot-password"
-            className="text-accent text-[13px] font-semibold hover:underline"
-          >
-            {t('auth.forgot')}
-          </Link>
-        </div>
-        <Button type="submit" variant="noir" size="lg" className="w-full">
-          {t('auth.signIn')}
-        </Button>
-      </Form>
-
-      <Callout tone="neutral" compact className="mt-5" description={t('auth.demoNotice')} />
-
-      <p className="text-muted mt-6 text-center text-sm">
-        {t('auth.noAccount')}{' '}
-        <Link href="/register" className="text-accent font-semibold hover:underline">
-          {t('auth.register')}
+      <p className="text-muted mt-8 text-center text-sm">
+        <Link href="/products" className="text-accent font-semibold hover:underline">
+          {t('site.products')}
         </Link>
       </p>
     </div>

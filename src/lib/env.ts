@@ -9,7 +9,8 @@ import { z } from 'zod';
  */
 const schema = z.object({
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
-  MONGODB_DB: z.string().min(1).default('rfc_gadget'),
+  // Never default to a production store database.
+  MONGODB_DB: z.string().min(1).default('gadget_resell'),
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
   CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
   CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
@@ -32,6 +33,8 @@ const schema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
   MAIL_FROM: z.string().min(1).optional(),
+  // 'log' prints emails instead of sending them (tests, local runs).
+  MAIL_TRANSPORT: z.enum(['smtp', 'log']).default('smtp'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 

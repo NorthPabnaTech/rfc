@@ -397,13 +397,13 @@ function SkeletonRows<T>({
         <TableRow key={r} className={cn('hover:bg-transparent', rowClassName)}>
           {selectable && (
             <TableCell className="w-[44px]">
-              <div className="bg-well size-4 animate-pulse rounded-[4px]" />
+              <div className="skeleton size-4 rounded-[4px]" />
             </TableCell>
           )}
           {columns.map((col) => (
             <TableCell key={col.key} className={cellClassName}>
               <div
-                className="bg-well h-3.5 animate-pulse rounded"
+                className="skeleton h-4 rounded"
                 style={{ width: `${40 + ((r + col.key.length) % 5) * 12}%` }}
               />
             </TableCell>

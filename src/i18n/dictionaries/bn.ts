@@ -400,6 +400,7 @@ export const bn: Dictionary = {
 
   status: {
     order: {
+      pending: 'অপেক্ষমান',
       placed: 'অর্ডার হয়েছে',
       processing: 'প্রসেসিং',
       confirmed: 'কনফার্মড',

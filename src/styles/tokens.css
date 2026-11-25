@@ -32,20 +32,20 @@
   --color-base-800: #2d3643;
   --color-base-900: #1c222b;
 
-  /* Brand — ocean blue #219ebc (primary brand / action colour) */
-  --color-brand-25: #f2fafd;
-  --color-brand-50: #e3f4f9;
-  --color-brand-100: #c6e8f2;
-  --color-brand-200: #8ecae6;
-  --color-brand-300: #5fb6d8;
-  --color-brand-400: #3aa9cc;
-  --color-brand-500: #219ebc;
-  --color-brand-600: #187f9b;
-  --color-brand-700: #136780;
-  --color-brand-800: #0f5166;
-  --color-brand-900: #023047;
-  /* Sky highlight (gradients, dark-mode links) */
-  --color-brand-cyan: #8ecae6;
+  /* Brand — electric blue #1170f5 (primary brand / action colour) */
+  --color-brand-25: #f4f8ff;
+  --color-brand-50: #e6f1ff;
+  --color-brand-100: #cce2ff;
+  --color-brand-200: #99c5ff;
+  --color-brand-300: #5ea0fd;
+  --color-brand-400: #2f85fa;
+  --color-brand-500: #1170f5;
+  --color-brand-600: #0a5ad6;
+  --color-brand-700: #0b48ab;
+  --color-brand-800: #0c3b87;
+  --color-brand-900: #050b2b;
+  /* Cyan highlight (gradients) */
+  --color-brand-cyan: #19c6ff;
 
   /* Sun — amber → orange, the warm half of the palette (CTAs, highlights) */
   --color-sun-50: #fff6e0;
@@ -111,23 +111,22 @@
   /* ═══ Semantic tokens — mapped to the scales above ═════════════════════ */
 
   /* Surfaces */
-  --color-surface: #f3f7fa;
+  --color-surface: var(--color-base-25);
   --color-panel: #ffffff;
   --color-well: var(--color-base-50);
 
   /* Text */
-  --color-ink: #0f2433;
-  --color-muted: #536779;
-  --color-subtle: #8496a7;
+  --color-ink: var(--color-base-900);
+  --color-muted: var(--color-base-500);
+  --color-subtle: var(--color-base-400);
 
   /* Lines — soft hairline (base-200 @ ~72%) + a stronger divider */
-  --color-line: #e3ebf1;
+  --color-line: color-mix(in srgb, #d7dfe9 72%, transparent);
   --color-line-2: var(--color-base-300);
 
-  /* Brand — blue fill with white text (brand-500 keeps ≥ 4.5:1 on white). */
-  /* brand-600 keeps >= 4.5:1 with white text; brand-500 is for charts/accents. */
-  --color-brand: var(--color-brand-600);
-  --color-brand-hover: var(--color-brand-700);
+  /* Brand — electric blue fill with white text */
+  --color-brand: var(--color-brand-500);
+  --color-brand-hover: var(--color-brand-600);
   --color-brand-soft: var(--color-brand-50);
   --color-brand-ink: var(--color-brand-700);
   --color-brand-contrast: #ffffff;
@@ -151,13 +150,13 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Noir — the palette's deep navy; sidebar, hero, footer */
-  --color-noir: #023047;
-  --color-noir-2: #033b57;
-  --color-noir-3: #064a6b;
-  --color-noir-line: #0d4f6e;
-  --color-noir-fg: #a7cde0;
-  --color-cream: #eef8fc;
+  /* Noir — deep navy; sidebar, hero, footer */
+  --color-noir: #050b2b;
+  --color-noir-2: #0a1338;
+  --color-noir-3: #121d4a;
+  --color-noir-line: #1f2b5e;
+  --color-noir-fg: #9ba7cc;
+  --color-cream: #eef4ff;
 
   /* Status Colors for utilities */
   --color-ok: var(--color-success-600);
@@ -171,19 +170,18 @@
   --color-sidebar-raised: var(--color-noir-3); /* hover / nested panels (flyout) */
   --color-sidebar-active: var(--color-brand-500); /* active item fill */
   --color-sidebar-border: var(--color-noir-line); /* dividers / hairlines */
-  --color-sidebar-fg: #a7cde0; /* idle label + icon */
-  --color-sidebar-fg-strong: white; /* hover / active / titles */
-  --color-sidebar-muted: #6f9db3; /* secondary text (email, hints) */
+  --color-sidebar-fg: #9ba7cc; /* idle label + icon */
+  --color-sidebar-fg-strong: #ffffff; /* hover / active / titles */
+  --color-sidebar-muted: #6b77a0; /* secondary text (email, hints) */
 
   /* Typography — loaded with next/font in app/layout.tsx (variables on <html>).
-   * Jost for English, Hind Siliguri for Bangla text (Jost has no Bengali
-   * glyphs, so the browser falls through per glyph), Anek Bangla for Bangla
-   * numerals — applied by the `num` utility (globals.css) in Bangla mode. */
+   * Nunito Sans for body/UI, Jost for display/headings, Hind Siliguri for Bangla
+   * fallback, Anek Bangla for Bangla numerals — applied by `num` in Bangla mode. */
   --font-sans:
-    var(--font-jost), 'Jost', 'Jost Fallback', var(--font-bangla), 'Hind Siliguri', ui-sans-serif,
+    var(--font-nunito-sans), 'Nunito Sans', var(--font-bangla), 'Hind Siliguri', ui-sans-serif,
     system-ui, sans-serif;
   --font-display:
-    var(--font-jost), 'Jost', 'Jost Fallback', var(--font-bangla), 'Hind Siliguri', ui-sans-serif,
+    var(--font-jost), 'Jost', var(--font-bangla), 'Hind Siliguri', ui-sans-serif,
     system-ui, sans-serif;
   --font-num-bn: var(--font-anek), 'Anek Bangla', var(--font-bangla), 'Hind Siliguri', sans-serif;
   --font-mono: var(--font-sans);
@@ -253,7 +251,7 @@
 
   /* Chart series (light) — validated with the dataviz palette checker:
    * ocean, deep orange, deep blue, amber (fixed order), neutral for "other". */
-  --chart-1: #219ebc;
+  --chart-1: #1170f5;
   --chart-2: #e07800;
   --chart-3: #2b5fa8;
   --chart-4: #d99a00;

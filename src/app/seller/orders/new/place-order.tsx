@@ -3,10 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { z } from 'zod';
 
 import { useI18n } from '@/i18n/provider';
-import { useCurrentSeller, usePlatformStore, useWallet } from '@/stores/platform-store';
-import type { DeliveryArea, Order } from '@/types/platform';
+import { CourierHistoryModal } from '@/features/fraud-checker/courier-history-modal';
+import { useResellerAuth } from '@/stores/reseller-auth';
 import { Panel } from '@components/dashboard/panel';
 import { Form, FormInput, FormSelect, FormTextarea, useWatch } from '@components/form';
 import { Icon } from '@components/icon/icon';
@@ -15,134 +16,325 @@ import { ProductImage } from '@components/platform/product-image';
 import { Callout, ConfirmDialog, PageHeader } from '@components/shared';
 import { CurrencyInput, QuantityInput } from '@components/shared/numeric-format-input';
 import { Button } from '@components/ui/button';
+import { Label } from '@components/ui/label';
 import { Select } from '@components/ui/select';
-import { DELIVERY_AREAS, detectDeliveryArea, DISTRICTS, upazilasOf } from '@lib/business/delivery';
-import { quoteOrder } from '@lib/business/orders';
+import { ApiError } from '@lib/api/client';
+import { resellerApi, type ResellerOrder } from '@lib/api/reseller';
+import { areasOf, districtsOf, DIVISIONS as BD_DIVISIONS } from '@lib/locations';
 import { checkSellingPrice } from '@lib/business/pricing';
 import { toast } from '@lib/toast';
-import { cn } from '@lib/utils';
-import { customerSchema } from '@lib/validators/reseller';
+import { BD_PHONE } from '@lib/validators/reseller';
 
-import { useSellerCatalog } from '../../components/use-seller-data';
+import { useSellerCatalog, useSellerWallet } from '../../components/use-seller-data';
 
-type Customer = {
+type CustomerFormValues = {
   name: string;
   phone: string;
-  altPhone: string;
-  address: string;
+  email: string;
+  division: string;
   district: string;
-  upazila: string;
-  area: DeliveryArea;
-  note?: string;
+  area: string;
+  street: string;
+  customerNote: string;
+};
+
+type OrderItemDraft = {
+  key: string;
+  productId: string;
+  sellingInput?: number;
+  qty: number;
+  variantInput: Record<string, string>;
 };
 
 export function PlaceOrder() {
   const { t, locale, money } = useI18n();
   const params = useSearchParams();
-  const seller = useCurrentSeller();
-  const wallet = useWallet(seller?.id);
-  const settings = usePlatformStore((s) => s.settings);
-  const placeOrder = usePlatformStore((s) => s.placeOrder);
-  const { products, categories } = useSellerCatalog();
-  const orderable = products.filter(
-    (p) => p.status === 'active' && p.availability !== 'out_of_stock',
+  const refreshMe = useResellerAuth((s) => s.refreshMe);
+  const { wallet, reload: reloadWallet } = useSellerWallet();
+  const { products, loading: catalogLoading } = useSellerCatalog();
+
+  const orderable = React.useMemo(
+    () => products.filter((p) => p.status === 'active' && p.availability !== 'out_of_stock'),
+    [products],
   );
 
-  const initial = orderable.find((p) => p.id === params.get('product')) ?? null;
-  const [productId, setProductId] = React.useState(initial?.id ?? '');
-  const product = products.find((p) => p.id === productId);
-  const [selling, setSelling] = React.useState<number | undefined>(
-    Number(params.get('price')) || initial?.suggestedPrice,
+  const paramProduct = params.get('product');
+  const paramPrice = Number(params.get('price')) || undefined;
+  const [items, setItems] = React.useState<OrderItemDraft[]>(() => [
+    {
+      key: 'item-1',
+      productId: '',
+      sellingInput: paramPrice,
+      qty: 1,
+      variantInput: {},
+    },
+  ]);
+  const [confirming, setConfirming] = React.useState<CustomerFormValues | null>(null);
+  const [removingKey, setRemovingKey] = React.useState<string | null>(null);
+  const [deliveryPaymentMode, setDeliveryPaymentMode] = React.useState<'with_product' | 'advance'>(
+    'with_product',
   );
-  const [qty, setQty] = React.useState(1);
-  const [confirming, setConfirming] = React.useState<Customer | null>(null);
   const [placing, setPlacing] = React.useState(false);
-  const [placed, setPlaced] = React.useState<Order | null>(null);
+  const [placed, setPlaced] = React.useState<ResellerOrder | null>(null);
+  const [fraudOpen, setFraudOpen] = React.useState(false);
 
-  const schema = React.useMemo(() => customerSchema(t), [t]);
-  const form = Form.useForm<Customer>({
+  const paramResolvedId = React.useMemo(
+    () =>
+      paramProduct
+        ? orderable.find((p) => p.id === paramProduct || p.slug === paramProduct)?.id || ''
+        : '',
+    [orderable, paramProduct],
+  );
+
+  const resolvedItems = React.useMemo(
+    () =>
+      items.map((item, idx) => {
+        const pid = item.productId || (idx === 0 ? paramResolvedId : '');
+        const product = products.find((p) => p.id === pid);
+        const selling =
+          item.sellingInput ?? (product ? product.suggestedPrice || product.basePrice : undefined);
+        const variant: Record<string, string> = {};
+        if (product?.variations) {
+          for (const v of product.variations) {
+            variant[v.name] = item.variantInput[v.name] ?? v.values[0] ?? '';
+          }
+        }
+        const basePrice = product?.basePrice ?? 0;
+        const priceCheck = product ? checkSellingPrice(selling, basePrice) : 'empty';
+        const sellingVal = selling ?? 0;
+        return {
+          ...item,
+          productId: pid,
+          product,
+          selling,
+          sellingVal,
+          basePrice,
+          priceCheck,
+          variant,
+        };
+      }),
+    [items, paramResolvedId, products],
+  );
+
+  const updateItem = (key: string, patch: Partial<OrderItemDraft>) => {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  };
+
+  const addItem = () => {
+    setItems((prev) => [
+      ...prev,
+      {
+        key: `item-${Date.now()}-${prev.length + 1}`,
+        productId: '',
+        sellingInput: undefined,
+        qty: 1,
+        variantInput: {},
+      },
+    ]);
+  };
+
+  const removeItem = (key: string) => {
+    setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.key !== key) : prev));
+  };
+
+  const schema = React.useMemo(
+    () =>
+      z.object({
+        name: z.string().trim().min(2, t('common.required')),
+        phone: z.string().trim().regex(BD_PHONE, t('common.invalidPhone')),
+        email: z.string().trim().email(t('common.invalidEmail')).or(z.literal('')).default(''),
+        division: z.string().trim().min(2, t('common.required')),
+        district: z.string().trim().min(2, t('common.required')),
+        area: z.string().trim().min(2, t('common.required')),
+        street: z.string().trim().min(4, t('common.required')),
+        customerNote: z.string().trim().optional().default(''),
+      }),
+    [t],
+  );
+
+  const form = Form.useForm<CustomerFormValues>({
     schema,
     defaultValues: {
       name: '',
       phone: '',
-      altPhone: '',
-      address: '',
-      district: '',
-      upazila: '',
-      area: 'outside_dhaka',
-      note: '',
+      email: '',
+      division: 'Dhaka',
+      district: 'Dhaka',
+      area: 'Mirpur',
+      street: '',
+      customerNote: '',
     },
   });
-  const [district, upazila, area] = useWatch({
+
+  const [division, district, phone] = useWatch({
     control: form.control,
-    name: ['district', 'upazila', 'area'],
+    name: ['division', 'district', 'phone'],
   });
+  const cleanPhone = (phone ?? '').trim().replace(/[\s-]/g, '').replace(/^\+?88/, '');
+  const isValidPhone = /^01[3-9]\d{8}$/.test(cleanPhone);
 
-  // Detect the delivery area from the address (seller may override).
   React.useEffect(() => {
-    if (district) form.setValue('area', detectDeliveryArea(district, upazila));
-  }, [district, upazila, form]);
+    const validDistricts = districtsOf(division);
+    if (validDistricts.length === 0) return;
+    const matched = validDistricts.find((d) => d.name === district);
+    if (!matched) {
+      const nextDistrict = validDistricts[0]!.name;
+      const nextAreas = areasOf(division, nextDistrict);
+      form.setValue('district', nextDistrict, { shouldValidate: true });
+      form.setValue('area', nextAreas[0] ?? '', { shouldValidate: true });
+      return;
+    }
+    const currentArea = form.getValues('area');
+    if (matched.areas.length > 0 && !matched.areas.includes(currentArea)) {
+      form.setValue('area', matched.areas[0]!, { shouldValidate: true });
+    }
+  }, [division, district, form]);
 
-  const priceCheck = product ? checkSellingPrice(selling, product.basePrice) : 'empty';
-  // Charges come from settings + product, never typed by the seller.
-  const deliveryCharge = product ? settings.deliveryCharges[area] + product.deliveryCharge : 0;
-  const packagingCharge = product?.packagingCharge ?? 0;
-  const quote = quoteOrder({
-    basePrice: product?.basePrice ?? 0,
-    sellingPrice: selling ?? 0,
-    quantity: qty,
-    deliveryCharge,
-    packagingCharge,
-    available: wallet.available,
-  });
-  const ready = !!product && (priceCheck === 'ok' || priceCheck === 'equal_base') && qty >= 1;
-  const short = Math.max(0, quote.payNow - wallet.available);
+  const validItems = resolvedItems.filter(
+    (it): it is typeof it & { product: NonNullable<typeof it.product> } => !!it.product,
+  );
+  const isInsideDhaka = district?.toLowerCase() === 'dhaka';
+  const deliveryCharge = validItems.length
+    ? Math.max(
+        ...validItems.map((it) =>
+          isInsideDhaka ? it.product.deliveryCharges.insideDhaka : it.product.deliveryCharges.outsideDhaka,
+        ),
+      )
+    : 0;
+  const packagingCost = validItems.length
+    ? Math.max(...validItems.map((it) => it.product.packagingCharge ?? 0))
+    : 0;
+  const upfrontCost = deliveryCharge + packagingCost;
 
-  const submit = (c: Customer) => {
+  const totalQty = validItems.reduce((sum, it) => sum + it.qty, 0);
+  const sellingTotal = validItems.reduce((sum, it) => sum + it.sellingVal * it.qty, 0);
+  const expectedProfit =
+    validItems.reduce((sum, it) => sum + (it.sellingVal - it.basePrice) * it.qty, 0) -
+    packagingCost;
+  const deliveryInAdvance = deliveryPaymentMode === 'advance';
+  const codTotal = deliveryInAdvance ? sellingTotal : sellingTotal + deliveryCharge;
+  const sufficient = wallet.walletBalance >= upfrontCost;
+  const short = Math.max(0, upfrontCost - wallet.walletBalance);
+  const ready =
+    validItems.length > 0 &&
+    validItems.length === resolvedItems.length &&
+    validItems.every(
+      (it) => (it.priceCheck === 'ok' || it.priceCheck === 'equal_base') && it.qty >= 1,
+    );
+
+  const submit = (c: CustomerFormValues) => {
     if (!ready) {
+      const invalid = resolvedItems.find(
+        (it) => it.product && it.priceCheck === 'below_base',
+      );
       toast.error(
-        product
-          ? t('seller.order.belowBase', { amount: money(product.basePrice) })
+        invalid?.product
+          ? t('seller.order.belowBase', { amount: money(invalid.product.basePrice) })
           : t('seller.order.selectProduct'),
       );
       return;
     }
-    if (!quote.sufficient) return;
+    if (!sufficient) {
+      toast.error(t('seller.order.insufficient'));
+      return;
+    }
     setConfirming(c);
   };
 
-  const confirm = () => {
-    if (!confirming || !product || !seller || placing) return;
+  const confirmOrder = async () => {
+    if (!confirming || validItems.length === 0 || placing) return;
     setPlacing(true);
-    const res = placeOrder({
-      sellerId: seller.id,
-      productId: product.id,
-      quantity: qty,
-      sellingPrice: selling ?? 0,
-      area: confirming.area,
-      customer: { ...confirming, altPhone: confirming.altPhone || undefined },
-      note: confirming.note || undefined,
-    });
-    setPlacing(false);
-    setConfirming(null);
-    if (res.ok) {
-      setPlaced(res.data);
+    try {
+      const order = await resellerApi.placeOrder({
+        customer: {
+          name: confirming.name.trim(),
+          phone: confirming.phone.trim(),
+          email: confirming.email.trim() || undefined,
+        },
+        shippingAddress: {
+          division: confirming.division.trim(),
+          district: confirming.district.trim(),
+          area: confirming.area.trim(),
+          street: confirming.street.trim(),
+        },
+        items: validItems.map((it) => ({
+          productId: it.product.id,
+          quantity: it.qty,
+          sellingPrice: it.sellingVal,
+          variant: Object.keys(it.variant).length > 0 ? it.variant : undefined,
+        })),
+        customerNote:
+          [
+            confirming.customerNote.trim(),
+            deliveryInAdvance ? 'Delivery charge already paid in advance by customer' : '',
+          ]
+            .filter(Boolean)
+            .join(' | ') || undefined,
+      });
+      setPlaced(order);
+      setConfirming(null);
+      await Promise.all([refreshMe(), reloadWallet()]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      toast.error(
-        res.error === 'insufficient' ? t('seller.order.insufficient') : t('common.somethingWrong'),
-      );
+      toast.success(`Order ${order.orderNumber} placed!`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t('common.somethingWrong'));
+    } finally {
+      setPlacing(false);
     }
   };
 
-  if (placed) return <Success order={placed} />;
+  if (placed) {
+    const s = placed.resellerSummary;
+    return (
+      <div className="mx-auto max-w-lg py-8 text-center">
+        <span className="mx-auto grid size-20 place-items-center rounded-full bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]">
+          <Icon name="checkCircle" size={40} />
+        </span>
+        <h1 className="type-page-title text-ink mt-6">{t('seller.order.successTitle')}</h1>
+        <p className="type-body text-muted mt-2">
+          Order <span className="font-mono font-bold text-ink">{placed.orderNumber}</span> has been
+          placed.
+        </p>
+        {s && (
+          <div className="bg-panel border-line mt-6 space-y-2 rounded-2xl border p-5 text-left text-[13px]">
+            <div className="flex justify-between">
+              <span className="text-muted">Reseller Price Total</span>
+              <Money value={s.resellerPriceTotal} className="font-semibold" />
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Your Selling Total</span>
+              <Money value={s.resellerSellingTotal} className="font-semibold" />
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Upfront Deducted (Delivery + Packaging)</span>
+              <Money value={s.upfrontDeducted} className="text-danger font-semibold" />
+            </div>
+            <div className="border-line flex justify-between border-t pt-2">
+              <span className="text-ink font-bold">Expected Profit (on delivery)</span>
+              <Money
+                value={s.expectedResellerProfit}
+                className="font-extrabold text-[var(--status-ok-fg)]"
+              />
+            </div>
+          </div>
+        )}
+        <div className="mt-6 flex justify-center gap-2">
+          <Button variant="primary" asChild>
+            <Link href={`/seller/orders/${placed.id}`}>{t('common.viewDetails')}</Link>
+          </Button>
+          <Button variant="secondary" asChild>
+            <Link href="/seller/orders">{t('nav.myOrders')}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-  const districts = DISTRICTS.map((d) => ({
+  const districts = districtsOf(division).map((d) => ({
     value: d.name,
     label: locale === 'bn' ? `${d.nameBn} (${d.name})` : d.name,
   }));
-  const upazilas = upazilasOf(district).map((u) => ({ value: u, label: u }));
-  const cat = categories.find((c) => c.id === product?.categoryId);
+  const upazilas = areasOf(division, district);
 
   return (
     <div className="space-y-5">
@@ -152,369 +344,371 @@ export function PlaceOrder() {
         backHref="/seller/orders"
         backLabel={t('nav.myOrders')}
       />
-      <Form<Customer> form={form} onFinish={submit}>
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="space-y-5">
-            <Panel title={<StepTitle n={1} label={t('seller.order.stepProduct')} />}>
-              <div className="flex flex-col gap-y-5">
-                <div className="flex flex-col gap-1.5">
-                  <span className="type-label text-ink">{t('seller.order.selectProduct')} *</span>
-                  <Select
-                    value={productId}
-                    showSearch
-                    placeholder={t('seller.order.selectProduct')}
-                    onValueChange={(v) => {
-                      setProductId(v);
-                      setSelling(products.find((p) => p.id === v)?.suggestedPrice);
-                    }}
-                    items={orderable.map((p) => ({
-                      value: p.id,
-                      label: `${locale === 'bn' ? p.nameBn : p.name} — ${money(p.basePrice)}`,
-                    }))}
-                  />
-                </div>
-                {product && (
-                  <div className="bg-well/60 flex items-center gap-3 rounded-xl p-3">
-                    <ProductImage
-                      src={product.images[0]}
-                      alt={product.name}
-                      icon={cat?.icon}
-                      className="size-14 shrink-0"
-                      iconSize={24}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-ink line-clamp-1 text-[13px] font-semibold">
-                        {locale === 'bn' ? product.nameBn : product.name}
-                      </p>
-                      <p className="text-muted text-xs">
-                        {t('seller.catalog.basePrice')}:{' '}
-                        <Money value={product.basePrice} className="text-ink font-bold" />
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="selling" className="type-label text-ink">
-                      {t('seller.product.sellingPrice')} *
-                    </label>
-                    <CurrencyInput
-                      id="selling"
-                      value={selling}
-                      onValueChange={(v: number | undefined) => setSelling(v)}
-                      disabled={!product}
-                      aria-invalid={priceCheck === 'below_base' || undefined}
-                    />
-                    <p
-                      className={cn(
-                        'type-helper',
-                        priceCheck === 'below_base'
-                          ? 'text-[var(--status-danger-fg)]'
-                          : 'text-muted',
-                      )}
-                    >
-                      {product && priceCheck === 'below_base'
-                        ? t('seller.order.belowBase', { amount: money(product.basePrice) })
-                        : t('seller.product.sellingPriceHint')}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="qty" className="type-label text-ink">
-                      {t('common.quantity')} *
-                    </label>
-                    <QuantityInput
-                      id="qty"
-                      min={1}
-                      max={20}
-                      value={qty}
-                      onValueChange={(v: number | undefined) => setQty(Math.max(1, v ?? 1))}
-                      disabled={!product}
-                    />
-                  </div>
-                </div>
-              </div>
-            </Panel>
 
-            <Panel title={<StepTitle n={2} label={t('seller.order.stepCustomer')} />}>
-              <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
-                <FormInput
-                  name="name"
-                  label={t('seller.order.customerName')}
-                  required
-                  autoComplete="off"
-                />
-                <FormInput
-                  name="phone"
-                  label={t('seller.order.customerPhone')}
-                  placeholder="01XXXXXXXXX"
-                  inputMode="tel"
-                  required
-                />
-                <FormInput
-                  name="altPhone"
-                  label={t('seller.order.altPhone')}
-                  placeholder="01XXXXXXXXX"
-                  inputMode="tel"
-                  hint={t('common.optional')}
-                />
-                <FormSelect
-                  name="district"
-                  label={t('seller.order.district')}
-                  items={districts}
-                  showSearch
-                  required
-                />
-                <FormSelect
-                  name="upazila"
-                  label={t('seller.order.upazila')}
-                  items={upazilas}
-                  showSearch
-                  required
-                  disabled={!district}
-                />
+      <Form<CustomerFormValues>
+        form={form}
+        onFinish={submit}
+        className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px]"
+      >
+        <div className="space-y-5">
+          <Panel title={t('seller.order.selectProduct')}>
+            {catalogLoading ? (
+              <div className="skeleton h-12 rounded-xl" />
+            ) : (
+              <div className="space-y-4">
+                {resolvedItems.map((item, idx) => (
+                  <div
+                    key={item.key}
+                    className={
+                      resolvedItems.length > 1
+                        ? 'border-line rounded-xl border p-3.5'
+                        : undefined
+                    }
+                  >
+                    {resolvedItems.length > 1 && (
+                      <div className="mb-2.5 flex items-center justify-between">
+                        <span className="text-muted text-xs font-semibold">
+                          Product #{idx + 1}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="xs"
+                          onClick={() => setRemovingKey(item.key)}
+                        >
+                          <Icon name="trash" size={14} />
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+
+                    <Select
+                      value={item.productId}
+                      onValueChange={(id) => {
+                        const next = products.find((p) => p.id === id);
+                        updateItem(item.key, {
+                          productId: id,
+                          sellingInput: next ? next.suggestedPrice || next.basePrice : undefined,
+                          variantInput: {},
+                        });
+                      }}
+                      placeholder={t('seller.order.selectProduct')}
+                      showSearch
+                      items={orderable.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} — ${money(p.basePrice)}`,
+                      }))}
+                    />
+
+                    {item.product && (
+                      <div className="bg-well/50 mt-3 flex items-center gap-4 rounded-xl p-3">
+                        <ProductImage
+                          src={item.product.images[0]}
+                          alt={item.product.name}
+                          className="size-16 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-ink truncate font-semibold">{item.product.name}</p>
+                          <p className="text-muted text-xs">
+                            Reseller Price:{' '}
+                            <Money value={item.product.basePrice} className="font-bold" /> ·
+                            Suggested: <Money value={item.product.suggestedPrice} />
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {item.product && (
+                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <Label className="mb-1.5">
+                            {t('seller.product.sellingPrice')}
+                            <span className="text-[var(--status-danger-fg)]" aria-hidden>
+                              *
+                            </span>
+                          </Label>
+                          <CurrencyInput
+                            value={item.selling}
+                            onValueChange={(v) =>
+                              updateItem(item.key, { sellingInput: v ?? undefined })
+                            }
+                            aria-invalid={item.priceCheck === 'below_base' || undefined}
+                          />
+                          {item.priceCheck === 'below_base' && (
+                            <p className="mt-1 text-xs text-[var(--status-danger-fg)]">
+                              Must be at least {money(item.product.basePrice)}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="mb-1.5">
+                            {t('common.quantity')}
+                            <span className="text-[var(--status-danger-fg)]" aria-hidden>
+                              *
+                            </span>
+                          </Label>
+                          <QuantityInput
+                            value={item.qty}
+                            onValueChange={(v) => updateItem(item.key, { qty: v ?? 0 })}
+                            min={1}
+                            max={50}
+                            aria-invalid={item.qty < 1 || undefined}
+                          />
+                          {item.qty < 1 && (
+                            <p className="mt-1 text-xs text-[var(--status-danger-fg)]">
+                              Quantity must be at least 1
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {item.product?.variations && item.product.variations.length > 0 && (
+                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        {item.product.variations.map((v) => (
+                          <div key={v.name}>
+                            <Label className="mb-1.5">
+                              {v.name}
+                              <span className="text-[var(--status-danger-fg)]" aria-hidden>
+                                *
+                              </span>
+                            </Label>
+                            <Select
+                              value={item.variant[v.name] ?? ''}
+                              onValueChange={(val) =>
+                                updateItem(item.key, {
+                                  variantInput: { ...item.variantInput, [v.name]: val },
+                                })
+                              }
+                              items={v.values.map((val) => ({ value: val, label: val }))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={addItem}
+                  className="w-full"
+                >
+                  <Icon name="plus" size={15} />
+                  Add another product
+                </Button>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title={t('seller.orders.customerInfo')}>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+              <FormInput name="name" label={t('common.name')} placeholder="Naim Alom" required />
+              <div>
+                <div className="mb-1.5 flex min-h-5 items-center justify-between gap-2">
+                  <Label htmlFor="phone">
+                    {t('common.phone')}
+                    <span className="text-[var(--status-danger-fg)]" aria-hidden>
+                      *
+                    </span>
+                  </Label>
+                  {isValidPhone && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      className="h-5 px-2 text-[11px]"
+                      onClick={() => setFraudOpen(true)}
+                    >
+                      <Icon name="search" size={12} />
+                      Check Fraud
+                    </Button>
+                  )}
+                </div>
+                <FormInput name="phone" placeholder="01811223344" />
+              </div>
+              <FormInput
+                name="email"
+                type="email"
+                label={`${t('common.email')} (${t('common.optional')})`}
+                placeholder="customer@example.com"
+                className="sm:col-span-2"
+              />
+              <FormSelect
+                name="division"
+                label="Division"
+                items={BD_DIVISIONS.map((d) => ({
+                  value: d.name,
+                  label: locale === 'bn' ? `${d.nameBn} (${d.name})` : d.name,
+                }))}
+                required
+              />
+              <FormSelect
+                name="district"
+                label={t('auth.district')}
+                items={districts}
+                showSearch
+                required
+              />
+              {upazilas.length > 0 ? (
                 <FormSelect
                   name="area"
-                  label={t('seller.order.deliveryArea')}
-                  hint={t('seller.order.deliveryAreaHint')}
-                  items={DELIVERY_AREAS.map((a) => ({
-                    value: a,
-                    label: `${t(`area.${a}`)} — ${money(settings.deliveryCharges[a])}`,
-                  }))}
-                />
-                <FormTextarea
-                  name="address"
-                  label={t('seller.order.fullAddress')}
-                  placeholder={t('seller.order.fullAddressPh')}
-                  rows={2}
+                  label="Area / Upazila"
+                  items={upazilas.map((u) => ({ value: u, label: u }))}
+                  showSearch
                   required
-                  className="sm:col-span-2"
                 />
-                <FormTextarea
-                  name="note"
-                  label={t('seller.order.orderNote')}
-                  rows={2}
-                  className="sm:col-span-2"
-                />
-              </div>
-            </Panel>
-          </div>
+              ) : (
+                <FormInput name="area" label="Area / Upazila" placeholder="Mirpur" required />
+              )}
+              <FormInput
+                name="street"
+                label="Street Address"
+                placeholder="House 12, Road 4, Block B"
+                required
+              />
+              <FormTextarea
+                name="customerNote"
+                label={t('common.note')}
+                placeholder="Call before delivery"
+                className="sm:col-span-2"
+                rows={2}
+              />
+            </div>
+          </Panel>
+        </div>
 
-          <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            <Panel title={<StepTitle n={3} label={t('seller.order.summary')} />}>
-              <dl className="space-y-2 text-[13px]">
-                <SumRow
-                  label={`${t('seller.order.subtotal')}${qty > 1 ? ` (${qty}×)` : ''}`}
-                  value={quote.subtotal}
-                />
-                <SumRow label={t('seller.order.codAmount')} value={quote.codAmount} strong />
-              </dl>
-              <div className="bg-well/60 mt-4 rounded-xl p-3">
-                <p className="text-subtle mb-1.5 text-[11px] font-bold tracking-wide uppercase">
-                  {t('seller.order.payNow')}
-                </p>
-                <dl className="space-y-1.5 text-[13px]">
-                  <SumRow
-                    label={`${t('invoice.deliveryCharge')} · ${t(`area.${area}`)}`}
-                    value={deliveryCharge}
-                  />
-                  <SumRow label={t('invoice.packagingCharge')} value={packagingCharge} />
-                  <div className="border-line flex items-center justify-between border-t pt-2">
-                    <dt className="text-ink font-semibold">{t('common.total')}</dt>
-                    <dd>
-                      <Money value={quote.payNow} className="text-ink text-base font-extrabold" />
-                    </dd>
-                  </div>
-                </dl>
+        <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+          <Panel title={t('seller.order.summary')}>
+            <dl className="divide-line divide-y text-[13px]">
+              <div className="flex justify-between py-2.5">
+                <dt className="text-muted">Selling Total × {totalQty}</dt>
+                <dd>
+                  <Money value={sellingTotal} className="font-semibold" />
+                </dd>
               </div>
-              <dl className="mt-4 space-y-1.5 text-[13px]">
-                <SumRow label={t('seller.order.walletBalance')} value={wallet.available} />
-                <SumRow
-                  label={t('seller.order.balanceAfter')}
-                  value={quote.balanceAfter}
-                  tone={
-                    quote.balanceAfter < 0
-                      ? 'text-[var(--status-danger-fg)] font-semibold'
-                      : undefined
-                  }
-                />
-              </dl>
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-[var(--status-ok-bg)] px-3 py-2.5">
-                <span className="text-[13px] font-semibold text-[var(--status-ok-fg)]">
-                  {t('seller.order.expectedProfit')}
+              <div className="flex justify-between py-2.5">
+                <dt className="text-muted">
+                  {t('invoice.deliveryCharge')} ({isInsideDhaka ? 'Inside Dhaka' : 'Outside Dhaka'})
+                </dt>
+                <dd>
+                  <Money value={deliveryCharge} className="font-semibold" />
+                </dd>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <dt className="text-ink font-bold">Customer COD Total</dt>
+                <dd>
+                  <Money value={codTotal} className="text-accent font-extrabold" />
+                </dd>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <dt className="text-muted">{t('invoice.packagingCharge')}</dt>
+                <dd>
+                  <Money value={packagingCost} className="font-semibold" />
+                </dd>
+              </div>
+              <div className="flex justify-between py-2.5">
+                <dt className="text-ink font-bold">Expected Profit</dt>
+                <dd>
+                  <Money
+                    value={expectedProfit}
+                    className={
+                      expectedProfit < 0
+                        ? 'font-extrabold text-[var(--status-danger-fg)]'
+                        : 'font-extrabold text-[var(--status-ok-fg)]'
+                    }
+                  />
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-4">
+              <Label className="mb-1.5">
+                Delivery charge payment
+                <span className="text-[var(--status-danger-fg)]" aria-hidden>
+                  *
                 </span>
-                <Money
-                  value={ready ? quote.expectedProfit : 0}
-                  signed
-                  className="text-lg font-extrabold text-[var(--status-ok-fg)]"
-                />
-              </div>
+              </Label>
+              <Select
+                value={deliveryPaymentMode}
+                onValueChange={(v) => setDeliveryPaymentMode(v as 'with_product' | 'advance')}
+                items={[
+                  {
+                    value: 'with_product',
+                    label: 'Customer will pay delivery charge with product',
+                  },
+                  {
+                    value: 'advance',
+                    label: 'Customer already paid delivery charge in advance',
+                  },
+                ]}
+              />
+            </div>
 
-              {!quote.sufficient && product ? (
-                <div className="mt-4 space-y-3">
-                  <Callout
-                    tone="danger"
-                    title={t('seller.order.insufficient')}
-                    description={t('seller.order.insufficientDesc', {
-                      need: money(quote.payNow),
-                      have: money(wallet.available),
-                      short: money(Math.max(short, settings.minAddBalance)),
-                    })}
-                  />
-                  <Button asChild variant="primary" className="w-full">
-                    <Link
-                      href={`/seller/wallet/add-balance?amount=${Math.max(settings.minAddBalance, Math.ceil(short / 10) * 10)}`}
-                    >
-                      <Icon name="moneyAdd" size={16} />
-                      {t('seller.order.addBalance')}
+            <div className="bg-well/60 mt-4 flex items-center justify-between rounded-xl p-3 text-xs">
+              <span className="text-muted">{t('seller.wallet.available')}</span>
+              <Money value={wallet.walletBalance} className="text-ink font-bold" />
+            </div>
+
+            {!sufficient && validItems.length > 0 && (
+              <Callout
+                tone="danger"
+                compact
+                className="mt-3"
+                description={`Insufficient wallet balance. Need ${money(short)} more to cover delivery + packaging.`}
+                action={
+                  <Button size="sm" variant="primary" asChild>
+                    <Link href={`/seller/wallet/add-balance?amount=${short}`}>
+                      {t('nav.addBalance')}
                     </Link>
                   </Button>
-                  <Button type="button" disabled className="w-full">
-                    {t('seller.order.confirmOrder')}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={!ready}
-                  className="bg-highlight text-highlight-contrast hover:bg-highlight-hover mt-4 w-full font-bold"
-                >
-                  <Icon name="check" size={17} />
-                  {t('seller.order.confirmOrder')}
-                </Button>
-              )}
-              <p className="text-subtle mt-3 flex gap-1.5 text-[11.5px]">
-                <Icon name="info" size={14} className="mt-px shrink-0" />
-                {t('seller.order.chargedOnce')}
-              </p>
-            </Panel>
-          </div>
+                }
+              />
+            )}
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="mt-5 w-full"
+              disabled={!ready || !sufficient}
+            >
+              <Icon name="check" size={17} />
+              {t('nav.placeOrder')}
+            </Button>
+          </Panel>
         </div>
       </Form>
 
       <ConfirmDialog
         open={!!confirming}
-        onOpenChange={(o) => !o && !placing && setConfirming(null)}
-        tone="info"
-        icon="cart"
+        onOpenChange={(o) => !o && setConfirming(null)}
         title={t('seller.order.confirmTitle')}
-        description={t('seller.order.confirmDesc', { amount: money(quote.payNow) })}
-        bullets={
-          confirming && product
-            ? [
-                { icon: 'box' as const, text: `${product.name} × ${qty}` },
-                { icon: 'user' as const, text: `${confirming.name} · ${confirming.phone}` },
-                {
-                  icon: 'coin' as const,
-                  text: `${t('seller.order.codAmount')}: ${money(quote.codAmount)}`,
-                },
-                {
-                  icon: 'wallet' as const,
-                  text: `${t('seller.order.payNow')}: ${money(quote.payNow)}`,
-                },
-              ]
-            : undefined
-        }
-        confirmLabel={placing ? t('seller.order.placing') : t('seller.order.confirmOrder')}
-        cancelLabel={t('common.cancel')}
-        loading={placing}
-        autoClose={false}
-        onConfirm={confirm}
+        description={`Upfront deduction of ${money(upfrontCost)} (delivery + packaging) will be charged from your wallet now.`}
+        confirmLabel={placing ? t('common.loading') : t('common.confirm')}
+        onConfirm={confirmOrder}
       />
-    </div>
-  );
-}
 
-function StepTitle({ n, label }: { n: number; label: string }) {
-  const { num } = useI18n();
-  return (
-    <span className="flex items-center gap-2.5">
-      <span className="bg-brand num grid size-6 place-items-center rounded-full text-[11px] font-bold text-white">
-        {num(n)}
-      </span>
-      {label}
-    </span>
-  );
-}
-
-function SumRow({
-  label,
-  value,
-  strong,
-  tone,
-}: {
-  label: string;
-  value: number;
-  strong?: boolean;
-  tone?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-muted">{label}</dt>
-      <dd>
-        <Money
-          value={value}
-          className={tone ?? (strong ? 'text-ink text-base font-bold' : 'text-ink font-semibold')}
-        />
-      </dd>
-    </div>
-  );
-}
-
-function Success({ order }: { order: Order }) {
-  const { t, money } = useI18n();
-  return (
-    <div className="mx-auto max-w-xl py-6 text-center sm:py-12">
-      <div className="relative mx-auto grid size-20 place-items-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-[var(--status-ok-bg)]" />
-        <span className="relative grid size-20 place-items-center rounded-full bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]">
-          <Icon name="checkCircle" size={40} />
-        </span>
-      </div>
-      <h1 className="type-page-title text-ink mt-6">{t('seller.order.successTitle')}</h1>
-      <p className="type-body text-muted mt-2">
-        {t('seller.order.successDesc', {
-          id: order.id,
-          amount: money(order.deliveryCharge + order.packagingCharge),
-        })}
-      </p>
-      <div className="bg-panel border-line mt-6 rounded-2xl border p-4 text-left text-[13px]">
-        <div className="flex justify-between py-1.5">
-          <span className="text-muted">{t('common.orderId')}</span>
-          <span className="text-ink font-semibold">{order.id}</span>
-        </div>
-        <div className="flex justify-between py-1.5">
-          <span className="text-muted">{t('common.product')}</span>
-          <span className="text-ink text-right font-semibold">
-            {order.productName} × {order.quantity}
-          </span>
-        </div>
-        <div className="flex justify-between py-1.5">
-          <span className="text-muted">{t('seller.order.codAmount')}</span>
-          <Money value={order.sellingPrice * order.quantity} className="text-ink font-semibold" />
-        </div>
-        <div className="flex justify-between py-1.5">
-          <span className="text-muted">{t('seller.order.expectedProfit')}</span>
-          <Money
-            value={(order.sellingPrice - order.basePrice) * order.quantity}
-            className="font-bold text-[var(--status-ok-fg)]"
-          />
-        </div>
-      </div>
-      <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
-        <Button variant="primary" asChild>
-          <Link href={`/seller/orders/${order.id}`}>{t('seller.order.viewOrder')}</Link>
-        </Button>
-        <Button variant="secondary" asChild>
-          <Link href={`/seller/invoices/${order.id}`}>
-            <Icon name="receipt" size={16} />
-            {t('seller.order.viewInvoice')}
-          </Link>
-        </Button>
-        <Button variant="ghost" asChild>
-          <Link href="/seller/products">{t('seller.order.placeAnother')}</Link>
-        </Button>
-      </div>
+      <ConfirmDialog
+        open={!!removingKey}
+        onOpenChange={(o) => !o && setRemovingKey(null)}
+        tone="danger"
+        title="Remove product?"
+        description="Are you sure you want to remove this product from the order?"
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (removingKey) removeItem(removingKey);
+          setRemovingKey(null);
+        }}
+      />
+      <CourierHistoryModal
+        open={fraudOpen}
+        onOpenChange={setFraudOpen}
+        fixedPhone={cleanPhone}
+        endpoint="/api/seller/fraud-check"
+      />
     </div>
   );
 }

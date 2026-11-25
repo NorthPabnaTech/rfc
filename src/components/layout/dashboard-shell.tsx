@@ -4,13 +4,14 @@ import * as React from 'react';
 import Link from 'next/link';
 
 import { useI18n } from '@/i18n/provider';
-import { useEarningsReleaser, usePlatformStore, useStoreHydrated } from '@/stores/platform-store';
+import { useResellerAuth } from '@/stores/reseller-auth';
 import type { Role } from '@/types/platform';
 import { PlatformMark } from '@components/common/platform-logo';
 import { Icon } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@components/ui/sheet';
 import type { NavGroup } from '@config/navigation';
+import { PLATFORM } from '@config/platform';
 import { cn } from '@lib/utils';
 
 import { Sidebar } from './sidebar';
@@ -35,8 +36,7 @@ export function DashboardShell({
   groups: NavGroup[];
   children: React.ReactNode;
 }) {
-  const hydrated = useStoreHydrated();
-  const session = usePlatformStore((s) => s.session);
+  const { initialized, loading, reseller, init } = useResellerAuth();
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   // Read the saved rail state once (the skeleton renders until hydrated, so
@@ -48,7 +48,10 @@ export function DashboardShell({
       return false;
     }
   });
-  useEarningsReleaser();
+
+  React.useEffect(() => {
+    void init();
+  }, [init]);
 
   const toggleCollapse = () =>
     setCollapsed((c) => {
@@ -60,29 +63,35 @@ export function DashboardShell({
       return !c;
     });
 
-  if (!hydrated) return <ShellSkeleton />;
-  if (session?.role !== role) return <AccessDenied role={role} />;
+  if (!initialized || loading) return <ShellSkeleton />;
+  if (!reseller || role !== 'seller') return <AccessDenied />;
 
-  const panelLabel = role === 'admin' ? t('nav.adminPanel') : t('nav.sellerPanel');
-  const home = role === 'admin' ? '/admin' : '/seller';
+  const panelLabel = t('nav.sellerPanel');
+  const home = '/seller';
 
   return (
     <div className="bg-surface flex min-h-dvh">
       <aside
         className={cn(
           'border-sidebar-border sticky top-0 hidden h-dvh shrink-0 border-r transition-[width] duration-200 lg:block',
-          collapsed ? 'w-[76px]' : 'w-[272px]',
+          collapsed ? 'w-[72px]' : 'w-[248px]',
         )}
       >
         <React.Suspense>
-          <Sidebar groups={groups} collapsed={collapsed} panelLabel={panelLabel} homeHref={home} />
+          <Sidebar
+            groups={groups}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            panelLabel={panelLabel}
+            homeHref={home}
+          />
         </React.Suspense>
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side="left"
-          className="w-[284px] max-w-[85vw] gap-0 border-0 p-0 [&>button]:text-white"
+          className="w-[260px] max-w-[85vw] gap-0 border-0 p-0 [&>button]:text-white"
         >
           <SheetTitle className="sr-only">{panelLabel}</SheetTitle>
           <React.Suspense>
@@ -98,19 +107,13 @@ export function DashboardShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <React.Suspense>
-          <Topbar
-            role={role}
-            groups={groups}
-            collapsed={collapsed}
-            onMenu={() => setMobileOpen(true)}
-            onToggleCollapse={toggleCollapse}
-          />
+          <Topbar role={role} groups={groups} onMenu={() => setMobileOpen(true)} />
         </React.Suspense>
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
           {children}
         </main>
         <footer className="text-subtle border-line border-t px-4 py-3 text-center text-[11.5px] sm:px-8">
-          {t('common.demoMode')}
+          {PLATFORM.name} · {t('nav.sellerPanel')}
         </footer>
       </div>
     </div>
@@ -137,9 +140,8 @@ function ShellSkeleton() {
   );
 }
 
-function AccessDenied({ role }: { role: Role }) {
+function AccessDenied() {
   const { t } = useI18n();
-  const login = usePlatformStore((s) => s.login);
   return (
     <main className="bg-hero-mesh flex min-h-dvh items-center justify-center px-4">
       <div className="bg-panel border-line shadow-pop w-full max-w-md rounded-2xl border p-8 text-center">
@@ -147,18 +149,18 @@ function AccessDenied({ role }: { role: Role }) {
         <h1 className="type-section-title text-ink mt-5">{t('auth.accessDenied')}</h1>
         <p className="type-body text-muted mt-2">
           {t('auth.accessDeniedDesc', {
-            role: role === 'admin' ? t('auth.demoAdmin') : t('auth.demoSeller'),
+            role: t('nav.sellerPanel'),
           })}
         </p>
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
-          <Button variant="primary" onClick={() => login(role)}>
-            <Icon name="login" size={16} />
-            {t('auth.continueAs', {
-              role: role === 'admin' ? t('auth.demoAdmin') : t('auth.demoSeller'),
-            })}
+          <Button variant="primary" asChild>
+            <Link href="/login">
+              <Icon name="login" size={16} />
+              {t('auth.goToLogin')}
+            </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/login">{t('auth.goToLogin')}</Link>
+            <Link href="/register">{t('auth.register')}</Link>
           </Button>
         </div>
       </div>

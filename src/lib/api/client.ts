@@ -1,38 +1,33 @@
-import { HAS_API, PLATFORM } from '@config/platform';
+import { PLATFORM } from '@config/platform';
 
-/*
- * Phase 2 API client — NOT used in Phase 1.
- *
- * Phase 1 pages read and mutate the demo store (`src/stores/platform-store.ts`).
- * When the backend exists, set NEXT_PUBLIC_API_URL and move each store action
- * onto these endpoints (the store's action names map 1:1 to the routes below),
- * keeping the UI unchanged. Nothing here makes a request until then.
- */
+const TOKEN_KEY = 'rfc_reseller_token';
 
-export const ENDPOINTS = {
-  login: '/auth/login',
-  register: '/auth/register',
-  products: '/products',
-  product: (id: string) => `/products/${id}`,
-  categories: '/categories',
-  suppliers: '/suppliers',
-  sellers: '/sellers',
-  seller: (id: string) => `/sellers/${id}`,
-  orders: '/orders',
-  order: (id: string) => `/orders/${id}`,
-  orderStatus: (id: string) => `/orders/${id}/status`,
-  wallet: '/wallet',
-  deposits: '/wallet/deposits',
-  withdrawals: '/wallet/withdrawals',
-  withdrawal: (id: string) => `/wallet/withdrawals/${id}`,
-  transactions: '/wallet/transactions',
-  earnings: '/wallet/earnings',
-  analytics: '/analytics',
-  expenses: '/expenses',
-  notifications: '/notifications',
-  tickets: '/support/tickets',
-  settings: '/settings',
-} as const;
+export function getResellerToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setResellerToken(token: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearResellerToken(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export class ApiError extends Error {
   constructor(
@@ -43,13 +38,52 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!HAS_API) throw new ApiError('API is not configured (Phase 1 uses mock data).', 0);
-  const res = await fetch(`${PLATFORM.apiUrl}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init.headers },
+export type ApiEnvelope<T> = {
+  ok: boolean;
+  data?: T;
+  error?: string;
+  authenticated?: boolean;
+};
+
+export function getApiBaseUrl(): string {
+  return (PLATFORM.apiUrl || 'http://localhost:3000/api/reseller').replace(/\/+$/, '');
+}
+
+export async function apiRaw<T>(
+  path: string,
+  init: RequestInit & { skipAuth?: boolean } = {},
+): Promise<ApiEnvelope<T>> {
+  const { skipAuth, headers, ...rest } = init;
+  const token = skipAuth ? null : getResellerToken();
+
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...rest,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
   });
-  if (!res.ok) throw new ApiError(await res.text().catch(() => res.statusText), res.status);
-  return (await res.json()) as T;
+
+  let json: ApiEnvelope<T> | null = null;
+  try {
+    json = (await res.json()) as ApiEnvelope<T>;
+  } catch {
+    /* non-JSON response */
+  }
+
+  if (!res.ok || !json?.ok) {
+    const msg = json?.error || res.statusText || 'Request failed';
+    throw new ApiError(msg, res.status);
+  }
+
+  return json;
+}
+
+export async function api<T>(
+  path: string,
+  init: RequestInit & { skipAuth?: boolean } = {},
+): Promise<T> {
+  const envelope = await apiRaw<T>(path, init);
+  return envelope.data as T;
 }

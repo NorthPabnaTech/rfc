@@ -1,9 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 
+import { deriveCategories, mapResellerProduct } from '@/app/seller/components/use-seller-data';
 import { type TKey, useI18n } from '@/i18n/provider';
-import { CATEGORIES, PRODUCTS } from '@/mock/catalog';
 import { usePlatformStore } from '@/stores/platform-store';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
 import { ProductImage } from '@components/platform/product-image';
@@ -11,7 +12,7 @@ import { StatusPill } from '@components/platform/status-pill';
 import { TelegramCard } from '@components/platform/telegram-card';
 import { Button } from '@components/ui/button';
 import { useHydrated } from '@hooks/use-hydrated';
-import { toPublicProduct } from '@lib/business/pricing';
+import { resellerApi, type ResellerProduct } from '@lib/api/reseller';
 import { cn } from '@lib/utils';
 
 export function SectionHeading({
@@ -55,18 +56,35 @@ export function SectionHeading({
 }
 
 /**
- * Public catalog — PRICE-FREE by construction (`toPublicProduct` strips every
- * price). Uses the static mock until mounted, then the (admin-editable) store.
+ * Public catalog — fetched unauthenticated (`skipAuth: true`) so prices are
+ * never returned by the API (`authenticated: false`).
  */
 export function usePublicCatalog() {
-  const products = usePlatformStore((s) => s.products);
-  const categories = usePlatformStore((s) => s.categories);
-  const mounted = useHydrated();
-  const src = mounted ? products : PRODUCTS;
-  return {
-    products: src.filter((p) => p.status !== 'draft').map(toPublicProduct),
-    categories: mounted ? categories : CATEGORIES,
-  };
+  const [raw, setRaw] = React.useState<ResellerProduct[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    resellerApi
+      .listProducts({ page: 1, limit: 50 }, { skipAuth: true })
+      .then((res) => {
+        if (active) setRaw(res.data.items);
+      })
+      .catch(() => {
+        if (active) setRaw([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const products = React.useMemo(() => raw.map(mapResellerProduct), [raw]);
+  const categories = React.useMemo(() => deriveCategories(raw), [raw]);
+
+  return { products, categories, loading };
 }
 
 export function HowItWorks() {
@@ -310,24 +328,29 @@ export function PublicProductCard({
   product,
   icon,
 }: {
-  product: ReturnType<typeof toPublicProduct>;
+  product: ReturnType<typeof mapResellerProduct>;
   icon: string;
 }) {
   const { t, locale } = useI18n();
   return (
     <div className="bg-panel border-line group flex flex-col overflow-hidden rounded-2xl border">
-      <ProductImage
-        src={product.images[0]}
-        alt={product.name}
-        icon={icon}
-        className="aspect-[4/3] w-full"
-        rounded="rounded-none"
-        iconSize={48}
-      />
+      <Link href={`/products/${product.slug}`} className="block overflow-hidden">
+        <ProductImage
+          src={product.images[0]}
+          alt={product.name}
+          icon={icon}
+          className="aspect-[4/3] w-full transition-transform duration-300 group-hover:scale-[1.03]"
+          rounded="rounded-none"
+          iconSize={48}
+        />
+      </Link>
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <h3 className="text-ink line-clamp-2 text-sm font-semibold">
+        <Link
+          href={`/products/${product.slug}`}
+          className="text-ink hover:text-accent line-clamp-2 text-sm font-semibold"
+        >
           {locale === 'bn' ? product.nameBn : product.name}
-        </h3>
+        </Link>
         <div className="mt-auto flex items-center justify-between gap-2">
           <StatusPill kind="availability" value={product.availability} />
         </div>

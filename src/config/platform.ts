@@ -10,7 +10,7 @@
  * a "not configured yet" state instead of a fake URL.
  */
 export const PLATFORM = {
-  name: process.env.NEXT_PUBLIC_APP_NAME || 'ResellHub',
+  name: process.env.NEXT_PUBLIC_APP_NAME || 'RFC Hub',
   tagline: 'Start reselling without inventory',
   appUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   apiUrl: process.env.NEXT_PUBLIC_API_URL || '',

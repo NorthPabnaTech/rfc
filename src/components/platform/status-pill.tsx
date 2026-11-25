@@ -24,7 +24,8 @@ const TONES: Record<Tone, string> = {
   violet: 'bg-violet-500/12 text-violet-600 dark:text-violet-300',
 };
 
-const ORDER_TONE: Record<OrderStatus, Tone> = {
+const ORDER_TONE: Record<string, Tone> = {
+  pending: 'warn',
   placed: 'neutral',
   processing: 'warn',
   confirmed: 'info',
@@ -90,5 +91,5 @@ export function StatusPill({
 }
 
 export function orderTone(s: OrderStatus): Tone {
-  return ORDER_TONE[s];
+  return ORDER_TONE[s] ?? 'neutral';
 }

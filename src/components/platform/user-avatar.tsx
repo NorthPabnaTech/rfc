@@ -9,20 +9,33 @@ function initials(name: string) {
   ).toUpperCase();
 }
 
-/** Initials avatar with a stable palette colour per name. */
+/** Initials avatar with a stable palette colour per name, or an image when `src` is provided. */
 export function UserAvatar({
   name,
+  src,
   color,
   size = 36,
   className,
 }: {
   name: string;
+  src?: string | null;
   color?: string;
   size?: number;
   className?: string;
 }) {
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const bg = color ?? COLORS[hash % COLORS.length]!;
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        className={cn('shrink-0 rounded-full object-cover', className)}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   return (
     <span
       className={cn(

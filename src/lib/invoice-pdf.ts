@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 
 import type { BusinessDTO, OrderDTO } from '@/types';
-import { ORDER_PLATFORM_LABELS, PAYMENT_METHOD_LABELS } from '@lib/constants';
+import { PAYMENT_METHOD_LABELS } from '@lib/constants';
 import { formatNumber, formatStoreDate } from '@lib/utils';
 
 type StoreIdentity = Pick<BusinessDTO, 'name' | 'address' | 'phone'> & {
@@ -257,10 +257,13 @@ export async function downloadOrderInvoicePdf(
       color: [17, 24, 39],
     });
   }
-  drawSmartText(doc, `Source: ${ORDER_PLATFORM_LABELS[order.platform]}`, colMid, y, {
-    size: 9.5,
-    color: [17, 24, 39],
-  });
+  drawSmartText(
+    doc,
+    `Payment: ${PAYMENT_METHOD_LABELS[order.paymentMethod]} (${order.paymentStatus.toUpperCase()})`,
+    colMid,
+    y,
+    { size: 9.5, color: [17, 24, 39] },
+  );
 
   y += 15;
   const fullAddress = [
@@ -271,18 +274,18 @@ export async function downloadOrderInvoicePdf(
     .filter(Boolean)
     .join(', ');
   const addrLines = wrapSmartText(doc, fullAddress, colMid - margin - 24, 9.5);
-  addrLines.forEach((line, idx) => {
-    drawSmartText(doc, line, margin, y + idx * 13, { size: 9.5, color: [17, 24, 39] });
-  });
-  drawSmartText(
-    doc,
-    `Payment: ${PAYMENT_METHOD_LABELS[order.paymentMethod]} (${order.paymentStatus.toUpperCase()})`,
-    colMid,
-    y,
-    { size: 9.5, color: [17, 24, 39] },
-  );
+  if (fullAddress) {
+    drawSmartText(doc, 'Address:', margin, y, {
+      size: 9,
+      weight: 'bold',
+      color: [107, 114, 128],
+    });
+    addrLines.forEach((line, idx) => {
+      drawSmartText(doc, line, margin, y + 13 + idx * 13, { size: 9.5, color: [17, 24, 39] });
+    });
+  }
 
-  y += Math.max(addrLines.length * 13, 18) + 22;
+  y += Math.max((fullAddress ? 13 : 0) + addrLines.length * 13, 18) + 22;
 
   // Items Table Header
   doc.setFillColor(243, 244, 246);

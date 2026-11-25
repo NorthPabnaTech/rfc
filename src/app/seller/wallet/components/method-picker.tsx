@@ -12,7 +12,24 @@ const BRAND: Record<PaymentMethod, { bg: string; fg: string; letter: string }> =
   bank: { bg: '#023047', fg: '#fff', letter: '' },
 };
 
-/** Payment / payout method cards (generic coloured tiles, not official logos). */
+const LOGO_SRC: Partial<Record<PaymentMethod, string>> = {
+  bkash: '/brand/bkash_logo.webp',
+  nagad: '/brand/nagad_logo.png',
+};
+
+function MethodLogo({ method }: { method: PaymentMethod }) {
+  const src = LOGO_SRC[method];
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={method} className="size-8 object-contain" />
+    );
+  }
+  if (method === 'rocket') return <span className="text-base font-black">R</span>;
+  return <Icon name="bank" size={20} />;
+}
+
+/** Payment / payout method cards. */
 export function MethodPicker({
   value,
   onChange,
@@ -25,7 +42,10 @@ export function MethodPicker({
   const { t } = useI18n();
   return (
     <div
-      className="grid grid-cols-2 gap-2.5 sm:grid-cols-4"
+      className={cn(
+        'grid gap-2.5',
+        methods.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4',
+      )}
       role="radiogroup"
       aria-label={t('seller.wallet.method')}
     >
@@ -45,10 +65,10 @@ export function MethodPicker({
             )}
           >
             <span
-              className="grid size-10 place-items-center rounded-xl text-base font-black"
-              style={{ background: b.bg, color: b.fg }}
+              className="grid size-10 place-items-center overflow-hidden rounded-xl text-base font-black"
+              style={LOGO_SRC[m] ? { background: '#ffffff' } : { background: b.bg, color: b.fg }}
             >
-              {b.letter || <Icon name="bank" size={20} />}
+              <MethodLogo method={m} />
             </span>
             <span className="text-ink text-[13px] font-semibold">{t(`payment.${m}`)}</span>
             {active && (

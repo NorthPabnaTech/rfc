@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 
 import { type TKey, useI18n } from '@/i18n/provider';
-import { usePlatformStore, useStoreHydrated } from '@/stores/platform-store';
+import { useResellerAuth } from '@/stores/reseller-auth';
 import { PlatformLogo } from '@components/common/platform-logo';
 import { Icon } from '@components/icon/icon';
 import { LanguageSwitcher, ThemeSwitcher } from '@components/platform/switchers';
@@ -25,9 +25,12 @@ export function SiteHeader() {
   const { t } = useI18n();
   const [open, setOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
-  const hydrated = useStoreHydrated();
-  const session = usePlatformStore((s) => s.session);
-  const dashboard = session?.role === 'admin' ? '/admin' : '/seller';
+  const { initialized, reseller, init } = useResellerAuth();
+  const dashboard = '/seller';
+
+  React.useEffect(() => {
+    void init();
+  }, [init]);
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -61,7 +64,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-1">
           <LanguageSwitcher />
           <ThemeSwitcher />
-          {hydrated && session ? (
+          {initialized && reseller ? (
             <Button variant="primary" size="md" asChild className="ml-1 hidden sm:inline-flex">
               <Link href={dashboard}>
                 <Icon name="grid" size={16} />
@@ -113,7 +116,7 @@ export function SiteHeader() {
             ))}
           </nav>
           <div className="border-line mt-auto flex flex-col gap-2 border-t p-4">
-            {hydrated && session ? (
+            {initialized && reseller ? (
               <Button variant="primary" asChild>
                 <Link href={dashboard}>{t('site.goToDashboard')}</Link>
               </Button>

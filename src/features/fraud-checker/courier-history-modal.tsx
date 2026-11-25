@@ -34,11 +34,13 @@ export function CourierHistoryModal({
   open,
   onOpenChange,
   fixedPhone,
+  endpoint = '/api/admin/fraud-check',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When provided (Order Details), automatically checks this number on open without manual input. */
   fixedPhone?: string;
+  endpoint?: string;
 }) {
   const isAutoMode = Boolean(fixedPhone);
   const [phoneInput, setPhoneInput] = React.useState(fixedPhone ?? '');
@@ -63,7 +65,7 @@ export function CourierHistoryModal({
     inFlightRef.current = true;
 
     try {
-      const res = await fetch('/api/admin/fraud-check', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: validated.phone }),
@@ -89,11 +91,14 @@ export function CourierHistoryModal({
       inFlightRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [endpoint]);
 
   // Auto-fetch when opened in Order Details mode.
   React.useEffect(() => {
     if (!open || !fixedPhone) return;
+    setReport(null);
+    setApiError(null);
+    setInputError(null);
     const timer = setTimeout(() => {
       void runCheck(fixedPhone);
     }, 0);

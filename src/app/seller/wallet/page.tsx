@@ -3,42 +3,84 @@
 import Link from 'next/link';
 
 import { useI18n } from '@/i18n/provider';
-import { usePlatformStore, useWallet } from '@/stores/platform-store';
-import { Panel } from '@components/dashboard/panel';
+import { KpiCard, Panel } from '@components/dashboard/panel';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
-import { transactionColumns } from '@components/platform/columns';
-import { WalletSummary } from '@components/platform/wallet-summary';
+import { Money } from '@components/platform/money';
+import { StatusPill } from '@components/platform/status-pill';
 import { PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { DataTable } from '@components/ui/data-table';
+import { type Column, DataTable } from '@components/ui/data-table';
+import type { WalletTransaction } from '@lib/api/reseller';
 
-import { useSellerRecords } from '../components/use-seller-data';
+import { useSellerTransactions, useSellerWallet } from '../components/use-seller-data';
 
 export default function WalletOverviewPage() {
-  const i18n = useI18n();
-  const { t, money } = i18n;
-  const { seller, transactions } = useSellerRecords();
-  const wallet = useWallet(seller?.id);
-  const s = usePlatformStore((x) => x.settings);
-  const fees = s.withdrawalFees;
+  const { t, money, dateTime } = useI18n();
+  const { wallet } = useSellerWallet();
+  const { items: transactions, loading } = useSellerTransactions({ page: 1, limit: 8 });
+
   const steps: [IconRegistryKey, string, string][] = [
     [
       'moneyAdd',
       t('site.walletFlow.w1'),
-      t('site.walletFlow.w1d', { min: money(s.minAddBalance) }),
+      t('site.walletFlow.w1d', { min: money(wallet.minDeposit) }),
     ],
     ['receipt', t('site.walletFlow.w2'), t('site.walletFlow.w2d')],
     ['clock', t('site.walletFlow.w3'), t('site.walletFlow.w3d')],
     [
       'moneySend',
       t('site.walletFlow.w4'),
-      t('site.walletFlow.w4d', {
-        min: money(s.minWithdrawal),
-        low: money(fees.lowFee),
-        high: money(fees.highFee),
-        threshold: money(fees.threshold),
-      }),
+      `Minimum withdrawal ${money(wallet.minWithdrawal)}.`,
     ],
+  ];
+
+  const columns: Column<WalletTransaction>[] = [
+    {
+      key: 'txNumber',
+      header: t('common.id'),
+      cell: (x) => <span className="font-mono text-xs text-muted">{x.txNumber}</span>,
+    },
+    {
+      key: 'date',
+      header: t('common.date'),
+      cell: (x) => <span className="num text-muted text-[13px]">{dateTime(x.createdAt)}</span>,
+    },
+    {
+      key: 'type',
+      header: t('common.type'),
+      cell: (x) => (
+        <span className="text-[13px] font-medium capitalize">{x.type.replace(/_/g, ' ')}</span>
+      ),
+    },
+    {
+      key: 'note',
+      header: t('common.description'),
+      cell: (x) => <span className="text-muted text-[13px]">{x.note || x.orderNumber || '—'}</span>,
+    },
+    {
+      key: 'amount',
+      header: t('common.amount'),
+      align: 'right',
+      cell: (x) => {
+        const signed = x.direction === 'debit' ? -x.amount : x.amount;
+        return (
+          <Money
+            value={signed}
+            signed
+            className={
+              x.direction === 'credit'
+                ? 'font-bold text-[var(--status-ok-fg)]'
+                : 'font-bold text-[var(--status-danger-fg)]'
+            }
+          />
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: t('common.status'),
+      cell: (x) => <StatusPill kind="tx" value={x.status === 'rejected' ? 'failed' : x.status} />,
+    },
   ];
 
   return (
@@ -46,7 +88,6 @@ export default function WalletOverviewPage() {
       <PageHeader
         title={t('seller.wallet.title')}
         description={t('seller.wallet.subtitle')}
-
         actions={
           <>
             <Button variant="secondary" asChild>
@@ -64,7 +105,38 @@ export default function WalletOverviewPage() {
           </>
         }
       />
-      <WalletSummary wallet={wallet} />
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <KpiCard
+          label={t('seller.dashboard.available')}
+          value={money(wallet.walletBalance)}
+          icon="wallet"
+          tone="brand"
+          href="/seller/wallet/transactions"
+        />
+        <KpiCard
+          label={t('seller.dashboard.totalEarnings')}
+          value={money(wallet.totalProfitEarned)}
+          icon="moneyBag"
+          tone="ok"
+          href="/seller/wallet/transactions?type=order_profit"
+        />
+        <KpiCard
+          label={t('nav.addBalance')}
+          value={money(wallet.totalDeposited)}
+          icon="moneyAdd"
+          tone="info"
+          href="/seller/wallet/transactions?type=deposit"
+        />
+        <KpiCard
+          label={t('nav.withdraw')}
+          value={money(wallet.totalWithdrawn)}
+          icon="moneySend"
+          tone="warn"
+          href="/seller/wallet/transactions?type=withdrawal"
+        />
+      </div>
+
       <Panel title={t('seller.wallet.howItWorks')}>
         <ol className="grid gap-3 md:grid-cols-4">
           {steps.map(([icon, title, desc], i) => (
@@ -85,6 +157,7 @@ export default function WalletOverviewPage() {
           ))}
         </ol>
       </Panel>
+
       <Panel
         title={t('seller.wallet.recent')}
         href="/seller/wallet/transactions"
@@ -92,9 +165,10 @@ export default function WalletOverviewPage() {
         flush
       >
         <DataTable
-          columns={transactionColumns(i18n)}
-          source={transactions.slice(0, 8)}
+          columns={columns}
+          source={transactions}
           rowKey="id"
+          isLoading={loading}
           classNames={{ root: 'rounded-none border-x-0 border-b-0' }}
           empty={{ title: t('common.noResults') }}
         />

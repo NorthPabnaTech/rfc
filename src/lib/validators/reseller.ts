@@ -10,7 +10,7 @@ import type { TKey, TVars } from '@/i18n/provider';
 
 type T = (key: TKey, vars?: TVars) => string;
 
-export const BD_PHONE = /^01[3-9]\d{8}$/;
+export const BD_PHONE = /^(?:\+?88)?01[3-9]\d{8}$/;
 const TELEGRAM = /^https:\/\/(t\.me|telegram\.me)\/[A-Za-z0-9_+/-]+$/;
 
 const req = (t: T) => z.string().trim().min(1, t('common.required'));

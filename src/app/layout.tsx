@@ -1,7 +1,7 @@
 import '@styles/globals.css';
 
 import type { Metadata, Viewport } from 'next';
-import { Anek_Bangla, Hind_Siliguri, Jost } from 'next/font/google';
+import { Anek_Bangla, Hind_Siliguri, Jost, Nunito_Sans } from 'next/font/google';
 import { cookies } from 'next/headers';
 import NextTopLoader from 'nextjs-toploader';
 
@@ -9,10 +9,20 @@ import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE } from '@/i18n/config';
 import { AppProviders } from '@/providers/app-providers';
 import { PLATFORM } from '@config/platform';
 
-// English UI text — Jost (variable weight). next/font also generates the
-// metric-matched "Jost Fallback" face, so text does not shift while it loads.
-const jost = Jost({ subsets: ['latin'], variable: '--font-jost', display: 'swap' });
-// Bangla text — Jost has no Bengali glyphs, so the browser falls through to it.
+// Body / UI font — Nunito Sans (variable).
+const nunitoSans = Nunito_Sans({
+  subsets: ['latin'],
+  variable: '--font-nunito-sans',
+  display: 'swap',
+});
+// Display / Heading font — Jost.
+const jost = Jost({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-jost',
+  display: 'swap',
+});
+// Bangla fallback — Hind Siliguri.
 const bangla = Hind_Siliguri({
   subsets: ['bengali'],
   variable: '--font-bangla',
@@ -51,7 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={locale}
-      className={`${jost.variable} ${bangla.variable} ${anek.variable}`}
+      className={`${nunitoSans.variable} ${jost.variable} ${bangla.variable} ${anek.variable}`}
       // next-themes sets the theme class before hydration.
       suppressHydrationWarning
     >

@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 
@@ -41,91 +40,73 @@ export function findActive(groups: NavGroup[], pathname: string, params: URLSear
 type Props = {
   groups: NavGroup[];
   collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onNavigate?: () => void;
   panelLabel: string;
   homeHref: string;
 };
 
 /**
- * Dark navy sidebar with collapsible groups. `collapsed` turns it into an
- * icon rail (desktop); on mobile it renders inside a Sheet.
+ * Dark navy sidebar. `collapsed` turns it into an icon rail (desktop);
+ * on mobile it renders inside a Sheet.
  */
-export function Sidebar({ groups, collapsed = false, onNavigate, panelLabel, homeHref }: Props) {
+export function Sidebar({
+  groups,
+  collapsed = false,
+  onToggleCollapse,
+  onNavigate,
+  panelLabel,
+  homeHref,
+}: Props) {
   const pathname = usePathname();
   const params = useSearchParams();
   const { t } = useI18n();
-  const [closed, setClosed] = React.useState<Record<string, boolean>>({});
+  const activeMatch = findActive(groups, pathname, params);
 
   return (
     <div className="bg-sidebar text-sidebar-fg flex h-full flex-col">
       <div
         className={cn(
-          'flex h-[68px] shrink-0 items-center',
-          collapsed ? 'justify-center px-2' : 'px-5',
+          'flex shrink-0 items-center',
+          collapsed ? 'flex-col justify-center gap-2 px-2 py-3.5' : 'h-[68px] justify-between px-4',
         )}
       >
-        <PlatformLogo tone="light" size="md" markOnly={collapsed} href={homeHref} />
+        <PlatformLogo tone="light" size="sm" markOnly={collapsed} href={homeHref} />
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+            className="text-sidebar-fg hover:bg-sidebar-raised hover:text-sidebar-fg-strong focus-ring grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
+          >
+            <Icon
+              name="panelLeft"
+              size={17}
+              className={cn('transition-transform', !collapsed && 'rotate-180')}
+            />
+          </button>
+        )}
       </div>
-      {!collapsed && (
-        <div className="px-5 pb-3">
-          <span className="border-sidebar-border text-sidebar-muted inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-[0.1em] uppercase">
-            <span className="bg-brand-400 size-1.5 rounded-full" />
-            {panelLabel}
-          </span>
-        </div>
-      )}
 
       <nav
         className="scrollbar-hidden flex-1 overflow-y-auto px-3 pt-2 pb-6"
         aria-label={panelLabel}
       >
-        {groups.map((group) => {
-          const isClosed = closed[group.label] && !collapsed;
-          const hasActive = group.items.some((i) => isNavActive(i, pathname, params));
-          return (
-            <div key={group.label} className="mb-4">
-              {collapsed ? (
-                <div className="border-sidebar-border mx-3 my-3 border-t first:hidden" />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setClosed((c) => ({ ...c, [group.label]: !c[group.label] }))}
-                  className="text-sidebar-muted hover:text-sidebar-fg-strong focus-ring flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold tracking-[0.14em] uppercase"
-                  aria-expanded={!isClosed}
-                >
-                  <span className="flex items-center gap-1.5">
-                    {t(group.label)}
-                    {isClosed && hasActive && (
-                      <span className="bg-brand-400 size-1.5 rounded-full" />
-                    )}
-                  </span>
-                  <Icon
-                    name="chevDown"
-                    size={13}
-                    className={cn('transition-transform', isClosed && '-rotate-90')}
-                  />
-                </button>
-              )}
-              <div className={cn('submenu', !isClosed && 'open')}>
-                <div>
-                  <ul className="mt-1.5 space-y-1">
-                    {group.items.map((item) => (
-                      <li key={item.href + item.label}>
-                        <NavLink
-                          item={item}
-                          active={isNavActive(item, pathname, params)}
-                          collapsed={collapsed}
-                          onNavigate={onNavigate}
-                          label={t(item.label)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        <ul className="space-y-1">
+          {groups
+            .flatMap((group) => group.items)
+            .map((item) => (
+              <li key={item.href + item.label}>
+                <NavLink
+                  item={item}
+                  active={activeMatch?.item === item}
+                  collapsed={collapsed}
+                  onNavigate={onNavigate}
+                  label={t(item.label)}
+                />
+              </li>
+            ))}
+        </ul>
       </nav>
     </div>
   );
@@ -150,18 +131,18 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'focus-ring group relative flex items-center gap-3 rounded-xl text-[14.5px] transition-colors',
-        collapsed ? 'mx-auto size-11 justify-center' : 'h-[42px] px-3.5',
+        'focus-ring group relative flex items-center gap-3 rounded-lg text-[13.5px] transition-colors',
+        collapsed ? 'mx-auto size-10 justify-center' : 'h-[38px] px-3',
         active
-          ? 'from-brand-500 to-brand-600 bg-gradient-to-r font-semibold text-white shadow-[0_8px_20px_-8px_var(--color-sidebar-glow)]'
+          ? 'bg-sidebar-active font-semibold text-white'
           : 'hover:bg-sidebar-raised hover:text-sidebar-fg-strong font-medium',
       )}
     >
       <Icon
         name={item.icon}
-        size={20}
+        size={18}
         className={cn(
-          active ? 'text-white' : 'text-sidebar-muted group-hover:text-sidebar-fg-strong',
+          active ? 'text-white' : 'text-sidebar-fg group-hover:text-sidebar-fg-strong',
         )}
       />
       {!collapsed && <span className="truncate">{label}</span>}

@@ -19,7 +19,9 @@
     "prepare": "husky",
     "test:smoke": "tsx --conditions=react-server --env-file=.env.local scripts/smoke-test.ts",
     "seed:demo": "tsx --conditions=react-server --env-file=.env.local scripts/seed-demo.ts",
-    "sync:locations": "tsx scripts/sync-bd-locations.ts"
+    "sync:locations": "tsx scripts/sync-bd-locations.ts",
+    "seed:reseller": "tsx --conditions=react-server --env-file=.env.local scripts/seed-reseller.ts",
+    "test:api": "tsx --conditions=react-server --env-file=.env.local scripts/api-smoke-test.ts"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [

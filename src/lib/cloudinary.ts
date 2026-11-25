@@ -94,6 +94,7 @@ export async function uploadImageWithMeta(
         unique_filename: false,
         overwrite: false,
         resource_type: 'image',
+        format: 'webp',
         transformation: [{ width: edge, height: edge, crop: 'limit', quality: 'auto:good' }],
       },
       (error, res) => (error || !res ? reject(error ?? new Error('Upload failed')) : resolve(res)),

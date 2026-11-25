@@ -74,20 +74,70 @@ export function Panel({
 
 export type KpiTone = 'brand' | 'sun' | 'ok' | 'danger' | 'info' | 'navy' | 'violet' | 'warn';
 
-const TONE: Record<KpiTone, string> = {
-  brand: 'bg-brand-soft text-brand-ink',
-  sun: 'bg-highlight-soft text-[var(--color-sun-600)] dark:text-[var(--color-sun-300)]',
-  ok: 'bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]',
-  danger: 'bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]',
-  info: 'bg-[var(--status-info-bg)] text-[var(--status-info-fg)]',
-  warn: 'bg-[var(--status-warn-bg)] text-[var(--status-warn-fg)]',
-  navy: 'bg-[#023047]/8 text-[#023047] dark:bg-white/8 dark:text-white',
-  violet: 'bg-violet-500/12 text-violet-600 dark:text-violet-300',
+const TONE: Record<
+  KpiTone,
+  { bg: string; fg: string; cardGradient: string; cardBorder: string }
+> = {
+  brand: {
+    bg: 'linear-gradient(135deg, #1170f5, #19c6ff)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #1170f5 18%, var(--color-panel)), color-mix(in srgb, #19c6ff 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #1170f5 32%, var(--color-line))',
+  },
+  ok: {
+    bg: 'linear-gradient(135deg, #10b981, #14b8a6)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #10b981 18%, var(--color-panel)), color-mix(in srgb, #14b8a6 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #10b981 32%, var(--color-line))',
+  },
+  warn: {
+    bg: 'linear-gradient(135deg, #f59e0b, #f97316)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #f59e0b 18%, var(--color-panel)), color-mix(in srgb, #f97316 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #f59e0b 32%, var(--color-line))',
+  },
+  sun: {
+    bg: 'linear-gradient(135deg, #f59e0b, #f97316)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #f59e0b 18%, var(--color-panel)), color-mix(in srgb, #f97316 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #f59e0b 32%, var(--color-line))',
+  },
+  danger: {
+    bg: 'linear-gradient(135deg, #f43f5e, #ef4444)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #f43f5e 18%, var(--color-panel)), color-mix(in srgb, #ef4444 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #f43f5e 32%, var(--color-line))',
+  },
+  info: {
+    bg: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #0ea5e9 18%, var(--color-panel)), color-mix(in srgb, #6366f1 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #0ea5e9 32%, var(--color-line))',
+  },
+  navy: {
+    bg: 'linear-gradient(135deg, #64748b, #475569)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #64748b 16%, var(--color-panel)), color-mix(in srgb, #334155 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #64748b 28%, var(--color-line))',
+  },
+  violet: {
+    bg: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    fg: '#ffffff',
+    cardGradient:
+      'linear-gradient(135deg, color-mix(in srgb, #6366f1 18%, var(--color-panel)), color-mix(in srgb, #8b5cf6 8%, var(--color-panel)))',
+    cardBorder: 'color-mix(in srgb, #6366f1 32%, var(--color-line))',
+  },
 };
 
 /**
- * Metric card: label + icon on the top row, the value large underneath, then
- * an optional trend pill ("▲ 24% vs last month") or hint.
+ * Metric card: matches `StatCard` (gradient surface + gradient icon medallion).
  */
 export function KpiCard({
   label,
@@ -109,50 +159,56 @@ export function KpiCard({
   href?: string;
   className?: string;
 }) {
+  const t = TONE[tone];
   const body = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-muted pt-0.5 text-[13.5px] leading-snug font-medium">{label}</p>
-        <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', TONE[tone])}>
-          <Icon name={icon} size={20} />
-        </span>
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="type-caption text-muted truncate">{label}</p>
+        <p className="num text-ink mt-1 truncate text-[21px] leading-tight font-semibold tracking-tight">
+          {value}
+        </p>
+        {(delta || hint) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {delta && (
+              <span
+                className={cn(
+                  'num inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold',
+                  delta.value >= 0
+                    ? 'bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]'
+                    : 'bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]',
+                )}
+              >
+                <Icon name={delta.value >= 0 ? 'chevUp' : 'chevDown'} size={12} />
+                {delta.text}
+              </span>
+            )}
+            <span className="text-subtle truncate text-[12px]">{hint ?? delta?.label}</span>
+          </div>
+        )}
       </div>
-      <p className="num text-ink mt-2 text-[24px] leading-none font-semibold tracking-[-0.02em] sm:text-[28px]">
-        {value}
-      </p>
-      {(delta || hint) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          {delta && (
-            <span
-              className={cn(
-                'num inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[12px] font-semibold',
-                delta.value >= 0
-                  ? 'bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]'
-                  : 'bg-[var(--status-danger-bg)] text-[var(--status-danger-fg)]',
-              )}
-            >
-              <Icon name={delta.value >= 0 ? 'chevUp' : 'chevDown'} size={12} />
-              {delta.text}
-            </span>
-          )}
-          <span className="text-subtle text-[12.5px]">{hint ?? delta?.label}</span>
-        </div>
-      )}
-    </>
+      <span
+        aria-hidden="true"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+        style={{ background: t.bg, color: t.fg }}
+      >
+        <Icon name={icon} size={17} stroke={1.8} />
+      </span>
+    </div>
   );
   const cls = cn(
-    CARD,
-    'block min-w-0 p-4 sm:p-5',
-    href &&
-      'focus-ring hover:border-brand-200 transition-[border-color,transform] hover:-translate-y-px dark:hover:border-brand-700',
+    'block min-w-0 rounded-xl border px-4 py-3.5 text-left shadow-xs transition-[transform,box-shadow,border-color]',
+    href && 'focus-ring hover:-translate-y-0.5 hover:shadow-md',
     className,
   );
+  const style = { backgroundImage: t.cardGradient, borderColor: t.cardBorder };
   return href ? (
-    <Link href={href} className={cls}>
+    <Link href={href} className={cls} style={style}>
       {body}
     </Link>
   ) : (
-    <div className={cls}>{body}</div>
+    <div className={cls} style={style}>
+      {body}
+    </div>
   );
 }
 

@@ -65,7 +65,7 @@ function flattenLeaves(obj: Record<string, unknown>, prefix = ''): Array<[string
 }
 
 /**
- * Wraps React Hook Form: defaults validation to 'onTouched', accepts a zod
+ * Wraps React Hook Form: defaults validation to 'onChange', accepts a zod
  * `schema`, and layers antd-style aliases on top of the standard RHF API.
  */
 export function useForm<T extends FieldValues = FieldValues>(
@@ -74,7 +74,8 @@ export function useForm<T extends FieldValues = FieldValues>(
   const { schema, resolver, ...rhfProps } = props ?? {};
 
   const rhf = useReactHookForm<T>({
-    mode: 'onTouched',
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     // An explicit resolver wins; otherwise derive one from the zod schema.
     // `raw`: the schema only validates — submit handlers get the input values
     // (typed `z.input<>`), and the server action parses them itself. Passing

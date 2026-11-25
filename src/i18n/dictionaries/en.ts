@@ -398,6 +398,7 @@ export const en = {
 
   status: {
     order: {
+      pending: 'Pending',
       placed: 'Order Placed',
       processing: 'Processing',
       confirmed: 'Confirmed',

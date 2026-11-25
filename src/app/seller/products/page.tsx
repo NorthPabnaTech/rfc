@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import { useI18n } from '@/i18n/provider';
 import type { Category, SellerProduct } from '@/types/platform';
 import { ListToolbar } from '@components/dashboard/list-toolbar';
-import { Icon } from '@components/icon/icon';
 import { Money } from '@components/platform/money';
 import { ProductImage } from '@components/platform/product-image';
 import { StatusPill } from '@components/platform/status-pill';
@@ -30,9 +29,9 @@ export default function SellerProductsPage() {
 }
 
 function Catalog() {
-  const { t, locale, num } = useI18n();
+  const { t, locale } = useI18n();
   const params = useSearchParams();
-  const { products, categories } = useSellerCatalog();
+  const { products, categories, loading } = useSellerCatalog();
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const list = useListState({
     rows: products,
@@ -123,9 +122,21 @@ function Catalog() {
         />
       </ListToolbar>
 
-      <p className="text-muted text-sm">{t('seller.catalog.count', { count: num(list.total) })}</p>
-
-      {list.total === 0 ? (
+      {loading ? (
+        view === 'grid' ? (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="skeleton h-72 rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton h-24 rounded-2xl" />
+            ))}
+          </div>
+        )
+      ) : list.total === 0 ? (
         <EmptyState
           title={t('common.noResults')}
           description={t('common.noResultsHint')}
@@ -167,9 +178,10 @@ function Catalog() {
 function ProductCard({ product: p, category }: { product: SellerProduct; category?: Category }) {
   const { t, locale } = useI18n();
   const out = p.availability === 'out_of_stock';
+  const href = `/seller/products/${p.slug || p.id}`;
   return (
     <div className="bg-panel border-line group flex flex-col overflow-hidden rounded-2xl border transition-shadow hover:shadow-[0_18px_40px_-24px_rgb(2_48_71/0.45)]">
-      <Link href={`/seller/products/${p.id}`} className="relative block overflow-hidden">
+      <Link href={href} className="relative block overflow-hidden">
         <ProductImage
           src={p.images[0]}
           alt={p.name}
@@ -181,18 +193,16 @@ function ProductCard({ product: p, category }: { product: SellerProduct; categor
           rounded="rounded-none"
           iconSize={46}
         />
-        <StatusPill
-          kind="availability"
-          value={p.availability}
-          className="absolute top-2.5 left-2.5 shadow-sm"
-        />
+        <div className="bg-panel/95 ring-line absolute top-2.5 left-2.5 rounded-full shadow-sm ring-1 backdrop-blur-sm">
+          <StatusPill kind="availability" value={p.availability} />
+        </div>
       </Link>
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         <span className="text-subtle text-[11px] font-semibold tracking-wide uppercase">
           {locale === 'bn' ? category?.nameBn : category?.name}
         </span>
         <Link
-          href={`/seller/products/${p.id}`}
+          href={href}
           className="text-ink hover:text-accent mt-1 line-clamp-2 text-[13.5px] leading-snug font-semibold"
         >
           {locale === 'bn' ? p.nameBn : p.name}
@@ -207,18 +217,15 @@ function ProductCard({ product: p, category }: { product: SellerProduct; categor
             <Money value={p.suggestedPrice} className="text-muted text-xs font-semibold" />
           </span>
         </div>
-        <div className="mt-3.5 grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/seller/products/${p.id}`}>{t('common.viewDetails')}</Link>
-          </Button>
+        <div className="mt-3.5">
           <Button
             variant="primary"
             size="sm"
             asChild
             disabled={out}
-            className={cn(out && 'pointer-events-none opacity-50')}
+            className={cn('w-full', out && 'pointer-events-none opacity-50')}
           >
-            <Link href={`/seller/products/${p.id}#price`} aria-disabled={out}>
+            <Link href={`${href}#price`} aria-disabled={out}>
               {t('seller.catalog.setPrice')}
             </Link>
           </Button>
@@ -228,9 +235,23 @@ function ProductCard({ product: p, category }: { product: SellerProduct; categor
   );
 }
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function ProductRow({ product: p, category }: { product: SellerProduct; category?: Category }) {
   const { t, locale } = useI18n();
   const out = p.availability === 'out_of_stock';
+  const href = `/seller/products/${p.slug || p.id}`;
   return (
     <div className="bg-panel border-line flex flex-col gap-4 rounded-2xl border p-3 sm:flex-row sm:items-center">
       <ProductImage
@@ -249,12 +270,12 @@ function ProductRow({ product: p, category }: { product: SellerProduct; category
           <StatusPill kind="availability" value={p.availability} />
         </div>
         <Link
-          href={`/seller/products/${p.id}`}
+          href={href}
           className="text-ink hover:text-accent mt-1 block font-semibold"
         >
           {locale === 'bn' ? p.nameBn : p.name}
         </Link>
-        <p className="text-muted mt-0.5 line-clamp-1 text-[12.5px]">{p.description}</p>
+        <p className="text-muted mt-0.5 line-clamp-1 text-[12.5px]">{stripHtml(p.description)}</p>
       </div>
       <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
         <div>
@@ -265,19 +286,16 @@ function ProductRow({ product: p, category }: { product: SellerProduct; category
           {t('seller.catalog.suggested')}: <Money value={p.suggestedPrice} />
         </span>
       </div>
-      <div className="flex gap-2 sm:flex-col">
+      <div className="flex">
         <Button
           variant="primary"
           size="sm"
           asChild
-          className={cn('flex-1', out && 'pointer-events-none opacity-50')}
+          disabled={out}
+          className={cn('w-full sm:w-auto', out && 'pointer-events-none opacity-50')}
         >
-          <Link href={`/seller/products/${p.id}#price`}>{t('seller.catalog.setPrice')}</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild className="flex-1">
-          <Link href={`/seller/products/${p.id}`}>
-            <Icon name="eye" size={14} />
-            {t('common.view')}
+          <Link href={`${href}#price`} aria-disabled={out}>
+            {t('seller.catalog.setPrice')}
           </Link>
         </Button>
       </div>
