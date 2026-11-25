@@ -130,6 +130,11 @@ your host's environment settings.
 | `npm run seed:demo [-- --reset]`                | Realistic development demo store (see above)                                                             |
 | `MONGODB_DB=rfc_gadget_test npm run test:smoke` | End-to-end business-rule test. Refuses to run unless the DB name ends in `_test`; cleans up after itself |
 
+### Test Database ENV
+
+`USE_TEST_DB=true
+MONGODB_DB_TEST=rfc_gadget_test`
+
 ## Images
 
 - **Uploads** go to Cloudinary folders `RFC-Gadget/products`, `RFC-Gadget/users`,
