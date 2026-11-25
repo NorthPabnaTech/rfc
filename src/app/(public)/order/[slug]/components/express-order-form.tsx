@@ -342,7 +342,7 @@ export function ExpressOrderForm({ product, user, addresses, fees }: Props) {
           <h2 className="text-ink text-lg font-bold">3. Payment Method</h2>
           <FormItem name="paymentMethod">
             {(field) => (
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="grid gap-2.5">
                 <button
                   type="button"
                   onClick={() => field.onChange('cod')}
@@ -359,22 +359,7 @@ export function ExpressOrderForm({ product, user, addresses, fees }: Props) {
                     <p className="text-xs opacity-80">Pay when you receive</p>
                   </div>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => field.onChange('paymently')}
-                  className={cn(
-                    'flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition',
-                    field.value === 'paymently'
-                      ? 'border-brand bg-brand-soft/70 text-ink'
-                      : 'border-line text-muted hover:border-line-2',
-                  )}
-                >
-                  <Icon name="card" size={18} className="text-accent shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">Pay Online</p>
-                    <p className="text-xs opacity-80">bKash, Nagad, Card</p>
-                  </div>
-                </button>
+                {/* Pay Online temporarily hidden */}
               </div>
             )}
           </FormItem>

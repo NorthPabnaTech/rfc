@@ -79,13 +79,13 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             zone: 'outside_dhaka',
           }),
       email: user?.email ?? '',
-      paymentMethod: 'paymently',
+      paymentMethod: 'cod',
       customerNote: '',
       saveAddress: !!user && addresses.length === 0,
     },
   });
   const zone = useWatch({ control: form.control, name: 'zone' }) as ShippingZone | undefined;
-  const paymentMethod = useWatch({ control: form.control, name: 'paymentMethod' }) ?? 'paymently';
+  const paymentMethod = useWatch({ control: form.control, name: 'paymentMethod' }) ?? 'cod';
   const clearCouponAction = React.useCallback(() => setCouponAction(null), []);
   const { quote, loading } = useCartQuote(
     items,
@@ -300,23 +300,8 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
         <Step n={3} title="Payment">
           <FormItem name="paymentMethod">
             {(field) => (
-              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-                <AddressChoice
-                  active={field.value === 'paymently'}
-                  onClick={() => field.onChange('paymently')}
-                  role="radio"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="bg-brand text-brand-contrast grid size-10 shrink-0 place-items-center rounded-full">
-                      <Icon name="card" size={18} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-ink font-semibold">Pay Online</p>
-                      <p className="text-muted text-xs">bKash</p>
-                    </div>
-                  </div>
-                </AddressChoice>
-
+              <div className="grid gap-3" role="radiogroup" aria-label="Payment method">
+                {/* Pay Online temporarily hidden */}
                 <AddressChoice
                   active={field.value === 'cod'}
                   onClick={() => field.onChange('cod')}
