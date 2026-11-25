@@ -26,7 +26,7 @@ export default async function HomePage() {
       getActiveBanners(),
       getActiveCampaigns(),
       getCategoryTree(),
-      listProductCards('featured', 5),
+      listProductCards('featured', 6),
       listProductCards('new', 10),
       listProductCards('deals', 10),
       listProductCards('combos', 5),
@@ -49,6 +49,7 @@ export default async function HomePage() {
         icon="sparkles"
         href="/products"
         products={featured}
+        gridClassName="xl:[&>*:nth-child(n+6)]:hidden"
         priority
       />
       <ProductSection
@@ -101,6 +102,7 @@ function ProductSection({
   icon,
   href,
   products,
+  gridClassName,
   priority = false,
 }: {
   title: string;
@@ -108,13 +110,18 @@ function ProductSection({
   icon: IconRegistryKey;
   href: string;
   products: ProductCardDTO[];
+  gridClassName?: string;
   priority?: boolean;
 }) {
   if (products.length === 0) return null;
   return (
     <section className="container-page pt-10 sm:pt-12">
       <SectionHeading title={title} subtitle={subtitle} icon={icon} href={href} />
-      <ProductGrid products={products} priorityCount={priority ? 5 : 0} />
+      <ProductGrid
+        products={products}
+        className={gridClassName}
+        priorityCount={priority ? 5 : 0}
+      />
     </section>
   );
 }
