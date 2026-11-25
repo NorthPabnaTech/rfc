@@ -2,10 +2,9 @@ import 'server-only';
 
 import { Types } from 'mongoose';
 
+import type { PaymentMethod, TransactionType, WithdrawalStatus } from '@/types/platform';
 import { quoteWithdrawal, releaseDate, withdrawalFee } from '@lib/business/wallet';
 import { AppError } from '@lib/errors';
-
-import type { PaymentMethod, TransactionType, WithdrawalStatus } from '@/types/platform';
 
 import { nextId, type Session, withTransaction } from '../db';
 import { DepositModel, EarningModel, TransactionModel, UserModel, WithdrawalModel } from '../models';
@@ -212,6 +211,9 @@ export async function requestWithdrawal(
   if (q.error === 'below_min' || q.error === 'empty') throw new AppError(`Minimum withdrawal is ৳${settings.minWithdrawal}.`, 422);
   if (q.error === 'insufficient') throw new AppError('Amount exceeds your available balance.', 409);
   const fee = withdrawalFee(input.amount, settings.withdrawalFees);
+  if (fee >= input.amount) {
+    throw new AppError(`The withdrawal fee (৳${fee}) is more than the amount. Withdraw a larger amount.`, 422);
+  }
 
   const w = await withTransaction(async (session) => {
     await debit(seller.id, input.amount, session); // hold the full amount

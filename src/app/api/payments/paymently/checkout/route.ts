@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { requireRequestUser } from '@/server/request-auth';
+import { PLATFORM } from '@config/platform';
 import { AppError } from '@lib/errors';
 import { createPaymentlyCharge, isPaymentlyConfigured } from '@lib/payments/paymently';
+
+/** Upper bound for one online top-up (guards against typos / abuse). */
+const MAX_DEPOSIT = 500_000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,26 +17,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = (await req.json()) as {
-      amount?: number;
-      fullName?: string;
-      email?: string;
-      resellerId?: string;
-    };
+    // The reseller id, name and email come from the verified session — never the body.
+    const user = await requireRequestUser(req, ['seller']);
 
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount < 1) {
+    const body = (await req.json().catch(() => null)) as { amount?: number } | null;
+    const amount = Number(body?.amount);
+    if (!Number.isInteger(amount) || amount < 1 || amount > MAX_DEPOSIT) {
       return NextResponse.json({ ok: false, error: 'Invalid deposit amount.' }, { status: 400 });
     }
 
-    const origin = req.nextUrl.origin;
+    // Redirects go to the configured app URL, not the (spoofable) request host.
+    const origin = (PLATFORM.appUrl || req.nextUrl.origin).replace(/\/+$/, '');
     const { paymentUrl } = await createPaymentlyCharge({
-      fullName: (body.fullName || 'Reseller').trim(),
-      email: (body.email || 'reseller@example.com').trim(),
+      fullName: user.name || 'Reseller',
+      email: user.email || 'reseller@example.com',
       amount,
       metadata: {
         type: 'wallet_deposit',
-        resellerId: String(body.resellerId || ''),
+        resellerId: user.id,
         amount: String(amount),
       },
       redirectUrl: `${origin}/seller/wallet/add-balance?paymently=success`,

@@ -2,10 +2,10 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import { businessSettingsSchema, generalSettingsSchema, telegramLink } from '@lib/validators/reseller';
-
 import { DEFAULT_SETTINGS } from '@/mock/settings';
 import type { PlatformSettings } from '@/types/platform';
+import { AppError } from '@lib/errors';
+import { businessSettingsSchema, generalSettingsSchema, telegramLink } from '@lib/validators/reseller';
 
 import { serverT } from '../http';
 import { toSettings } from '../mappers';
@@ -68,8 +68,15 @@ export const settingsPatchSchema = z.object({
 });
 
 export async function updateSettings(patch: z.output<typeof settingsPatchSchema>) {
-  await getSettings();
+  const current = await getSettings();
   const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+  // A withdrawal must always pay out something: the minimum has to exceed every fee.
+  const minWithdrawal = patch.minWithdrawal ?? current.minWithdrawal;
+  const fees = patch.withdrawalFees ?? current.withdrawalFees;
+  const maxFee = Math.max(fees.lowFee, fees.highFee, fees.atThresholdFee);
+  if (minWithdrawal <= maxFee) {
+    throw new AppError(`Minimum withdrawal (৳${minWithdrawal}) must be more than the highest withdrawal fee (৳${maxFee}).`, 422);
+  }
   await SettingsModel.updateOne({ _id: ID }, { $set: clean });
   return getSettings();
 }

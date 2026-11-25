@@ -3,12 +3,12 @@ import 'server-only';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
+import type { OrderStatus } from '@/types/platform';
+import { detectDeliveryArea } from '@lib/business/delivery';
 import { ORDER_TRANSITIONS } from '@lib/business/orders';
 import { sellerBasePrice } from '@lib/business/pricing';
 import { AppError } from '@lib/errors';
 import { customerSchema } from '@lib/validators/reseller';
-
-import type { OrderStatus } from '@/types/platform';
 
 import { nextId, withTransaction } from '../db';
 import { objectId, serverT } from '../http';
@@ -20,15 +20,22 @@ import { createPendingEarning, credit, debit, ledger } from './wallet';
 export const placeOrderSchema = z.object({
   productId: objectId,
   quantity: z.coerce.number().int().min(1).max(50),
-  sellingPrice: z.coerce.number().int().min(1),
+  sellingPrice: z.coerce.number().int().min(1).max(10_000_000),
+  /** The base price the seller saw; if the admin changed it since, the order is refused. */
+  expectedBasePrice: z.coerce.number().min(0).optional(),
   customer: customerSchema(serverT),
 });
 
 /**
  * Places an order for a seller. Never trusts the client: base price, delivery
- * and packaging charges come from the product + settings. The wallet is
- * debited once, atomically, inside the same transaction that creates the
+ * area and charges come from the product, the address and settings. The wallet
+ * is debited once, atomically, inside the same transaction that creates the
  * order and its two ledger entries.
+ *
+ * Price snapshot: the order stores basePrice / supplierCost / platformMargin /
+ * charges as they are NOW. Seller profit, platform profit and earnings are
+ * always computed from that snapshot, so changing a product's price later
+ * never changes the money on orders already placed.
  */
 export async function placeOrder(
   seller: { id: string; name: string },
@@ -39,11 +46,20 @@ export async function placeOrder(
     throw new AppError('This product is not available right now.', 409);
   }
   const base = sellerBasePrice(product);
+  if (input.expectedBasePrice !== undefined && input.expectedBasePrice !== base) {
+    throw new AppError(
+      `The base price of this product changed from ৳${input.expectedBasePrice} to ৳${base}. Review your selling price and place the order again.`,
+      409,
+    );
+  }
   if (input.sellingPrice < base) {
     throw new AppError(`Selling price must be at least the base price (৳${base}).`, 422);
   }
   const settings = await getSettings();
-  const { area, note, altPhone, ...customer } = input.customer;
+  // The client's `area` is ignored: the delivery zone always follows the address.
+  const { name, phone, address, district, upazila, note, altPhone } = input.customer;
+  const customer = { name, phone, address, district, upazila };
+  const area = detectDeliveryArea(customer.district, customer.upazila);
   const deliveryCharge = settings.deliveryCharges[area] + (product.deliveryCharge ?? 0);
   const packagingCharge = product.packagingCharge ?? 0;
 

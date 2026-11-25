@@ -29,6 +29,12 @@ export function clearResellerToken(): void {
   }
 }
 
+/** `Authorization` header for this app's own seller Route Handlers (`/api/seller/*`, `/api/payments/*`). */
+export function authHeaders(): Record<string, string> {
+  const token = getResellerToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,

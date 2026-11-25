@@ -13,7 +13,8 @@ import { StatusPill } from '@components/platform/status-pill';
 import { Callout, ConfirmDialog, PageHeader } from '@components/shared';
 import { CurrencyInput } from '@components/shared/numeric-format-input';
 import { Button } from '@components/ui/button';
-import { resellerApi, type DepositResponse } from '@lib/api/reseller';
+import { authHeaders } from '@lib/api/client';
+import { type DepositResponse,resellerApi } from '@lib/api/reseller';
 import { toast } from '@lib/toast';
 import { cn } from '@lib/utils';
 
@@ -33,7 +34,6 @@ function AddBalance() {
   const { t, money, dateTime } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
-  const reseller = useResellerAuth((s) => s.reseller);
   const refreshMe = useResellerAuth((s) => s.refreshMe);
   const { wallet, reload: reloadWallet } = useSellerWallet();
   const { items: recentDeposits, reload: reloadTx } = useSellerTransactions({
@@ -68,7 +68,7 @@ function AddBalance() {
     setVerifying(true);
     fetch('/api/payments/paymently/verify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ invoiceId }),
     })
       .then((r) => r.json())
@@ -132,13 +132,9 @@ function AddBalance() {
     try {
       const res = await fetch('/api/payments/paymently/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: value,
-          fullName: reseller?.name || 'Reseller',
-          email: reseller?.email || 'reseller@example.com',
-          resellerId: reseller?.id || '',
-        }),
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        // Name, email and reseller id come from the verified session on the server.
+        body: JSON.stringify({ amount: value }),
       });
       const json = (await res.json()) as { ok?: boolean; paymentUrl?: string; error?: string };
       if (!res.ok || !json.ok || !json.paymentUrl) {

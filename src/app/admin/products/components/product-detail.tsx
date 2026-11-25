@@ -45,7 +45,8 @@ export function ProductDetail({ id }: { id: string }) {
   const sup = suppliers.find((s) => s.id === product.supplierId);
   const base = sellerBasePrice(product);
   const delivered = productOrders.filter((o) => o.status === 'delivered');
-  const units = delivered.reduce((a, o) => a + o.quantity, 0);
+  // From each order's own price snapshot — a later price change must not rewrite past profit.
+  const platformProfit = delivered.reduce((a, o) => a + o.platformMargin * o.quantity, 0);
 
   const info: [string, React.ReactNode][] = [
     [
@@ -183,7 +184,7 @@ export function ProductDetail({ id }: { id: string }) {
             />
             <KpiCard
               label={t('admin.analysis.platformProfit')}
-              value={money(units * product.platformMargin)}
+              value={money(platformProfit)}
               icon="coin"
               tone="ok"
             />

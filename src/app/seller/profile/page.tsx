@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@components/ui/dialog';
-import { ApiError } from '@lib/api/client';
+import { ApiError, authHeaders } from '@lib/api/client';
 import { resellerApi } from '@lib/api/reseller';
 import { toast } from '@lib/toast';
 import { BD_PHONE } from '@lib/validators/reseller';
@@ -87,7 +87,7 @@ export default function SellerProfilePage() {
       if (reseller.avatarUrl) {
         await fetch('/api/seller/avatar/upload', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ url: reseller.avatarUrl }),
         });
       }
@@ -95,6 +95,7 @@ export default function SellerProfilePage() {
       formData.append('file', file);
       const uploadRes = await fetch('/api/seller/avatar/upload', {
         method: 'POST',
+        headers: authHeaders(),
         body: formData,
       });
       const uploadJson = (await uploadRes.json()) as {

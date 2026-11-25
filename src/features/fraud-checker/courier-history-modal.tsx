@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@components/ui/dialog';
 import { Input } from '@components/ui/input';
+import { authHeaders } from '@lib/api/client';
 
 import { FraudReportView } from './fraud-report-view';
 
@@ -67,7 +68,7 @@ export function CourierHistoryModal({
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ phone: validated.phone }),
       });
 
