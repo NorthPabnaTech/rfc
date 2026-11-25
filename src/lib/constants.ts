@@ -80,6 +80,7 @@ export const ORDER_PLATFORMS = [
   'instagram',
   'tiktok',
   'whatsapp',
+  'reseller',
   'other',
 ] as const;
 export type OrderPlatform = (typeof ORDER_PLATFORMS)[number];
@@ -91,6 +92,7 @@ export const ORDER_PLATFORM_LABELS: Record<OrderPlatform, string> = {
   instagram: 'Instagram',
   tiktok: 'TikTok',
   whatsapp: 'WhatsApp',
+  reseller: 'Reseller',
   other: 'Other',
 };
 
@@ -392,3 +394,55 @@ export function isAcceptedImageFile(file: { name: string; type: string }): boole
 
 export const PAGE_SIZE = 24;
 export const ADMIN_PAGE_SIZE = 10;
+
+/* ─── Resellers & Wallet ─────────────────────────────────────────────────── */
+
+export const MIN_RESELLER_DEPOSIT = 100;
+export const MIN_RESELLER_WITHDRAWAL = 50;
+
+export const WALLET_TX_TYPES = [
+  'deposit',
+  'withdrawal',
+  'order_deduction',
+  'order_profit',
+  'order_refund',
+  'admin_adjustment',
+] as const;
+export type WalletTxType = (typeof WALLET_TX_TYPES)[number];
+
+export const WALLET_TX_TYPE_LABELS: Record<WalletTxType, string> = {
+  deposit: 'Add Balance',
+  withdrawal: 'Withdrawal',
+  order_deduction: 'Order Delivery & Packaging',
+  order_profit: 'Order Profit',
+  order_refund: 'Order Refund',
+  admin_adjustment: 'Admin Adjustment',
+};
+
+export const WALLET_TX_STATUSES = ['pending', 'completed', 'rejected', 'failed'] as const;
+export type WalletTxStatus = (typeof WALLET_TX_STATUSES)[number];
+export const WALLET_TX_STATUS_LABELS: Record<WalletTxStatus, string> = {
+  pending: 'Pending',
+  completed: 'Completed',
+  rejected: 'Rejected',
+  failed: 'Failed',
+};
+
+export const TICKET_STATUSES = ['open', 'in_progress', 'resolved', 'closed'] as const;
+export type TicketStatus = (typeof TICKET_STATUSES)[number];
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+export const TICKET_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+  open: ['in_progress', 'resolved', 'closed'],
+  in_progress: ['resolved', 'closed'],
+  resolved: [],
+  closed: [],
+};
+
+export const TICKET_PRIORITIES = ['low', 'medium', 'high'] as const;
+export type TicketPriority = (typeof TICKET_PRIORITIES)[number];

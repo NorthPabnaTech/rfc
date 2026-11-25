@@ -27,18 +27,19 @@ export default async function AdminOrdersPage({
 }) {
   const sp = await searchParams;
   const status = ORDER_STATUSES.find((s) => s === param(sp, 'status'));
-  const platform = ORDER_PLATFORMS.find((p) => p === param(sp, 'platform'));
+  const platform = ORDER_PLATFORMS.find((p) => p === param(sp, 'platform') && p !== 'reseller');
   const [data, counts, businesses] = await Promise.all([
     listAdminOrders({
       q: param(sp, 'q'),
       status,
       platform,
+      excludeReseller: true,
       business: param(sp, 'business'),
       from: param(sp, 'from'),
       to: param(sp, 'to'),
       page: pageParam(sp),
     }),
-    countOrdersByStatus(),
+    countOrdersByStatus('non_reseller'),
     listBusinesses(),
   ]);
 
@@ -82,7 +83,7 @@ export default async function AdminOrdersPage({
           {
             name: 'platform',
             label: 'Platforms',
-            options: ORDER_PLATFORMS.filter((p) => p !== 'messenger').map((p) => ({
+            options: ORDER_PLATFORMS.filter((p) => p !== 'messenger' && p !== 'reseller').map((p) => ({
               value: p,
               label: ORDER_PLATFORM_LABELS[p],
             })),

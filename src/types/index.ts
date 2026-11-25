@@ -177,6 +177,9 @@ export type AdminProductRowDTO = {
   categoryName?: string;
   supplierName?: string;
   supplierPrice: number;
+  resellerEnabled?: boolean;
+  resellerProfit?: number;
+  resellerPackagingCost?: number;
   price: number;
   salePrice: number | null;
   effectivePrice: number;
@@ -219,6 +222,9 @@ export type AdminProductDTO = {
     inStock: boolean;
   }[];
   supplierPrice: number;
+  resellerEnabled?: boolean;
+  resellerProfit?: number;
+  resellerPackagingCost?: number;
   price: number;
   salePrice: number | null;
   stockStatus: StockStatus;
@@ -347,6 +353,16 @@ export type OrderDTO = {
   discount: number;
   total: number;
   supplierCost?: number;
+  resellerSummary?: {
+    resellerPriceTotal: number;
+    resellerSellingTotal: number;
+    deliveryCharge: number;
+    packagingCost: number;
+    upfrontDeducted: number;
+    expectedResellerProfit: number;
+    profitCredited: boolean;
+    upfrontRefunded: boolean;
+  };
   refundedAmount?: number;
   returnedItems?: ReturnedOrderItemDTO[];
   paymentMethod: PaymentMethod;
@@ -689,7 +705,7 @@ export type MediaAssetDTO = {
 };
 
 export type MediaReferenceDTO = {
-  kind: 'Product' | 'Category' | 'Banner' | 'Expense' | 'User' | 'Review' | 'Return';
+  kind: 'Product' | 'Category' | 'Banner' | 'Expense' | 'User' | 'Reseller' | 'Review' | 'Return';
   id: string;
   label: string;
 };

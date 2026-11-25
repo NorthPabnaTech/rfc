@@ -5,6 +5,7 @@ import type { QueryFilter, SortOrder } from 'mongoose';
 import {
   CategoryModel,
   connectDB,
+  nextSequence,
   type Product,
   ProductModel,
   ReviewModel,
@@ -344,6 +345,17 @@ async function validateRefs(input: ProductOutput): Promise<void> {
   }
 }
 
+/** Generates a unique sequential SKU (e.g. `RFC-0001`), skipping any manually taken codes. */
+async function generateUniqueSku(): Promise<string> {
+  for (let i = 0; i < 50; i++) {
+    const seq = await nextSequence('product_sku', 0);
+    const candidate = `RFC-${String(seq).padStart(4, '0')}`;
+    const exists = await ProductModel.exists({ sku: candidate });
+    if (!exists) return candidate;
+  }
+  throw new AppError('Could not generate a unique SKU. Please try again.');
+}
+
 export async function saveProduct(
   input: ProductOutput,
   id?: string,
@@ -355,12 +367,11 @@ export async function saveProduct(
   const business = input.business || DEFAULT_BUSINESS_SLUG;
   const visibility: ProductVisibility =
     business !== DEFAULT_BUSINESS_SLUG ? 'private' : input.visibility;
-  const data = {
+  const baseData = {
     ...input,
     business,
     visibility,
     slug,
-    sku: input.sku?.toUpperCase(),
     description: input.description ? sanitizeRichText(input.description) : undefined,
   };
 
@@ -370,14 +381,16 @@ export async function saveProduct(
     const removed = doc.images.filter(
       (old) => old.publicId && !input.images.some((n) => n.publicId === old.publicId),
     );
-    doc.set(data);
-    if (!data.sku) doc.set('sku', undefined);
+    const existingSku = doc.sku?.trim();
+    const sku = existingSku || (await generateUniqueSku());
+    doc.set({ ...baseData, sku });
     await doc.save();
     await deleteImages(removed);
     return { id: String(doc._id), slug: doc.slug };
   }
 
-  const doc = await ProductModel.create(data);
+  const sku = await generateUniqueSku();
+  const doc = await ProductModel.create({ ...baseData, sku });
   return { id: String(doc._id), slug: doc.slug };
 }
 

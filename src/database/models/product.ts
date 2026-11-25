@@ -78,6 +78,12 @@ export interface Product {
   }[];
   /** What we pay the supplier (for combos: the items' total) — admin-only. */
   supplierPrice: number;
+  /** Whether this product is exposed in the external Reseller API. */
+  resellerEnabled: boolean;
+  /** Admin profit margin (Tk) added on top of supplierPrice for resellers. */
+  resellerProfit: number;
+  /** Optional packaging cost charged to resellers (falls back to supplierPackagingCost). */
+  resellerPackagingCost?: number;
   /** Regular selling price. */
   price: number;
   /** Optional discounted price; must be lower than `price` to take effect. */
@@ -180,6 +186,9 @@ const productSchema = new Schema<Product>(
       default: [],
     },
     supplierPrice: { type: Number, required: true, min: 0 },
+    resellerEnabled: { type: Boolean, default: false, index: true },
+    resellerProfit: { type: Number, default: 50, min: 0 },
+    resellerPackagingCost: { type: Number, min: 0 },
     price: { type: Number, required: true, min: 0 },
     salePrice: { type: Number, min: 0, default: null },
     effectivePrice: { type: Number, required: true, min: 0, index: true },

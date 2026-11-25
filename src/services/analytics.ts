@@ -126,7 +126,7 @@ export async function getAnalysisDashboard(opts: {
   const [orders, expenses, businesses] = await Promise.all([
     OrderModel.find(
       orderQuery,
-      'business platform status total subtotal shippingFee discount supplierCost refundedAmount returnedItems createdAt',
+      'business platform status total subtotal shippingFee discount supplierCost refundedAmount returnedItems resellerSummary createdAt',
     ).lean(),
     ExpenseModel.find(
       expenseQuery,
@@ -232,7 +232,7 @@ export async function getAnalysisDashboard(opts: {
 
     if (o.status === 'returned') {
       returnedOrders += 1;
-      const returnShipping = o.shippingFee ?? 0;
+      const returnShipping = o.platform === 'reseller' ? 0 : (o.shippingFee ?? 0);
       shippingFees += returnShipping;
       const key = dayjs(o.createdAt)
         .tz(TZ)
@@ -260,13 +260,19 @@ export async function getAnalysisDashboard(opts: {
     const orderRefund =
       o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : returnedTotal;
 
-    const netOrderRev = Math.max(0, o.total - orderRefund);
+    const isReseller = o.platform === 'reseller' && Boolean(o.resellerSummary);
+    const orderGross = isReseller ? o.resellerSummary!.resellerPriceTotal : o.total;
+    const netOrderRev = Math.max(0, orderGross - orderRefund);
     const netOrderCogs = Math.max(0, (o.supplierCost ?? 0) - returnedCost);
     const resellerDelivery = resellerDeliveryByOrderId.get(String(o._id)) ?? 0;
-    const orderShipping = resellerDelivery > 0 ? resellerDelivery : (o.shippingFee ?? 0);
-    const orderPackaging = packagingByOrderId.get(String(o._id)) ?? 0;
+    const orderShipping = isReseller
+      ? 0
+      : resellerDelivery > 0
+        ? resellerDelivery
+        : (o.shippingFee ?? 0);
+    const orderPackaging = isReseller ? 0 : (packagingByOrderId.get(String(o._id)) ?? 0);
 
-    grossRevenue += o.total;
+    grossRevenue += orderGross;
     discounts += o.discount ?? 0;
     refunds += orderRefund;
     shippingFees += orderShipping;

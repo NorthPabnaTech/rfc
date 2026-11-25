@@ -14,6 +14,7 @@ import { ADMIN_NAV } from './admin-nav';
 
 export type AdminBadges = {
   pendingOrders: number;
+  pendingResellerOrders: number;
   openReturns: number;
   unansweredQuestions: number;
 };
@@ -22,6 +23,11 @@ type Props = { badges: AdminBadges; user: { name: string; email?: string } };
 
 function NavLinks({ badges, onNavigate }: { badges: AdminBadges; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const activeHref =
+    ADMIN_NAV.flatMap((g) => g.items.map((i) => i.href))
+      .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+      .sort((a, b) => b.length - a.length)[0] ?? null;
+
   return (
     <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Admin">
       {ADMIN_NAV.map((group) => (
@@ -31,7 +37,7 @@ function NavLinks({ badges, onNavigate }: { badges: AdminBadges; onNavigate?: ()
           </p>
           <ul className="space-y-0.5">
             {group.items.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = item.href === activeHref;
               const count = item.badge ? badges[item.badge] : 0;
               return (
                 <li key={item.href}>

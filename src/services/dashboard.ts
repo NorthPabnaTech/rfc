@@ -78,7 +78,7 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
     ]),
     OrderModel.find(
       { status: { $in: REALIZED_STATUSES } },
-      'total shippingFee supplierCost refundedAmount returnedItems',
+      'platform total shippingFee supplierCost refundedAmount returnedItems resellerSummary',
     ).lean(),
     OrderModel.countDocuments(),
     ProductModel.countDocuments(),
@@ -131,6 +131,9 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
     listAdminOrders({ page: 1 }),
   ]);
 
+  const resellerOrderIds = new Set(
+    realizedOrders.filter((o) => o.platform === 'reseller').map((o) => String(o._id)),
+  );
   const realizedIds = realizedOrders.map((o) => o._id);
   const realizedSupplierOrders = realizedIds.length
     ? await SupplierOrderModel.find(
@@ -138,7 +141,10 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
         'order packagingCost deliveryCharge deliveryChargePaidByCustomer',
       ).lean()
     : [];
-  const totalPackaging = realizedSupplierOrders.reduce((s, so) => s + (so.packagingCost ?? 0), 0);
+  const totalPackaging = realizedSupplierOrders.reduce(
+    (s, so) => (resellerOrderIds.has(String(so.order)) ? s : s + (so.packagingCost ?? 0)),
+    0,
+  );
   const resellerDeliveryByOrderId = new Map<string, number>();
   for (const so of realizedSupplierOrders) {
     if (so.deliveryChargePaidByCustomer === false) {
@@ -161,10 +167,15 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
     const returnedTotal = (o.returnedItems ?? []).reduce((s, ri) => s + ri.lineTotal, 0);
     const orderRefund =
       o.refundedAmount && o.refundedAmount > 0 ? o.refundedAmount : returnedTotal;
-    const resellerDelivery = resellerDeliveryByOrderId.get(String(o._id)) ?? 0;
-    realizedSales += Math.max(0, o.total - orderRefund);
-    realizedShipping += resellerDelivery > 0 ? resellerDelivery : (o.shippingFee ?? 0);
-    realizedCogs += Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+    if (o.platform === 'reseller' && o.resellerSummary) {
+      realizedSales += Math.max(0, o.resellerSummary.resellerPriceTotal - orderRefund);
+      realizedCogs += Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+    } else {
+      const resellerDelivery = resellerDeliveryByOrderId.get(String(o._id)) ?? 0;
+      realizedSales += Math.max(0, o.total - orderRefund);
+      realizedShipping += resellerDelivery > 0 ? resellerDelivery : (o.shippingFee ?? 0);
+      realizedCogs += Math.max(0, (o.supplierCost ?? 0) - returnedCost);
+    }
   }
   const realizedProfit = Math.max(
     0,
@@ -216,10 +227,11 @@ export async function getDashboardData(days = 30): Promise<DashboardData> {
 /** Counts shown as badges in the admin sidebar. */
 export async function getAdminBadges() {
   await connectDB();
-  const [pendingOrders, openReturns, unansweredQuestions] = await Promise.all([
-    OrderModel.countDocuments({ status: 'pending' }),
+  const [pendingOrders, pendingResellerOrders, openReturns, unansweredQuestions] = await Promise.all([
+    OrderModel.countDocuments({ status: 'pending', platform: { $ne: 'reseller' } }),
+    OrderModel.countDocuments({ status: 'pending', platform: 'reseller' }),
     ReturnRequestModel.countDocuments({ status: 'pending' }),
     QuestionModel.countDocuments({ answer: { $in: [null, ''] }, isHidden: false }),
   ]);
-  return { pendingOrders, openReturns, unansweredQuestions };
+  return { pendingOrders, pendingResellerOrders, openReturns, unansweredQuestions };
 }

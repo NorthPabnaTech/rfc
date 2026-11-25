@@ -43,6 +43,18 @@ export interface Order {
   business: string;
   /** Null for guest checkouts and manual orders for unregistered customers. */
   user?: Types.ObjectId | null;
+  /** Set when the order was placed by an external reseller via the Reseller API. */
+  reseller?: Types.ObjectId | null;
+  resellerSummary?: {
+    resellerPriceTotal: number;
+    resellerSellingTotal: number;
+    deliveryCharge: number;
+    packagingCost: number;
+    upfrontDeducted: number;
+    expectedResellerProfit: number;
+    profitCredited: boolean;
+    upfrontRefunded: boolean;
+  };
   customer: { name: string; phone: string; email?: string };
   shippingAddress: AddressSnapshot;
   items: OrderItem[];
@@ -116,6 +128,23 @@ const orderSchema = new Schema<Order>(
     invoiceNumber: { type: String, trim: true },
     business: { type: String, default: DEFAULT_BUSINESS_SLUG, index: true },
     user: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    reseller: { type: Schema.Types.ObjectId, ref: 'Reseller', default: null, index: true },
+    resellerSummary: {
+      type: new Schema(
+        {
+          resellerPriceTotal: { type: Number, required: true, min: 0 },
+          resellerSellingTotal: { type: Number, required: true, min: 0 },
+          deliveryCharge: { type: Number, required: true, min: 0 },
+          packagingCost: { type: Number, required: true, min: 0 },
+          upfrontDeducted: { type: Number, required: true, min: 0 },
+          expectedResellerProfit: { type: Number, required: true },
+          profitCredited: { type: Boolean, default: false },
+          upfrontRefunded: { type: Boolean, default: false },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
     customer: {
       name: { type: String, required: true, trim: true, maxlength: 80 },
       phone: { type: String, required: true, trim: true, maxlength: 20 },

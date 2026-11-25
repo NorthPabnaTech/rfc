@@ -27,6 +27,13 @@ export {
 } from './models/product';
 export { type PushSubscription, PushSubscriptionModel } from './models/push-subscription';
 export { type Question, QuestionModel } from './models/question';
+export { type Reseller, type ResellerDocument, type ResellerPayoutDetails, ResellerModel } from './models/reseller';
+export {
+  type ResellerChangeLog,
+  type ResellerChangeLogDocument,
+  ResellerChangeLogModel,
+  type ResellerFieldChange,
+} from './models/reseller-change-log';
 export { type ReturnRequest, ReturnRequestModel } from './models/return-request';
 export { type Review, ReviewModel } from './models/review';
 export { DEFAULT_SETTINGS, type Settings, SettingsModel } from './models/settings';
@@ -38,5 +45,11 @@ export {
   type SupplierOrderEvent,
   SupplierOrderModel,
 } from './models/supplier-order';
+export {
+  type SupportTicket,
+  SupportTicketModel,
+  type TicketMessage,
+} from './models/support-ticket';
 export { type Tag, TagModel } from './models/tag';
 export { type User, type UserDocument, UserModel } from './models/user';
+export { type WalletTransaction, WalletTransactionModel } from './models/wallet-transaction';

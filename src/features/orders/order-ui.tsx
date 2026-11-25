@@ -262,26 +262,68 @@ export function OrderTotals({
         </dd>
       </div>
       {admin && order.supplierCost !== undefined && (
-        <>
-          <Row label="Supplier cost" value={<Taka amount={order.supplierCost} />} />
-          {deliverySubsidy > 0 && (
-            <Row label="Delivery discount (you pay)" value={<Taka amount={deliverySubsidy} />} />
-          )}
-          {packagingCost > 0 && (
-            <Row label="Packaging cost" value={<Taka amount={packagingCost} />} />
-          )}
-          <Row
-            label="Est. profit"
-            value={
-              <Taka
-                amount={profit}
-                className={
-                  profit >= 0 ? 'text-[var(--status-ok-fg)]' : 'text-[var(--status-danger-fg)]'
-                }
+        order.platform === 'reseller' && order.resellerSummary ? (
+          <>
+            <Row
+              label="Reseller base price"
+              value={<Taka amount={order.resellerSummary.resellerPriceTotal} />}
+            />
+            <Row label="Supplier cost" value={<Taka amount={order.supplierCost} />} />
+            {(order.resellerSummary.packagingCost > 0 || packagingCost > 0) && (
+              <Row
+                label="Packaging (paid by reseller)"
+                value={<Taka amount={order.resellerSummary.packagingCost || packagingCost} />}
               />
-            }
-          />
-        </>
+            )}
+            <Row
+              label="Your profit (Admin)"
+              value={
+                <Taka
+                  amount={order.resellerSummary.resellerPriceTotal - order.supplierCost}
+                  className={
+                    order.resellerSummary.resellerPriceTotal - order.supplierCost >= 0
+                      ? 'font-bold text-[var(--status-ok-fg)]'
+                      : 'font-bold text-[var(--status-danger-fg)]'
+                  }
+                />
+              }
+            />
+            <Row
+              label="Reseller profit"
+              value={
+                <Taka
+                  amount={order.resellerSummary.expectedResellerProfit}
+                  className={
+                    order.resellerSummary.expectedResellerProfit >= 0
+                      ? 'font-semibold text-[var(--status-ok-fg)]'
+                      : 'font-semibold text-[var(--status-danger-fg)]'
+                  }
+                />
+              }
+            />
+          </>
+        ) : (
+          <>
+            <Row label="Supplier cost" value={<Taka amount={order.supplierCost} />} />
+            {deliverySubsidy > 0 && (
+              <Row label="Delivery discount (you pay)" value={<Taka amount={deliverySubsidy} />} />
+            )}
+            {packagingCost > 0 && (
+              <Row label="Packaging cost" value={<Taka amount={packagingCost} />} />
+            )}
+            <Row
+              label="Est. profit"
+              value={
+                <Taka
+                  amount={profit}
+                  className={
+                    profit >= 0 ? 'text-[var(--status-ok-fg)]' : 'text-[var(--status-danger-fg)]'
+                  }
+                />
+              }
+            />
+          </>
+        )
       )}
     </dl>
   );

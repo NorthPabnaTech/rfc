@@ -100,6 +100,12 @@ export const productSchema = z
       )
       .optional(),
     supplierPrice: money('Supplier price'),
+    resellerEnabled: z.boolean().default(false),
+    resellerProfit: z.coerce.number().min(0).default(50),
+    resellerPackagingCost: z
+      .union([money('Reseller packaging cost'), z.literal(''), z.null()])
+      .optional()
+      .transform((v) => (v === '' || v == null ? undefined : v)),
     price: money('Selling price').refine((v) => v > 0, 'Selling price must be above 0'),
     salePrice: z
       .union([money('Discount price'), z.literal(''), z.null()])

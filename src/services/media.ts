@@ -13,6 +13,7 @@ import {
   type MediaAsset,
   MediaAssetModel,
   ProductModel,
+  ResellerModel,
   ReturnRequestModel,
   ReviewModel,
   UserModel,
@@ -159,7 +160,7 @@ export async function listMediaAssets(f: MediaFilters): Promise<Paginated<MediaA
 
 /**
  * Checks whether a media asset is currently referenced by any product, category,
- * banner, expense, user avatar, review, or return request.
+ * banner, expense, user avatar, reseller avatar, review, or return request.
  */
 export async function findMediaReferences(id: string): Promise<MediaReferenceDTO[]> {
   await connectDB();
@@ -167,42 +168,54 @@ export async function findMediaReferences(id: string): Promise<MediaReferenceDTO
   if (!asset) throw new AppError('Media file not found.', 404);
 
   const match = { $or: [{ publicId: asset.publicId }, { url: asset.url }] };
-  const [products, categories, banners, expenses, users, reviews, returns] = await Promise.all([
-    ProductModel.find(
-      { $or: [{ 'images.publicId': asset.publicId }, { 'images.url': asset.url }] },
-      'name',
-    )
-      .limit(10)
-      .lean(),
-    CategoryModel.find(
-      { $or: [{ 'image.publicId': asset.publicId }, { 'image.url': asset.url }] },
-      'name',
-    )
-      .limit(10)
-      .lean(),
-    BannerModel.find(
-      { $or: [{ 'image.publicId': asset.publicId }, { 'image.url': asset.url }] },
-      'title',
-    )
-      .limit(10)
-      .lean(),
-    ExpenseModel.find(
-      { $or: [{ 'attachment.publicId': asset.publicId }, { 'attachment.url': asset.url }] },
-      'title',
-    )
-      .limit(10)
-      .lean(),
-    UserModel.find(
-      { $or: [{ 'avatar.publicId': asset.publicId }, { 'avatar.url': asset.url }] },
-      'name',
-    )
-      .limit(10)
-      .lean(),
-    ReviewModel.find({ images: { $elemMatch: match } }, '_id').limit(5).lean(),
-    ReturnRequestModel.find({ images: { $elemMatch: match } }, 'orderNumber')
-      .limit(5)
-      .lean(),
-  ]);
+  const [products, categories, banners, expenses, users, resellers, reviews, returns] =
+    await Promise.all([
+      ProductModel.find(
+        { $or: [{ 'images.publicId': asset.publicId }, { 'images.url': asset.url }] },
+        'name',
+      )
+        .limit(10)
+        .lean(),
+      CategoryModel.find(
+        { $or: [{ 'image.publicId': asset.publicId }, { 'image.url': asset.url }] },
+        'name',
+      )
+        .limit(10)
+        .lean(),
+      BannerModel.find(
+        { $or: [{ 'image.publicId': asset.publicId }, { 'image.url': asset.url }] },
+        'title',
+      )
+        .limit(10)
+        .lean(),
+      ExpenseModel.find(
+        { $or: [{ 'attachment.publicId': asset.publicId }, { 'attachment.url': asset.url }] },
+        'title',
+      )
+        .limit(10)
+        .lean(),
+      UserModel.find(
+        { $or: [{ 'avatar.publicId': asset.publicId }, { 'avatar.url': asset.url }] },
+        'name',
+      )
+        .limit(10)
+        .lean(),
+      ResellerModel.find(
+        {
+          $or: [
+            { avatarUrl: asset.url },
+            { avatarUrl: { $regex: escapeRegex(asset.publicId) } },
+          ],
+        },
+        'name shopName',
+      )
+        .limit(10)
+        .lean(),
+      ReviewModel.find({ images: { $elemMatch: match } }, '_id').limit(5).lean(),
+      ReturnRequestModel.find({ images: { $elemMatch: match } }, 'orderNumber')
+        .limit(5)
+        .lean(),
+    ]);
 
   const refs: MediaReferenceDTO[] = [];
   products.forEach((p) => refs.push({ kind: 'Product', id: String(p._id), label: p.name }));
@@ -210,6 +223,13 @@ export async function findMediaReferences(id: string): Promise<MediaReferenceDTO
   banners.forEach((b) => refs.push({ kind: 'Banner', id: String(b._id), label: b.title }));
   expenses.forEach((e) => refs.push({ kind: 'Expense', id: String(e._id), label: e.title }));
   users.forEach((u) => refs.push({ kind: 'User', id: String(u._id), label: u.name }));
+  resellers.forEach((r) =>
+    refs.push({
+      kind: 'Reseller',
+      id: String(r._id),
+      label: r.shopName ? `${r.name} (${r.shopName})` : r.name,
+    }),
+  );
   reviews.forEach((r) => refs.push({ kind: 'Review', id: String(r._id), label: 'Customer review' }));
   returns.forEach((r) =>
     refs.push({ kind: 'Return', id: String(r._id), label: `Return ${r.orderNumber}` }),

@@ -50,6 +50,7 @@ import {
   notifyCustomerOrderStatus,
 } from './notifications';
 import { getSettings } from './settings';
+import { settleResellerOrderOnStatusChange } from './resellers';
 import { createSupplierOrdersForOrder } from './supplier-orders';
 
 /* ─── Pricing ────────────────────────────────────────────────────────────── */
@@ -446,6 +447,7 @@ export type AdminOrderFilters = {
   q?: string;
   status?: OrderStatus;
   platform?: OrderPlatform;
+  excludeReseller?: boolean;
   business?: string;
   from?: string;
   to?: string;
@@ -484,6 +486,7 @@ export async function listAdminOrders(f: AdminOrderFilters): Promise<Paginated<O
   }
   if (f.status) query.status = f.status;
   if (f.platform) query.platform = f.platform;
+  else if (f.excludeReseller) query.platform = { $ne: 'reseller' } as unknown as OrderPlatform;
   if (f.business && f.business !== 'all') {
     query.business =
       f.business === DEFAULT_BUSINESS_SLUG
@@ -513,9 +516,18 @@ export async function listAdminOrders(f: AdminOrderFilters): Promise<Paginated<O
   };
 }
 
-export async function countOrdersByStatus(): Promise<Record<string, number>> {
+export async function countOrdersByStatus(
+  scope: 'all' | 'reseller' | 'non_reseller' = 'all',
+): Promise<Record<string, number>> {
   await connectDB();
+  const match =
+    scope === 'reseller'
+      ? { platform: 'reseller' }
+      : scope === 'non_reseller'
+        ? { platform: { $ne: 'reseller' } }
+        : null;
   const rows = await OrderModel.aggregate<{ _id: string; n: number }>([
+    ...(match ? [{ $match: match }] : []),
     { $group: { _id: '$status', n: { $sum: 1 } } },
   ]);
   return Object.fromEntries(rows.map((r) => [r._id, r.n]));
@@ -770,6 +782,8 @@ export async function updateOrderStatus(
         );
       }
     }
+
+    await settleResellerOrderOnStatusChange(order, next, prevStatus, session);
 
     await order.save({ session });
     return order;

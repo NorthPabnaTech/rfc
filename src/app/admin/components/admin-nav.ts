@@ -5,7 +5,7 @@ export type AdminNavItem = {
   label: string;
   icon: IconRegistryKey;
   /** Key into the badge counts passed from the layout. */
-  badge?: 'pendingOrders' | 'openReturns' | 'unansweredQuestions';
+  badge?: 'pendingOrders' | 'pendingResellerOrders' | 'openReturns' | 'unansweredQuestions';
 };
 
 export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
@@ -21,6 +21,20 @@ export const ADMIN_NAV: { title: string; items: AdminNavItem[] }[] = [
     items: [
       { href: '/admin/orders', label: 'Orders', icon: 'cart', badge: 'pendingOrders' },
       { href: '/admin/customers', label: 'Customers', icon: 'users' },
+    ],
+  },
+  {
+    title: 'Resellers',
+    items: [
+      { href: '/admin/resellers', label: 'Resellers', icon: 'users' },
+      {
+        href: '/admin/resellers/orders',
+        label: 'Reseller Orders',
+        icon: 'cart',
+        badge: 'pendingResellerOrders',
+      },
+      { href: '/admin/resellers/transactions', label: 'Wallet & Payouts', icon: 'coin' },
+      { href: '/admin/resellers/tickets', label: 'Support Tickets', icon: 'question' },
     ],
   },
   {

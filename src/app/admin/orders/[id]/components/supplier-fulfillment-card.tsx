@@ -13,6 +13,10 @@ import { Icon } from '@components/icon/icon';
 import { Callout, ConfirmDialog, StatusBadge } from '@components/shared';
 import { Badge } from '@components/ui/badge';
 import { Button } from '@components/ui/button';
+import { Checkbox } from '@components/ui/checkbox';
+import { Input } from '@components/ui/input';
+import { Label } from '@components/ui/label';
+import { Select } from '@components/ui/select';
 import { SUPPLIER_ORDER_STATUS_LABELS, type SupplierOrderStatus } from '@lib/constants';
 import { toast } from '@lib/toast';
 import { formatStoreDateTime } from '@lib/utils';
@@ -88,10 +92,14 @@ export function SupplierFulfillmentCard({
   supplierOrders,
   productMeta,
   orderStatus,
+  isResellerOrder = false,
+  resellerPriceTotal,
 }: {
   supplierOrders: SupplierOrderDTO[];
   productMeta: Record<string, SupplierOrderProductMeta>;
   orderStatus?: string;
+  isResellerOrder?: boolean;
+  resellerPriceTotal?: number;
 }) {
   if (!supplierOrders.length) return null;
 
@@ -115,6 +123,8 @@ export function SupplierFulfillmentCard({
             so={so}
             meta={productMeta[so.productId]}
             orderStatus={orderStatus}
+            isResellerOrder={isResellerOrder}
+            resellerPriceTotal={resellerPriceTotal}
           />
         ))}
       </div>
@@ -126,10 +136,14 @@ function SupplierOrderItemCard({
   so,
   meta,
   orderStatus,
+  isResellerOrder = false,
+  resellerPriceTotal,
 }: {
   so: SupplierOrderDTO;
   meta?: SupplierOrderProductMeta;
   orderStatus?: string;
+  isResellerOrder?: boolean;
+  resellerPriceTotal?: number;
 }) {
   const router = useRouter();
   const [sellingPrice, setSellingPrice] = React.useState(String(so.sellingPrice));
@@ -159,8 +173,9 @@ function SupplierOrderItemCard({
         : minRules.resellerPaysDeliveryOutsideDhaka
     : 0;
   const requiredMinTotal = requiredMinUnit * so.quantity;
-  const expectedProfit =
-    parsedPrice - so.costPrice - so.packagingCost - (paidByCustomer ? 0 : so.deliveryCharge);
+  const expectedProfit = isResellerOrder
+    ? (resellerPriceTotal ?? parsedPrice) - so.costPrice - (paidByCustomer ? 0 : so.deliveryCharge)
+    : parsedPrice - so.costPrice - so.packagingCost - (paidByCustomer ? 0 : so.deliveryCharge);
 
   const priceError =
     parsedPrice <= so.costPrice
@@ -258,83 +273,73 @@ function SupplierOrderItemCard({
       )}
 
       {canSubmit ? (
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-ink mb-1 block text-xs font-semibold">
+              <Label htmlFor={`selling-${so.id}`} className="mb-1.5">
                 Selling Price (BDT)
-              </label>
-              <input
+              </Label>
+              <Input
+                id={`selling-${so.id}`}
                 type="number"
                 min={1}
                 value={sellingPrice}
                 onChange={(e) => setSellingPrice(e.target.value)}
-                className="input-flat h-9 w-full px-3 text-sm"
               />
             </div>
 
             {variants.length > 0 && (
               <div>
-                <label className="text-ink mb-1 block text-xs font-semibold">
-                  Supplier Variant
-                </label>
-                <select
+                <Label className="mb-1.5">Supplier Variant</Label>
+                <Select
                   value={variantId}
-                  onChange={(e) => setVariantId(e.target.value)}
-                  className="input-flat h-9 w-full px-3 text-sm"
-                >
-                  <option value="">Choose variant…</option>
-                  {variants.map((v) => {
+                  onValueChange={setVariantId}
+                  placeholder="Choose variant…"
+                  items={variants.map((v) => {
                     const label =
                       [v.color, v.size].filter(Boolean).join(' / ') || v.externalVariantId;
-                    return (
-                      <option
-                        key={v.externalVariantId}
-                        value={v.externalVariantId}
-                        disabled={!v.inStock}
-                      >
-                        {label} ({v.inStock ? `${v.stockQuantity} in stock` : 'Out of stock'})
-                      </option>
-                    );
+                    return {
+                      value: v.externalVariantId,
+                      label: `${label} (${v.inStock ? `${v.stockQuantity} in stock` : 'Out of stock'})`,
+                      disabled: !v.inStock,
+                    };
                   })}
-                </select>
+                />
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex flex-wrap gap-5 text-xs">
             <label className="text-ink flex cursor-pointer items-center gap-2 font-medium">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={paidByCustomer}
-                onChange={(e) => setPaidByCustomer(e.target.checked)}
-                className="accent-brand size-4 rounded"
+                onCheckedChange={(v) => setPaidByCustomer(Boolean(v))}
               />
-              Customer pays delivery (৳{so.deliveryCharge}{' '}
-              {insideDhaka ? 'Inside Dhaka' : 'Outside Dhaka'})
+              <span>
+                Customer pays delivery (৳{so.deliveryCharge}{' '}
+                {insideDhaka ? 'Inside Dhaka' : 'Outside Dhaka'})
+              </span>
             </label>
             {paidByCustomer && (
               <label className="text-ink flex cursor-pointer items-center gap-2 font-medium">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={paidUpfront}
-                  onChange={(e) => setPaidUpfront(e.target.checked)}
-                  className="accent-brand size-4 rounded"
+                  onCheckedChange={(v) => setPaidUpfront(Boolean(v))}
                 />
-                Delivery already paid upfront to RFC Gadget
+                <span>Delivery already paid upfront to RFC Gadget</span>
               </label>
             )}
           </div>
 
           <div>
-            <label className="text-ink mb-1 block text-xs font-semibold">
+            <Label htmlFor={`note-${so.id}`} className="mb-1.5">
               Note for supplier (optional)
-            </label>
-            <input
+            </Label>
+            <Input
+              id={`note-${so.id}`}
               value={customerNote}
               onChange={(e) => setCustomerNote(e.target.value)}
               placeholder="Delivery instructions…"
-              className="input-flat h-9 w-full px-3 text-sm"
             />
           </div>
 
@@ -349,7 +354,9 @@ function SupplierOrderItemCard({
               <Taka amount={so.costPrice} className="text-ink font-semibold" />
             </div>
             <div>
-              <span className="text-subtle block">Packaging</span>
+              <span className="text-subtle block">
+                {isResellerOrder ? 'Packaging (Reseller)' : 'Packaging'}
+              </span>
               <Taka amount={so.packagingCost} className="text-ink font-semibold" />
             </div>
             <div>

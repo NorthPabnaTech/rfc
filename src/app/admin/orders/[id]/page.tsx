@@ -92,8 +92,8 @@ export default async function AdminOrderPage({
       <PageHeader
         title={order.orderNumber}
         subtitle={`${business?.name ?? order.business} · ${order.invoiceNumber} · ${ORDER_PLATFORM_LABELS[order.platform]} order · ${formatStoreDateTime(order.createdAt)}`}
-        backHref="/admin/orders"
-        backLabel="Orders"
+        backHref={order.platform === 'reseller' ? '/admin/resellers/orders' : '/admin/orders'}
+        backLabel={order.platform === 'reseller' ? 'Reseller Orders' : 'Orders'}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <OrderToolbar order={order} business={business} />
@@ -126,6 +126,8 @@ export default async function AdminOrderPage({
             supplierOrders={normalizedSupplierOrders}
             productMeta={productMeta}
             orderStatus={order.status}
+            isResellerOrder={order.platform === 'reseller'}
+            resellerPriceTotal={order.resellerSummary?.resellerPriceTotal}
           />
           {order.returnedItems && order.returnedItems.length > 0 && (
             <Card title="Returned items">

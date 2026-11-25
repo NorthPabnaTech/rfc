@@ -84,6 +84,9 @@ const EMPTY: ProductInput = {
   supplier: '',
   supplierProductUrl: '',
   supplierPrice: 0,
+  resellerEnabled: false,
+  resellerProfit: 50,
+  resellerPackagingCost: undefined,
   price: 0,
   salePrice: null,
   stockStatus: 'in_stock',
@@ -113,6 +116,7 @@ function toFormValues(p: Partial<AdminProductDTO>): ProductInput {
     description: p.description ?? '',
     subCategory: p.subCategory ?? '',
     supplierProductUrl: p.supplierProductUrl ?? '',
+    resellerProfit: p.resellerEnabled ? (p.resellerProfit ?? 50) : p.resellerProfit || 50,
     sku: p.sku ?? '',
     seo: {
       metaTitle: p.seo?.metaTitle ?? '',
@@ -143,6 +147,8 @@ export function ProductForm({
     categoryId,
     supplierUrl,
     supplierPrice,
+    resellerEnabled,
+    resellerProfit,
     price,
     salePrice,
     selectedBusiness,
@@ -155,6 +161,8 @@ export function ProductForm({
       'category',
       'supplierProductUrl',
       'supplierPrice',
+      'resellerEnabled',
+      'resellerProfit',
       'price',
       'salePrice',
       'business',
@@ -267,6 +275,33 @@ export function ProductForm({
                   title={`Margin per unit: ৳${formatNumber(margin)}${sell > 0 ? ` (${Math.round((margin / sell) * 100)}%)` : ''}`}
                 />
               )}
+              <div className="border-line mt-4 border-t pt-4">
+                <FormSwitch
+                  name="resellerEnabled"
+                  label="Available for resellers"
+                />
+                {resellerEnabled && (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                      <FormCurrency
+                        name="resellerProfit"
+                        label="Your profit margin (৳)"
+                        hint="Added on top of supplier price"
+                      />
+                      <FormCurrency
+                        name="resellerPackagingCost"
+                        label="Reseller packaging cost (৳)"
+                        hint="Optional; defaults to supplier packaging"
+                      />
+                    </div>
+                    <Callout
+                      tone="info"
+                      compact
+                      title={`Reseller price: ৳${formatNumber(Number(supplierPrice || 0) + Number(resellerProfit || 0))} (Supplier ৳${formatNumber(Number(supplierPrice || 0))} + Your Profit ৳${formatNumber(Number(resellerProfit || 0))})`}
+                    />
+                  </div>
+                )}
+              </div>
             </FormSection>
           </Panel>
 
@@ -668,7 +703,25 @@ export function ProductForm({
                   />
                 )}
               </FormItem>
-              <FormInput name="sku" label="SKU" placeholder="Optional, e.g. RFC-EAR-001" />
+              <FormInput
+                name="sku"
+                label="SKU"
+                disabled
+                placeholder={
+                  product?.sku
+                    ? undefined
+                    : product
+                      ? 'Auto-generated on save'
+                      : 'Auto-generated on create'
+                }
+                hint={
+                  product?.sku
+                    ? 'Assigned once and cannot be changed.'
+                    : product
+                      ? 'Will be auto-generated on save and cannot be changed afterwards.'
+                      : 'Generated automatically on creation and cannot be changed.'
+                }
+              />
             </FormSection>
           </Panel>
 

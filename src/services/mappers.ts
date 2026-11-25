@@ -167,6 +167,9 @@ export function toAdminProductRow(p: ProductWithRefs): AdminProductRowDTO {
     categoryName: populated(p.category)?.name,
     supplierName: populated(p.supplier)?.name,
     supplierPrice: p.supplierPrice,
+    resellerEnabled: p.resellerEnabled ?? false,
+    resellerProfit: p.resellerProfit ?? 0,
+    resellerPackagingCost: p.resellerPackagingCost,
     price: p.price,
     salePrice: p.salePrice ?? null,
     effectivePrice: p.effectivePrice,
@@ -214,6 +217,9 @@ export function toAdminProduct(p: Product): AdminProductDTO {
       inStock: v.inStock,
     })),
     supplierPrice: p.supplierPrice,
+    resellerEnabled: p.resellerEnabled ?? false,
+    resellerProfit: p.resellerProfit ?? 0,
+    resellerPackagingCost: p.resellerPackagingCost,
     price: p.price,
     salePrice: p.salePrice ?? null,
     stockStatus: p.stockStatus,
@@ -380,6 +386,7 @@ export function toOrder(o: Order, { admin }: { admin: boolean }): OrderDTO {
     ...(admin
       ? {
           supplierCost: o.supplierCost,
+          ...(o.resellerSummary ? { resellerSummary: o.resellerSummary } : {}),
           adminNote: o.adminNote,
           refundedAmount: o.refundedAmount ?? 0,
           returnedItems: (o.returnedItems ?? []).map((ri) => ({
