@@ -1,27 +1,16 @@
 import type { MetadataRoute } from 'next';
 
-import { SITE } from '@/config/site';
+import { PLATFORM } from '@config/platform';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: SITE.name,
-    short_name: SITE.shortName,
-    description: SITE.description,
+    name: PLATFORM.name,
+    short_name: PLATFORM.name,
+    description: PLATFORM.tagline,
     start_url: '/',
     display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
-    icons: [
-      {
-        src: '/icon.png',
-        sizes: '512x512',
-        type: 'image/png',
-      },
-      {
-        src: '/apple-icon.png',
-        sizes: '180x180',
-        type: 'image/png',
-      },
-    ],
+    background_color: '#023047',
+    theme_color: '#023047',
+    icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }],
   };
 }

@@ -7,7 +7,7 @@ import { Slot } from 'radix-ui';
 import { cn } from '@lib/utils';
 
 const buttonVariants = cva(
-  "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-current after:opacity-0 after:transition-[opacity] after:duration-200 after:ease-out active:after:opacity-[0.08] active:after:transition-none inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap focus-ring transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96] active:duration-75 disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-current after:opacity-0 after:transition-[opacity] after:duration-200 after:ease-out active:after:opacity-[0.08] active:after:transition-none inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg text-[14px] font-semibold whitespace-nowrap focus-ring transition-[background-color,color,box-shadow,transform] duration-150 ease-out active:scale-[0.96] active:duration-75 disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

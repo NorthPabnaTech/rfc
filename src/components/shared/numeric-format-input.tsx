@@ -197,7 +197,7 @@ export const NumericFormatInput = React.forwardRef<HTMLInputElement, NumericForm
       return (
         <div
           className={cn(
-            'border-line flex h-[34px] w-full items-center rounded-md border bg-white px-2.5 shadow-2xs transition-colors',
+            'border-line flex h-10 w-full items-center rounded-md border bg-white px-3 shadow-2xs transition-colors',
             'focus-within:border-accent focus-within:ring-accent focus-within:ring-1',
             disabled && 'bg-well/50 cursor-not-allowed opacity-60',
             containerClassName,
@@ -214,7 +214,7 @@ export const NumericFormatInput = React.forwardRef<HTMLInputElement, NumericForm
             disabled={disabled}
             placeholder={placeholder}
             className={cn(
-              'text-ink placeholder:text-muted/60 h-full w-full min-w-0 bg-transparent text-right font-mono text-xs font-semibold outline-none',
+              'text-ink placeholder:text-muted/60 h-full w-full min-w-0 bg-transparent text-right font-mono text-sm font-semibold outline-none',
               className,
             )}
             {...restProps}
@@ -235,7 +235,7 @@ export const NumericFormatInput = React.forwardRef<HTMLInputElement, NumericForm
         disabled={disabled}
         placeholder={placeholder}
         className={cn(
-          'border-line text-ink flex h-[34px] w-full min-w-0 rounded-md border bg-white px-2.5 py-1 text-right font-mono text-xs font-semibold shadow-2xs transition-[border-color,box-shadow] outline-none',
+          'border-line text-ink flex h-10 w-full min-w-0 rounded-md border bg-white px-3 py-1 text-right font-mono text-sm font-semibold shadow-2xs transition-[border-color,box-shadow] outline-none',
           'focus:border-accent focus:ring-accent focus:ring-1',
           'disabled:bg-well/50 disabled:cursor-not-allowed disabled:opacity-60',
           className,
@@ -266,7 +266,7 @@ QuantityInput.displayName = 'QuantityInput';
 export const CurrencyInput = React.forwardRef<HTMLInputElement, NumericFormatInputProps>(
   function CurrencyInput({ prefix, className, containerClassName, ...props }, ref) {
     const bdtPrefix = prefix ?? (
-      <span className="font-mono text-[calc(1em-1.5px)] font-semibold tracking-tight text-current uppercase select-none">
+      <span className="text-muted font-mono text-[calc(1em-1.5px)] font-semibold tracking-tight uppercase select-none">
         BDT
       </span>
     );

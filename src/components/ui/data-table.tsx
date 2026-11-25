@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { useI18n } from '@/i18n/provider';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
 import { EmptyState } from '@components/shared';
 import { cn } from '@lib/utils';
@@ -209,22 +210,23 @@ export function DataTable<T>({
   // First/last cells align with the card padding. Rows use horizontal dividers
   // only (no vertical column dividers) for a cleaner, modern look.
   const tableClass = cn(
-    '[&_th:first-child]:pl-4 [&_td:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:last-child]:pr-4',
+    '[&_th:first-child]:pl-5 [&_td:first-child]:pl-5 [&_th:last-child]:pr-5 [&_td:last-child]:pr-5 sm:[&_th:first-child]:pl-6 sm:[&_td:first-child]:pl-6 sm:[&_th:last-child]:pr-6 sm:[&_td:last-child]:pr-6',
     classNames?.table,
   );
 
   return (
     <div
-      className={cn('border-line rounded-xl2 bg-panel overflow-hidden border', classNames?.root)}
+      className={cn(
+        'border-line bg-panel overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgb(2_48_71/0.04),0_6px_24px_-18px_rgb(2_48_71/0.18)]',
+        classNames?.root,
+      )}
     >
       {hasHeaderBand && (
-        <div className="border-line flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="border-line flex items-center justify-between gap-3 border-b px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            {title != null && (
-              <div className="text-ink truncate text-[14px] font-semibold">{title}</div>
-            )}
+            {title != null && <div className="type-card-title text-ink truncate">{title}</div>}
             {description != null && (
-              <div className="text-subtle mt-0.5 truncate text-[12px]">{description}</div>
+              <div className="text-subtle mt-0.5 truncate text-[13px]">{description}</div>
             )}
           </div>
           {toolbar != null && <div className="flex shrink-0 items-center gap-2">{toolbar}</div>}
@@ -250,7 +252,7 @@ export function DataTable<T>({
                 <div className={cn('bg-line absolute top-1/2 right-0 h-4 w-px -translate-y-1/2')} />
               </TableHead>
             )}
-            {columns.map((col, index) => (
+            {columns.map((col) => (
               <TableHead
                 key={col.key}
                 style={{
@@ -267,12 +269,6 @@ export function DataTable<T>({
                 )}
               >
                 {col.header}
-                <div
-                  className={cn(
-                    'bg-line absolute top-1/2 right-0 h-4 w-px -translate-y-1/2',
-                    index === columns.length - 1 && 'hidden',
-                  )}
-                />
               </TableHead>
             ))}
           </TableRow>
@@ -297,7 +293,9 @@ export function DataTable<T>({
                     action={empty.action}
                   />
                 ) : (
-                  <div className="text-muted py-12 text-center text-[12.5px]">No results.</div>
+                  <div className="text-muted py-12 text-center text-[14px]">
+                    <NoResults />
+                  </div>
                 )}
               </TableCell>
             </TableRow>
@@ -356,7 +354,7 @@ export function DataTable<T>({
 
       {showFooter && (
         <FooterBar
-          className={classNames?.footer}
+          className={cn('rounded-none border-x-0 border-b-0', classNames?.footer)}
           selectedCount={selectable ? selected.length : 0}
           onClearSelection={selectable ? () => emitSelection([]) : undefined}
           pagination={
@@ -442,11 +440,11 @@ export function FooterBar({
   return (
     <div
       className={cn(
-        'border-line rounded-b-xl2 bg-panel flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border border-t px-4 py-2.5',
+        'border-line bg-panel flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-b-2xl border border-t px-5 py-3 sm:px-6',
         className,
       )}
     >
-      <div className="flex items-center gap-2 text-[12px]">
+      <div className="flex items-center gap-2 text-[13px]">
         {selectedCount > 0 ? (
           <>
             <span className="text-ink font-medium">{selectedCount} selected</span>
@@ -471,15 +469,14 @@ export function FooterBar({
 }
 
 function RangeLabel({ page, limit, total }: PaginationConfig) {
+  const { t, num } = useI18n();
   const pageCount = Math.max(1, Math.ceil(total / Math.max(1, limit)));
   const current = Math.min(Math.max(1, page), pageCount);
   const from = total === 0 ? 0 : (current - 1) * limit + 1;
   const to = Math.min(current * limit, total);
   return (
-    <span className="text-subtle">
-      Showing <span className="text-ink font-medium">{from}</span>–
-      <span className="text-ink font-medium">{to}</span> of{' '}
-      <span className="text-ink font-medium">{total}</span>
+    <span className="text-subtle num">
+      {t('common.showing', { from: num(from), to: num(to), total: num(total) })}
     </span>
   );
 }
@@ -493,6 +490,7 @@ function PageControls({
   onLimitChange,
   disabled,
 }: PaginationConfig) {
+  const { t, num } = useI18n();
   const pageCount = Math.max(1, Math.ceil(total / Math.max(1, limit)));
   const current = Math.min(Math.max(1, page), pageCount);
 
@@ -509,12 +507,12 @@ function PageControls({
     <div className="flex items-center gap-4">
       {pageSizeOptions && onLimitChange && (
         <div className="hidden items-center gap-2 sm:flex">
-          <span className="text-subtle text-[12px]">Rows per page</span>
+          <span className="text-subtle text-[13px]">{t('common.rowsPerPage')}</span>
           <Select
             value={String(limit)}
             onValueChange={(v) => onLimitChange(Number(v))}
             disabled={disabled}
-            aria-label="Rows per page"
+            aria-label={t('common.rowsPerPage')}
             align="end"
             size="sm"
             className="w-[68px] px-2"
@@ -523,9 +521,8 @@ function PageControls({
         </div>
       )}
 
-      <span className="text-subtle text-[12px]">
-        Page <span className="text-ink font-medium">{current}</span> of{' '}
-        <span className="text-ink font-medium">{pageCount}</span>
+      <span className="text-subtle num text-[13px]">
+        {t('common.pageOf', { page: num(current), pages: num(pageCount) })}
       </span>
 
       <div className="flex items-center gap-1">
@@ -578,4 +575,9 @@ function PageButton({
       <Icon name={icon} size={14} className={cn(flip && 'rotate-180')} />
     </button>
   );
+}
+
+function NoResults() {
+  const { t } = useI18n();
+  return <>{t('common.noResults')}</>;
 }

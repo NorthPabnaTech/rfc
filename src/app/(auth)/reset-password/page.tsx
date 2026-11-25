@@ -1,49 +1,60 @@
-import type { Metadata } from 'next';
+'use client';
+
+import * as React from 'react';
 import Link from 'next/link';
 
-import { isResetTokenValid } from '@/services/users';
-import { Callout } from '@components/shared/callout';
+import { useI18n } from '@/i18n/provider';
+import { Form, FormPassword } from '@components/form';
+import { Icon } from '@components/icon/icon';
+import { Callout } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { param, type SearchParams } from '@lib/search-params';
+import { resetSchema } from '@lib/validators/reseller';
 
-import { ResetPasswordForm } from './components/reset-password-form';
-
-export const metadata: Metadata = {
-  title: 'Set a new password',
-  robots: { index: false },
-  // The token is in the URL — never leak it to other sites via Referer.
-  referrer: 'no-referrer',
-};
-
-export default async function ResetPasswordPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const token = param(await searchParams, 'token');
-  const valid = !!token && token.length <= 200 && (await isResetTokenValid(token));
-
-  if (!valid) {
-    return (
-      <>
-        <h1 className="type-display text-ink">Link expired</h1>
-        <Callout tone="warn" className="mt-6">
-          This reset link is invalid, already used or has expired. Request a new one to continue.
-        </Callout>
-        <Button asChild variant="noir" size="xl" className="mt-6 w-full">
-          <Link href="/forgot-password">Request a new link</Link>
-        </Button>
-      </>
-    );
-  }
+export default function ResetPasswordPage() {
+  const { t } = useI18n();
+  const schema = React.useMemo(() => resetSchema(t), [t]);
+  const [done, setDone] = React.useState(false);
 
   return (
-    <>
-      <h1 className="type-display text-ink">Set a new password</h1>
-      <p className="text-muted mt-2 text-sm">
-        Choose a new password. You&apos;ll be signed out on your other devices.
-      </p>
-      <ResetPasswordForm token={token} />
-    </>
+    <div>
+      <span className="bg-brand-soft text-brand-ink grid size-12 place-items-center rounded-2xl">
+        <Icon name="shieldCheck" size={22} />
+      </span>
+      <h1 className="type-page-title text-ink mt-5">{t('auth.resetTitle')}</h1>
+      <p className="type-body text-muted mt-1.5">{t('auth.resetSubtitle')}</p>
+      {done ? (
+        <div className="mt-7 space-y-4">
+          <Callout tone="success" description={t('auth.resetDone')} />
+          <Button variant="primary" asChild className="w-full">
+            <Link href="/login">{t('auth.signIn')}</Link>
+          </Button>
+        </div>
+      ) : (
+        <Form
+          schema={schema}
+          initialValues={{ password: '', confirm: '' }}
+          onFinish={() => setDone(true)}
+          className="mt-7 flex flex-col gap-y-5"
+        >
+          <FormPassword
+            name="password"
+            label={t('auth.newPassword')}
+            hint={t('auth.passwordMin')}
+            required
+            autoComplete="new-password"
+          />
+          <FormPassword
+            name="confirm"
+            label={t('auth.confirmPassword')}
+            required
+            autoComplete="new-password"
+          />
+          <Button type="submit" variant="primary" size="lg" className="w-full">
+            {t('auth.updatePassword')}
+          </Button>
+        </Form>
+      )}
+      <Callout tone="neutral" compact className="mt-5" description={t('auth.demoNotice')} />
+    </div>
   );
 }

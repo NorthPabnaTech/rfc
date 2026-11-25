@@ -1,585 +1,351 @@
 'use client';
 
 import * as React from 'react';
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useRouter } from 'nextjs-toploader/app';
-import { useWatch } from 'react-hook-form';
 
-import { saveProductAction } from '@/actions/admin';
-import { ImageUploader } from '@/features/uploads/image-uploader';
-import type {
-  AdminProductDTO,
-  BusinessDTO,
-  CategoryDTO,
-  ImageDTO,
-  SupplierDTO,
-  TagDTO,
-} from '@/types';
-import { ChipInput, ChipMultiSelect } from '@components/common/chip-input';
+import { useI18n } from '@/i18n/provider';
+import { usePlatformStore } from '@/stores/platform-store';
+import type { Product } from '@/types/platform';
+import { Panel } from '@components/dashboard/panel';
 import {
   Form,
   FormCurrency,
   FormInput,
-  FormItem,
   FormSelect,
-  FormSwitch,
   FormTextarea,
+  useWatch,
 } from '@components/form';
 import { Icon } from '@components/icon/icon';
-import { Callout, FormSection } from '@components/shared';
+import { Money } from '@components/platform/money';
+import { ProductImage } from '@components/platform/product-image';
+import { Callout, PageHeader } from '@components/shared';
 import { Button } from '@components/ui/button';
-import { Textarea } from '@components/ui/textarea';
-import { handleActionResult } from '@lib/action-client';
-import {
-  DEFAULT_BUSINESS_SLUG,
-  PRODUCT_VISIBILITIES,
-  PRODUCT_VISIBILITY_LABELS,
-  STOCK_STATUS_LABELS,
-  STOCK_STATUSES,
-} from '@lib/constants';
-import { formatNumber } from '@lib/utils';
-import { type ProductInput, productSchema } from '@lib/validators/catalog';
+import { sellerBasePrice } from '@lib/business/pricing';
+import { toast } from '@lib/toast';
+import { productSchema } from '@lib/validators/reseller';
 
-// Quill touches `document` on import, so the editor only loads in the browser.
-const RichTextEditor = dynamic(
-  () => import('@components/ui/rich-text-editor').then((m) => m.RichTextEditor),
-  { ssr: false, loading: () => <div className="skeleton h-48" /> },
-);
-
-type Props = {
-  product?: AdminProductDTO;
-  initialDraft?: Partial<AdminProductDTO>;
-  categories: CategoryDTO[];
-  tags: TagDTO[];
-  suppliers: SupplierDTO[];
-  businesses: BusinessDTO[];
+type Values = {
+  name: string;
+  nameBn: string;
+  description: string;
+  categoryId: string;
+  supplierId: string;
+  supplierCost: number;
+  platformMargin: number;
+  deliveryCharge: number;
+  packagingCharge: number;
+  suggestedPrice: number;
+  status: Product['status'];
+  availability: Product['availability'];
 };
 
-function parseSpecificationsText(text: string): Array<{ label: string; value: string }> {
-  const rows: Array<{ label: string; value: string }> = [];
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim().replace(/^[-*•]\s*/, '');
-    if (!line) continue;
-    const colonIdx = line.indexOf(':');
-    if (colonIdx <= 0) continue;
-    const label = line.slice(0, colonIdx).trim();
-    const value = line.slice(colonIdx + 1).trim();
-    if (label && value) {
-      rows.push({ label, value });
-    }
-  }
-  return rows;
-}
+const MAX_IMAGES = 4;
+const MAX_BYTES = 900_000;
 
-const EMPTY: ProductInput = {
-  name: '',
-  slug: '',
-  shortDescription: '',
-  description: '',
-  category: '',
-  subCategory: '',
-  tags: [],
-  supplier: '',
-  supplierProductUrl: '',
-  supplierPrice: 0,
-  price: 0,
-  salePrice: null,
-  stockStatus: 'in_stock',
-  stockQuantity: 0,
-  trackInventory: false,
-  business: DEFAULT_BUSINESS_SLUG,
-  visibility: 'public',
-  sku: '',
-  images: [],
-  variations: [],
-  specifications: [],
-  seo: { metaTitle: '', metaDescription: '', keywords: [] },
-  status: 'published',
-  isFeatured: false,
-  isComboOffer: false,
-};
-
-function toFormValues(p: Partial<AdminProductDTO>): ProductInput {
-  return {
-    ...EMPTY,
-    ...p,
-    slug: p.slug ?? '',
-    shortDescription: p.shortDescription ?? '',
-    description: p.description ?? '',
-    subCategory: p.subCategory ?? '',
-    supplierProductUrl: p.supplierProductUrl ?? '',
-    sku: p.sku ?? '',
-    seo: {
-      metaTitle: p.seo?.metaTitle ?? '',
-      metaDescription: p.seo?.metaDescription ?? '',
-      keywords: p.seo?.keywords ?? [],
-    },
-  };
-}
-
-export function ProductForm({
-  product,
-  initialDraft,
-  categories,
-  tags,
-  suppliers,
-  businesses,
-}: Props) {
+export function ProductForm({ product }: { product?: Product }) {
+  const { t, locale, money } = useI18n();
   const router = useRouter();
-  const source = product ?? initialDraft;
-  const [specPasteText, setSpecPasteText] = React.useState('');
-  const form = Form.useForm<ProductInput>({
-    schema: productSchema,
-    defaultValues: source ? toFormValues(source) : EMPTY,
+  const { categories, suppliers, settings, upsertProduct } = usePlatformStore();
+  const schema = React.useMemo(() => productSchema(t), [t]);
+  const form = Form.useForm<Values>({
+    schema,
+    defaultValues: product
+      ? { ...product }
+      : {
+          name: '',
+          nameBn: '',
+          description: '',
+          categoryId: '',
+          supplierId: '',
+          supplierCost: 0,
+          platformMargin: settings.defaultMargin,
+          deliveryCharge: 0,
+          packagingCharge: settings.defaultPackagingCharge,
+          suggestedPrice: 0,
+          status: 'active',
+          availability: 'in_stock',
+        },
   });
-  const { isSubmitting } = form.formState;
+  const [images, setImages] = React.useState<string[]>(
+    product?.images ?? [`art:${categories.length * 3 + 1}`],
+  );
 
-  const [categoryId, supplierUrl, supplierPrice, price, salePrice, selectedBusiness, trackInventory] =
-    useWatch({
-      control: form.control,
-      name: [
-        'category',
-        'supplierProductUrl',
-        'supplierPrice',
-        'price',
-        'salePrice',
-        'business',
-        'trackInventory',
-      ],
+  const onFinish = (v: Values) => {
+    const id = product?.id ?? `prd-${Date.now().toString(36)}`;
+    const record: Product = {
+      ...v,
+      supplierCost: Number(v.supplierCost),
+      platformMargin: Number(v.platformMargin),
+      deliveryCharge: Number(v.deliveryCharge),
+      packagingCharge: Number(v.packagingCharge),
+      suggestedPrice: Number(v.suggestedPrice),
+      id,
+      slug: v.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, ''),
+      images,
+      createdAt: product?.createdAt ?? new Date().toISOString(),
+    };
+    upsertProduct(record);
+    toast.success(product ? t('admin.products.updated') : t('admin.products.created'));
+    router.push(`/admin/products/${id}`);
+  };
+
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    [...files].slice(0, MAX_IMAGES - images.length).forEach((file) => {
+      if (file.size > MAX_BYTES) {
+        toast.warning(`${file.name}: max 900 KB`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () =>
+        setImages((imgs) => [...imgs, String(reader.result)].slice(0, MAX_IMAGES));
+      reader.readAsDataURL(file);
     });
-  const selectedBizObj = businesses.find((b) => b.slug === selectedBusiness);
-  const isInternalBusiness = selectedBizObj ? !selectedBizObj.isPublicStorefront : false;
+  };
 
-  React.useEffect(() => {
-    if (isInternalBusiness && form.getValues('visibility') !== 'private') {
-      form.setValue('visibility', 'private');
-    }
-  }, [isInternalBusiness, form]);
-  const parents = categories.filter((c) => !c.parentId);
-  const children = categories.filter((c) => c.parentId && c.parentId === categoryId);
-
-  // Changing the category clears a sub-category that belongs to another one.
-  React.useEffect(() => {
-    const sub = form.getValues('subCategory');
-    if (sub && !categories.some((c) => c.id === sub && c.parentId === categoryId)) {
-      form.setValue('subCategory', '');
-    }
-  }, [categoryId, categories, form]);
-  const sell =
-    Number(salePrice) > 0 && Number(salePrice) < Number(price) ? Number(salePrice) : Number(price);
-  const margin = sell - Number(supplierPrice || 0);
+  const icon = categories.find((c) => c.id === form.watch('categoryId'))?.icon;
 
   return (
-    <Form
-      form={form}
-      className="gap-6"
-      onFinish={async (values) => {
-        const res = await saveProductAction(values, product?.id);
-        if (handleActionResult(res, form)) {
-          router.push('/admin/products');
-          router.refresh();
-        }
-      }}
-      onFinishFailed={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-    >
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
-          <Panel>
-            <FormSection title="Basic information" icon="doc">
-              <FormInput
-                name="name"
-                label="Product name"
-                required
-                placeholder="e.g. Premium Leather Wallet"
-              />
-              <FormTextarea
-                name="shortDescription"
-                label="Short description"
-                rows={2}
-                placeholder="One or two lines shown near the price"
-              />
-              <FormItem name="description" label="Full description">
-                {(field) => (
-                  <RichTextEditor
-                    value={(field.value as string) ?? ''}
-                    onChange={field.onChange}
-                    placeholder="Describe the product: features, materials, size guide…"
-                  />
-                )}
-              </FormItem>
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection
-              title="Images"
-              icon="image"
-              description="Upload photos (stored in Cloudinary) and/or paste image URLs from the supplier site. Drag to reorder — the first image is the cover."
-            >
-              <FormItem name="images">
-                {(field) => (
-                  <ImageUploader
-                    purpose="products"
-                    nameHint={form.watch('name')}
-                    max={15}
-                    allowUrl
-                    sortable
-                    value={(field.value as ImageDTO[]) ?? []}
-                    onChange={field.onChange}
-                  />
-                )}
-              </FormItem>
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection title="Pricing" icon="coin">
-              <div className="grid gap-x-4 gap-y-5 sm:grid-cols-3">
-                <FormCurrency
-                  name="supplierPrice"
-                  label="Supplier price"
+    <div className="space-y-5">
+      <PageHeader
+        title={product ? t('admin.products.editTitle') : t('admin.products.newTitle')}
+        description={product ? product.name : t('admin.products.newSubtitle')}
+        backHref={product ? `/admin/products/${product.id}` : '/admin/products'}
+        backLabel={t('common.back')}
+      />
+      <Form<Values> form={form} onFinish={onFinish}>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5">
+            <Panel title={t('admin.products.basic')}>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+                <FormInput name="name" label={t('admin.products.nameEn')} required />
+                <FormInput name="nameBn" label={t('admin.products.nameBn')} required />
+                <FormSelect
+                  name="categoryId"
+                  label={t('common.category')}
                   required
-                  hint="What you pay"
+                  items={categories.map((c) => ({
+                    value: c.id,
+                    label: locale === 'bn' ? c.nameBn : c.name,
+                  }))}
                 />
-                <FormCurrency name="price" label="Selling price" required />
-                <FormCurrency name="salePrice" label="Discount price" hint="Optional" />
+                <FormSelect
+                  name="supplierId"
+                  label={t('common.supplier')}
+                  required
+                  showSearch
+                  items={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                />
+                <FormTextarea
+                  name="description"
+                  label={t('common.description')}
+                  required
+                  rows={4}
+                  className="sm:col-span-2"
+                />
               </div>
-              {Number(price) > 0 && (
-                <Callout
-                  tone={margin > 0 ? 'success' : 'danger'}
-                  compact
-                  title={`Margin per unit: ৳${formatNumber(margin)}${sell > 0 ? ` (${Math.round((margin / sell) * 100)}%)` : ''}`}
-                />
-              )}
-            </FormSection>
-          </Panel>
+            </Panel>
 
-          <Panel>
-            <FormSection
-              title="Variations"
-              icon="layers"
-              description="Options the customer must choose, e.g. Size: S, M, L or Color: Black, Brown."
-            >
-              <Form.List name="variations">
-                {(fields, { add, remove }) => (
-                  <div className="space-y-3">
-                    {fields.map((f) => (
-                      <div
-                        key={f.key}
-                        className="bg-surface grid gap-3 rounded-xl p-3 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-start"
-                      >
-                        <FormInput name={[f.name, 'name']} label="Option" placeholder="Size" />
-                        <FormItem name={[f.name, 'values']} label="Values">
-                          {(field, _s, meta) => (
-                            <ChipInput
-                              value={(field.value as string[]) ?? []}
-                              onChange={field.onChange}
-                              placeholder="S, M, L…"
-                              aria-invalid={meta.invalid}
-                            />
-                          )}
-                        </FormItem>
-                        {/* Label-height spacer keeps the button level with the inputs. */}
-                        <div className="flex flex-col gap-1.5">
-                          <span aria-hidden className="type-label invisible hidden sm:block">
-                            Remove
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Remove option"
-                            onClick={() => remove(f.name)}
-                          >
-                            <Icon name="trash" size={16} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {fields.length < 5 && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => add({ name: '', values: [] })}
-                      >
-                        <Icon name="plus" size={14} /> Add option
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Form.List>
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection
-              title="Specifications"
-              icon="list"
-              description="Shown as a table on the product page."
-            >
-              <Form.List name="specifications">
-                {(fields, { add, remove }) => {
-                  const applyParsedSpecs = (rawText: string): boolean => {
-                    const parsed = parseSpecificationsText(rawText);
-                    if (parsed.length === 0) return false;
-                    const current = form.getValues('specifications') ?? [];
-                    // Remove trailing/existing blank placeholder rows before appending parsed rows.
-                    for (let i = current.length - 1; i >= 0; i--) {
-                      const row = current[i];
-                      if (!row?.label?.trim() && !row?.value?.trim()) {
-                        remove(i);
-                      }
-                    }
-                    add(parsed);
-                    setSpecPasteText('');
-                    return true;
-                  };
-
-                  return (
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Textarea
-                          rows={3}
-                          value={specPasteText}
-                          onChange={(e) => setSpecPasteText(e.target.value)}
-                          onPaste={(e) => {
-                            const pasted = e.clipboardData.getData('text');
-                            if (pasted && applyParsedSpecs(pasted)) {
-                              e.preventDefault();
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                              if (applyParsedSpecs(specPasteText)) {
-                                e.preventDefault();
-                              }
-                            }
-                          }}
-                          placeholder={'Quick paste (Label: Value per line)\ne.g. Material: Food Grade Silicone & SS 304\nPower: 600W'}
-                          aria-label="Quick paste specifications"
-                          className="text-xs"
-                        />
-                        {specPasteText.trim() && (
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => applyParsedSpecs(specPasteText)}
-                            >
-                              Apply to table
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      {fields.map((f) => (
-                        <div
-                          key={f.key}
-                          className="grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)_auto] sm:items-start"
-                        >
-                          <FormInput
-                            name={[f.name, 'label']}
-                            placeholder="Material"
-                            aria-label="Specification label"
-                          />
-                          <FormInput
-                            name={[f.name, 'value']}
-                            placeholder="Genuine leather"
-                            aria-label="Specification value"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Remove row"
-                            onClick={() => remove(f.name)}
-                          >
-                            <Icon name="trash" size={16} />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => add({ label: '', value: '' })}
-                      >
-                        <Icon name="plus" size={14} /> Add specification
-                      </Button>
-                    </div>
-                  );
-                }}
-              </Form.List>
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection
-              title="SEO"
-              icon="search"
-              description="Leave blank to use the product name and short description."
-            >
-              <FormInput
-                name="slug"
-                label="URL slug"
-                placeholder="auto-generated from the name"
-                hint="/products/your-slug"
-              />
-              <FormInput name="seo.metaTitle" label="Meta title" />
-              <FormTextarea name="seo.metaDescription" label="Meta description" rows={2} />
-              <FormItem name="seo.keywords" label="Keywords">
-                {(field) => (
-                  <ChipInput
-                    value={(field.value as string[]) ?? []}
-                    onChange={field.onChange}
-                    placeholder="wallet, leather…"
-                  />
-                )}
-              </FormItem>
-            </FormSection>
-          </Panel>
-        </div>
-
-        <div className="space-y-6">
-          <Panel>
-            <FormSection title="Store & Visibility" icon="eye">
-              <FormSelect
-                name="business"
-                label="Business / Store"
-                items={businesses.map((b) => ({
-                  value: b.slug,
-                  label: b.isPublicStorefront ? `${b.name} (Public)` : `${b.name} (Internal)`,
-                }))}
-              />
-              <FormSelect
-                name="visibility"
-                label="Visibility"
-                disabled={isInternalBusiness}
-                items={PRODUCT_VISIBILITIES.map((v) => ({
-                  value: v,
-                  label: PRODUCT_VISIBILITY_LABELS[v],
-                }))}
-                hint={
-                  isInternalBusiness
-                    ? 'Internal store products are always private.'
-                    : 'Private products never appear on the public RFC Gadget website.'
-                }
-              />
-              <FormSelect
-                name="status"
-                label="Status"
-                items={[
-                  { value: 'published', label: 'Published' },
-                  { value: 'draft', label: 'Draft — hidden' },
-                ]}
-              />
-              <FormSelect
-                name="stockStatus"
-                label="Stock status"
-                items={STOCK_STATUSES.map((s) => ({ value: s, label: STOCK_STATUS_LABELS[s] }))}
-              />
-              <FormSwitch
-                name="trackInventory"
-                label="Track numeric stock quantity"
-                hint="Automatically deduct & restore stock on orders."
-              />
-              {trackInventory && (
-                <FormInput
-                  name="stockQuantity"
-                  type="number"
-                  min={0}
-                  label="Stock quantity"
-                />
-              )}
-              <FormSwitch name="isFeatured" label="Feature on homepage" />
-              <FormSwitch
-                name="isComboOffer"
-                label="Show in Combo offers"
-              />
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection title="Organization" icon="folder">
-              <FormSelect
-                name="category"
-                label="Category"
-                required
-                showSearch
-                placeholder="Choose category"
-                items={parents.map((c) => ({ value: c.id, label: c.name }))}
-              />
-              <FormSelect
-                name="subCategory"
-                label="Sub-category"
-                placeholder={children.length ? 'Optional' : 'No sub-categories'}
-                disabled={children.length === 0}
-                clearable
-                onClear={() => form.setValue('subCategory', '')}
-                items={children.map((c) => ({ value: c.id, label: c.name }))}
-              />
-              <FormItem name="tags" label="Tags">
-                {(field) => (
-                  <ChipMultiSelect
-                    options={tags.map((t) => ({ value: t.id, label: t.name }))}
-                    value={(field.value as string[]) ?? []}
-                    onChange={field.onChange}
-                    emptyText="Create tags under Catalog → Tags."
-                  />
-                )}
-              </FormItem>
-              <FormInput name="sku" label="SKU" placeholder="Optional, e.g. RFC-EAR-001" />
-            </FormSection>
-          </Panel>
-
-          <Panel>
-            <FormSection title="Supplier" icon="store">
-              <FormSelect
-                name="supplier"
-                label="Supplier"
-                required
-                placeholder="Choose supplier"
-                items={suppliers.map((s) => ({
-                  value: s.id,
-                  label: `${s.name}${s.status === 'inactive' ? ' (inactive)' : ''}`,
-                }))}
-              />
-              <FormInput
-                name="supplierProductUrl"
-                label="Supplier product URL"
-                placeholder="https://…"
-                hint={
-                  supplierUrl && /^https?:\/\//.test(supplierUrl) ? (
-                    <a
-                      href={supplierUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent inline-flex items-center gap-1 font-semibold hover:underline"
+            <Panel title={t('common.images')} description={t('admin.products.imagesHint')}>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {images.map((src, i) => (
+                  <div key={i} className="group relative">
+                    <ProductImage
+                      src={src}
+                      alt=""
+                      icon={icon}
+                      className="aspect-square w-full"
+                      iconSize={32}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImages((imgs) => imgs.filter((_, j) => j !== i))}
+                      className="bg-panel/90 text-ink absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full shadow"
+                      aria-label={t('common.remove')}
                     >
-                      Open supplier page <Icon name="external" size={12} />
-                    </a>
-                  ) : undefined
-                }
-              />
-            </FormSection>
-          </Panel>
-        </div>
-      </div>
+                      <Icon name="x" size={14} />
+                    </button>
+                  </div>
+                ))}
+                {images.length < MAX_IMAGES && (
+                  <label className="border-line-2 text-muted hover:border-brand hover:text-accent flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-xs font-semibold">
+                    <Icon name="upload" size={22} />
+                    {t('common.upload')}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={(e) => addFiles(e.target.files)}
+                    />
+                  </label>
+                )}
+              </div>
+            </Panel>
 
-      <div className="border-line bg-panel/90 sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2.5 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <Button type="button" variant="secondary" asChild>
-          <Link href="/admin/products">Cancel</Link>
-        </Button>
-        <Button type="submit" variant="primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : product ? 'Save changes' : 'Create product'}
-        </Button>
-      </div>
-    </Form>
+            <Panel
+              title={t('admin.products.pricing')}
+              description={t('admin.products.pricingHint')}
+            >
+              <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3">
+                <FormCurrency
+                  name="supplierCost"
+                  label={t('admin.products.supplierCost')}
+                  required
+                />
+                <FormCurrency name="platformMargin" label={t('admin.products.margin')} required />
+                <FormCurrency
+                  name="suggestedPrice"
+                  label={t('admin.products.suggested')}
+                  hint={t('admin.products.suggestedHint')}
+                />
+              </div>
+            </Panel>
+
+            <Panel title={t('admin.products.charges')}>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+                <FormCurrency
+                  name="deliveryCharge"
+                  label={t('admin.products.extraDelivery')}
+                  hint={t('admin.products.extraDeliveryHint')}
+                />
+                <FormCurrency
+                  name="packagingCharge"
+                  label={t('admin.products.packaging')}
+                  required
+                />
+              </div>
+              <p className="type-helper text-muted mt-4">
+                {t('admin.settings.deliveryCharges')}: {t('area.inside_dhaka')}{' '}
+                {money(settings.deliveryCharges.inside_dhaka)} · {t('area.sub_dhaka')}{' '}
+                {money(settings.deliveryCharges.sub_dhaka)} · {t('area.outside_dhaka')}{' '}
+                {money(settings.deliveryCharges.outside_dhaka)}
+              </p>
+            </Panel>
+          </div>
+
+          <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+            <PricingPreview control={form.control} />
+            <Panel title={t('admin.products.statusAvailability')}>
+              <div className="flex flex-col gap-y-5">
+                <FormSelect
+                  name="status"
+                  label={t('admin.products.productStatus')}
+                  items={(['active', 'draft', 'out_of_stock'] as const).map((s) => ({
+                    value: s,
+                    label: t(`status.product.${s}`),
+                  }))}
+                />
+                <FormSelect
+                  name="availability"
+                  label={t('admin.products.availability')}
+                  items={(['in_stock', 'limited', 'out_of_stock'] as const).map((s) => ({
+                    value: s,
+                    label: t(`status.availability.${s}`),
+                  }))}
+                />
+              </div>
+            </Panel>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.back()}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" variant="primary" className="flex-1">
+                <Icon name="check" size={16} />
+                {product ? t('common.saveChanges') : t('common.create')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Form>
+    </div>
   );
 }
 
-function Panel({ children }: { children: React.ReactNode }) {
-  return <div className="bg-panel hairline rounded-xl2 p-5">{children}</div>;
+/** Live: Supplier cost + margin = base price; what a seller earns at the suggested price. */
+function PricingPreview({
+  control,
+}: {
+  control: ReturnType<typeof Form.useForm<Values>>['control'];
+}) {
+  const { t, money } = useI18n();
+  const [cost, margin, suggested] = useWatch({
+    control,
+    name: ['supplierCost', 'platformMargin', 'suggestedPrice'],
+  });
+  const base = sellerBasePrice({
+    supplierCost: Number(cost) || 0,
+    platformMargin: Number(margin) || 0,
+  });
+  const sell = Number(suggested) || 0;
+  return (
+    <Panel title={t('admin.products.exampleTitle')}>
+      <div className="bg-well/60 rounded-xl p-3">
+        <div className="text-subtle mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase">
+          <Icon name="lock" size={12} />
+          {t('admin.products.adminOnly')}
+        </div>
+        <Row label={t('admin.products.supplierCost')} value={Number(cost) || 0} />
+        <Row
+          label={`+ ${t('admin.products.margin')}`}
+          value={Number(margin) || 0}
+          tone="text-[var(--status-ok-fg)] font-semibold"
+        />
+      </div>
+      <div className="border-line mt-3 border-b pb-2">
+        <Row label={`= ${t('admin.products.basePrice')}`} value={base} strong />
+        <p className="text-subtle text-[11px]">{t('admin.products.sellerSees')}</p>
+      </div>
+      {sell > 0 && (
+        <div className="mt-2">
+          <Row label={t('admin.products.exampleSelling', { amount: money(sell) })} value={sell} />
+          <Row
+            label={t('admin.analysis.sellerProfit')}
+            value={sell - base}
+            tone={
+              sell - base >= 0
+                ? 'text-[var(--status-ok-fg)] font-bold'
+                : 'text-[var(--status-danger-fg)] font-bold'
+            }
+          />
+        </div>
+      )}
+      {sell > 0 && sell < base && (
+        <Callout
+          tone="warn"
+          compact
+          className="mt-3"
+          description={t('seller.product.belowBase', { amount: money(base - sell) })}
+        />
+      )}
+    </Panel>
+  );
 }
+
+const Row = ({
+  label,
+  value,
+  strong,
+  tone,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  tone?: string;
+}) => (
+  <div className="flex items-center justify-between py-1.5 text-[14px]">
+    <span className="text-muted">{label}</span>
+    <Money
+      value={value}
+      className={strong ? 'text-ink text-base font-bold' : (tone ?? 'text-ink font-semibold')}
+    />
+  </div>
+);

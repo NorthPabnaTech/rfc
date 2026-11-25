@@ -9,13 +9,13 @@ export type FieldSize = 'lg' | 'md' | 'sm';
 /** Control height per size. */
 export const FIELD_HEIGHT: Record<FieldSize, string> = {
   lg: 'h-10',
-  md: 'h-9',
+  md: 'h-10',
   sm: 'h-8',
 };
 
 /** Control text size per size. */
 export const FIELD_TEXT: Record<FieldSize, string> = {
   lg: 'text-sm',
-  md: 'text-[13px]',
+  md: 'text-[14px]',
   sm: 'text-[12px]',
 };
