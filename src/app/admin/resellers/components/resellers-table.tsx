@@ -7,7 +7,7 @@ import { useRouter } from 'nextjs-toploader/app';
 import { toggleResellerActiveAction } from '@/actions/resellers';
 import { Taka } from '@/features/products/price';
 import { Icon } from '@components/icon/icon';
-import { ConfirmDialog, StatusBadge, TableFrame } from '@components/shared';
+import { ConfirmDialog, EmptyState, StatusBadge, TableFrame } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { Dropdown } from '@components/ui/dropdown';
 import { toast } from '@lib/toast';
@@ -47,11 +47,6 @@ export function ResellersTable({ items }: { items: ResellerRow[] }) {
   return (
     <>
       <TableFrame>
-      {items.length === 0 ? (
-        <div className="text-muted p-10 text-center text-sm">
-          No resellers found. Resellers can register via the Reseller API.
-        </div>
-      ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-line bg-well/60 text-muted border-b text-xs uppercase">
@@ -66,6 +61,17 @@ export function ResellersTable({ items }: { items: ResellerRow[] }) {
               </tr>
             </thead>
             <tbody className="divide-line divide-y">
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <EmptyState
+                      compact
+                      title="No resellers yet"
+                      description="Resellers appear here once they register through the Reseller API."
+                    />
+                  </td>
+                </tr>
+              )}
               {items.map((r) => (
                 <tr key={r.id} className="hover:bg-well/40 transition-colors">
                   <td className="px-4 py-3">
@@ -147,8 +153,7 @@ export function ResellersTable({ items }: { items: ResellerRow[] }) {
             </tbody>
           </table>
         </div>
-      )}
-    </TableFrame>
+      </TableFrame>
       <ConfirmDialog
         open={!!confirmTarget}
         onOpenChange={(open) => !open && setConfirmTarget(null)}

@@ -13,6 +13,7 @@ import {
   DrawerContent,
   DrawerFooter,
   DrawerHeader,
+  EmptyState,
   StatusBadge,
   TableFrame,
 } from '@components/shared';
@@ -20,11 +21,7 @@ import { Button } from '@components/ui/button';
 import { Dropdown, type DropdownEntry } from '@components/ui/dropdown';
 import { Select } from '@components/ui/select';
 import { Textarea } from '@components/ui/textarea';
-import {
-  TICKET_STATUS_LABELS,
-  TICKET_STATUS_TRANSITIONS,
-  type TicketStatus,
-} from '@lib/constants';
+import { TICKET_STATUS_LABELS, TICKET_STATUS_TRANSITIONS, type TicketStatus } from '@lib/constants';
 import { toast } from '@lib/toast';
 import { formatStoreDateTime } from '@lib/utils';
 
@@ -38,7 +35,12 @@ export type AdminTicketRow = {
   priority: string;
   status: TicketStatus;
   orderNumber?: string;
-  messages: { senderRole: 'reseller' | 'admin'; senderName: string; message: string; createdAt: string }[];
+  messages: {
+    senderRole: 'reseller' | 'admin';
+    senderName: string;
+    message: string;
+    createdAt: string;
+  }[];
   lastReplyAt: string;
 };
 
@@ -138,79 +140,86 @@ export function TicketsManager({ items }: { items: AdminTicketRow[] }) {
   return (
     <>
       <TableFrame>
-        {items.length === 0 ? (
-          <div className="text-muted p-10 text-center text-sm">No support tickets found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-line bg-well/60 text-muted border-b text-xs uppercase">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-line bg-well/60 text-muted border-b text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Ticket</th>
+                <th className="px-4 py-3 font-semibold">Reseller</th>
+                <th className="px-4 py-3 font-semibold">Category</th>
+                <th className="px-4 py-3 font-semibold">Priority</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Updated</th>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-line divide-y">
+              {items.length === 0 && (
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Ticket</th>
-                  <th className="px-4 py-3 font-semibold">Reseller</th>
-                  <th className="px-4 py-3 font-semibold">Category</th>
-                  <th className="px-4 py-3 font-semibold">Priority</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Updated</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                  <td colSpan={7} className="p-0">
+                    <EmptyState
+                      compact
+                      title="No support tickets found"
+                      description="Tickets opened by resellers will show up here."
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-line divide-y">
-                {items.map((t) => (
-                  <tr key={t.id} className="hover:bg-well/40 transition-colors">
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTicketId(t.id)}
-                        className="text-left hover:underline"
-                      >
-                        <div className="text-ink font-semibold">{t.subject}</div>
-                        <div className="text-muted mt-0.5 flex items-center gap-2 text-xs">
-                          <span className="font-mono">{t.ticketNumber}</span>
-                          {t.orderNumber ? <span>· Order {t.orderNumber}</span> : null}
-                          <span>
-                            · {t.messages.length} {t.messages.length === 1 ? 'message' : 'messages'}
-                          </span>
-                        </div>
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/resellers/${t.resellerId}`}
-                        className="text-ink font-medium hover:underline"
-                      >
-                        {t.shopName}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-xs capitalize">{t.category}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${priorityTone(t.priority)}`}
-                      >
-                        {t.priority}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        status={ticketStatusTone(t.status)}
-                        label={TICKET_STATUS_LABELS[t.status]}
-                      />
-                    </td>
-                    <td className="text-muted px-4 py-3 text-xs whitespace-nowrap">
-                      {formatStoreDateTime(t.lastReplyAt)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Dropdown align="end" items={buildDropdownItems(t)}>
-                        <Button variant="ghost" size="icon-sm" aria-label="Actions">
-                          <Icon name="more" size={16} />
-                        </Button>
-                      </Dropdown>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              )}
+              {items.map((t) => (
+                <tr key={t.id} className="hover:bg-well/40 transition-colors">
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTicketId(t.id)}
+                      className="text-left hover:underline"
+                    >
+                      <div className="text-ink font-semibold">{t.subject}</div>
+                      <div className="text-muted mt-0.5 flex items-center gap-2 text-xs">
+                        <span className="font-mono">{t.ticketNumber}</span>
+                        {t.orderNumber ? <span>· Order {t.orderNumber}</span> : null}
+                        <span>
+                          · {t.messages.length} {t.messages.length === 1 ? 'message' : 'messages'}
+                        </span>
+                      </div>
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/admin/resellers/${t.resellerId}`}
+                      className="text-ink font-medium hover:underline"
+                    >
+                      {t.shopName}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-xs capitalize">{t.category}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${priorityTone(t.priority)}`}
+                    >
+                      {t.priority}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge
+                      status={ticketStatusTone(t.status)}
+                      label={TICKET_STATUS_LABELS[t.status]}
+                    />
+                  </td>
+                  <td className="text-muted px-4 py-3 text-xs whitespace-nowrap">
+                    {formatStoreDateTime(t.lastReplyAt)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Dropdown align="end" items={buildDropdownItems(t)}>
+                      <Button variant="ghost" size="icon-sm" aria-label="Actions">
+                        <Icon name="more" size={16} />
+                      </Button>
+                    </Dropdown>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </TableFrame>
 
       <Drawer open={!!activeTicket} onOpenChange={(open) => !open && setActiveTicketId(null)}>
@@ -329,8 +338,8 @@ export function TicketsManager({ items }: { items: AdminTicketRow[] }) {
               ) : (
                 <DrawerFooter className="justify-between">
                   <span className="text-muted text-xs">
-                    This ticket is {TICKET_STATUS_LABELS[activeTicket.status].toLowerCase()}. Replies
-                    are disabled.
+                    This ticket is {TICKET_STATUS_LABELS[activeTicket.status].toLowerCase()}.
+                    Replies are disabled.
                   </span>
                   <Button variant="outline" onClick={() => setActiveTicketId(null)}>
                     Close
