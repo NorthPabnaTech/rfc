@@ -73,8 +73,10 @@ function syncDimensionFromVariants(
   for (const val of values) {
     const norm = val.toLowerCase();
     const sup = supplierMap.get(norm);
-    if (sup) {
-      if (!sup.hasInStock) disabledValues.push(val);
+    if (supplierMap.size > 0) {
+      // If the supplier provides values for this dimension, anything omitted or
+      // marked out-of-stock by the supplier is disabled locally.
+      if (!sup || !sup.hasInStock) disabledValues.push(val);
     } else if (existingDisabled.has(norm)) {
       disabledValues.push(val);
     }
@@ -251,6 +253,7 @@ export async function syncSupplierProducts(
       stockQuantity: v.stockQuantity,
       inStock: v.inStock,
     }));
+    local.stockQuantity = ext.stockQuantity;
 
     // Respect both supplier availability and local inventory tracking rules.
     if (!ext.inStock) {
@@ -279,6 +282,38 @@ export async function syncSupplierProducts(
   });
 
   return { updated, totalFetched: allProducts.length };
+}
+
+export async function syncAllActiveSuppliers(): Promise<{
+  syncedSuppliers: number;
+  updated: number;
+  totalFetched: number;
+  errors: string[];
+}> {
+  await connectDB();
+  const suppliers = await SupplierModel.find({
+    status: 'active',
+    type: 'api',
+  }).lean();
+
+  let syncedSuppliers = 0;
+  let updated = 0;
+  let totalFetched = 0;
+  const errors: string[] = [];
+
+  for (const s of suppliers) {
+    if (!isSupplierApiConfigured(s)) continue;
+    try {
+      const res = await syncSupplierProducts(String(s._id));
+      syncedSuppliers++;
+      updated += res.updated;
+      totalFetched += res.totalFetched;
+    } catch (err) {
+      errors.push(`${s.name}: ${err instanceof Error ? err.message : 'Sync error'}`);
+    }
+  }
+
+  return { syncedSuppliers, updated, totalFetched, errors };
 }
 
 export async function syncDueSuppliers(): Promise<{ synced: number; errors: string[] }> {

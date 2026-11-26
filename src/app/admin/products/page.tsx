@@ -18,6 +18,7 @@ import { pageParam, param, type SearchParams } from '@lib/search-params';
 
 import { ListToolbar } from '../components/list-toolbar';
 import { ProductsTable } from './components/products-table';
+import { SyncStockButton } from './components/sync-stock-button';
 
 export const metadata: Metadata = { title: 'Products' };
 
@@ -53,11 +54,14 @@ export default async function AdminProductsPage({
         title="Products"
         description={`${data.total} products in your catalog`}
         actions={
-          <Button variant="primary" asChild>
-            <Link href="/admin/products/new">
-              <Icon name="plus" size={15} /> Add product
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {suppliers.some((s) => s.type === 'api') && <SyncStockButton />}
+            <Button variant="primary" asChild>
+              <Link href="/admin/products/new">
+                <Icon name="plus" size={15} /> Add product
+              </Link>
+            </Button>
+          </div>
         }
       />
       <ListToolbar

@@ -47,7 +47,11 @@ import {
   confirmAndSendSupplierOrder,
   refreshSupplierOrderStatus,
 } from '@/services/supplier-orders';
-import { fetchSupplierCatalog, syncSupplierProducts } from '@/services/supplier-sync';
+import {
+  fetchSupplierCatalog,
+  syncAllActiveSuppliers,
+  syncSupplierProducts,
+} from '@/services/supplier-sync';
 import { searchCustomers, setCustomerActive } from '@/services/users';
 import { requireAdmin } from '@lib/auth/current-user';
 import { type ActionResult, runAction } from '@lib/errors';
@@ -600,6 +604,18 @@ export async function syncSupplierProductsAction(
   return runAction(async () => {
     await requireAdmin();
     const res = await syncSupplierProducts(objectId.parse(supplierId));
+    revalidateStorefront();
+    revalidatePath('/admin', 'layout');
+    return res;
+  }, 'Supplier stock synchronized');
+}
+
+export async function syncAllSuppliersAction(): Promise<
+  ActionResult<{ syncedSuppliers: number; updated: number; totalFetched: number; errors: string[] }>
+> {
+  return runAction(async () => {
+    await requireAdmin();
+    const res = await syncAllActiveSuppliers();
     revalidateStorefront();
     revalidatePath('/admin', 'layout');
     return res;
