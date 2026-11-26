@@ -2,11 +2,11 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 
 import { syncAllSuppliersAction } from '@/actions/admin';
 import { Icon } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
+import { toast } from '@lib/toast';
 
 export function SyncStockButton() {
   const router = useRouter();
