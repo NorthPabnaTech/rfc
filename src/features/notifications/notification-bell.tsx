@@ -12,6 +12,14 @@ import {
 import type { NotificationDTO, NotificationFeedDTO } from '@/types';
 import { Icon, type IconRegistryKey } from '@components/icon/icon';
 import { Button } from '@components/ui/button';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from '@components/ui/dialog';
 import { Dropdown } from '@components/ui/dropdown';
 import {
   NOTIFICATION_EVENT,
@@ -400,42 +408,47 @@ export function NotificationBell({
         )}
       </button>
     </Dropdown>
-    {pushKey && (push.state === 'default' || push.state === 'denied') && !promptDismissed && (
-      <div
-        role="dialog"
-        aria-label="Enable push notifications"
-        className="border-line bg-panel shadow-modal fixed right-4 bottom-20 left-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border p-3.5 sm:bottom-5 sm:left-auto"
+    {pushKey && (
+      <Dialog
+        open={(push.state === 'default' || push.state === 'denied') && !promptDismissed}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) dismissPrompt();
+        }}
       >
-        <span className="bg-brand/15 text-brand grid size-10 shrink-0 place-items-center rounded-xl">
-          <Icon name="bell" size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-ink text-xs font-semibold">
-            {push.state === 'denied'
-              ? 'System notifications are blocked'
-              : 'Turn on system notifications'}
-          </p>
-          <p className="text-muted text-[11px] leading-snug">
-            {push.state === 'denied'
-              ? 'Allow notifications in browser site settings, then tap Turn on.'
-              : 'Get order updates & replies on your phone even when the browser is closed.'}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button type="button" variant="ghost" size="sm" onClick={dismissPrompt}>
-            Later
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            disabled={enabling}
-            onClick={onEnablePush}
-          >
-            {enabling ? 'Turning on…' : 'Turn on'}
-          </Button>
-        </div>
-      </div>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogBody className="flex items-start gap-3.5 px-5 py-5">
+            <span className="bg-brand/15 text-brand grid size-10 shrink-0 place-items-center rounded-xl">
+              <Icon name="bell" size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-sm font-semibold">
+                {push.state === 'denied'
+                  ? 'System notifications are blocked'
+                  : 'Turn on system notifications'}
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-xs leading-relaxed">
+                {push.state === 'denied'
+                  ? 'Allow notifications in browser site settings, then tap Turn on.'
+                  : 'Get order updates & replies on your phone even when the browser is closed.'}
+              </DialogDescription>
+            </div>
+          </DialogBody>
+          <DialogFooter className="px-5 py-3.5">
+            <Button type="button" variant="ghost" size="sm" onClick={dismissPrompt}>
+              Later
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={enabling}
+              onClick={onEnablePush}
+            >
+              {enabling ? 'Turning on…' : 'Turn on'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     )}
     </>
   );
