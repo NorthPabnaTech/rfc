@@ -74,6 +74,7 @@ export type ProductFilters = {
   maxPrice?: number;
   availability?: 'in_stock';
   onSale?: boolean;
+  featured?: boolean;
   sort?: ProductSort;
   page?: number;
   pageSize?: number;
@@ -110,6 +111,7 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
   }
   if (filters.availability === 'in_stock') query.stockStatus = { $ne: 'out_of_stock' };
   if (filters.onSale) query.salePrice = { $ne: null };
+  if (filters.featured) query.isFeatured = true;
 
   const rawQ = filters.q?.trim().slice(0, 80);
   if (rawQ) {

@@ -1,11 +1,123 @@
 import 'server-only';
 
 import { connectDB, ProductModel, SupplierModel } from '@/database';
-import type { AdminProductDTO, SupplierCatalogProductDTO } from '@/types';
+import type {
+  AdminProductDTO,
+  SupplierCatalogProductDTO,
+  SupplierCatalogVariantDTO,
+} from '@/types';
 import { AppError } from '@lib/errors';
 
 import { getSupplierAdapter, isSupplierApiConfigured } from './suppliers/registry';
 import type { SupplierProductsPage } from './suppliers/types';
+
+type VariantDimension = 'Color' | 'Size';
+type SyncedVariation = { name: string; values: string[]; disabledValues: string[] };
+
+/**
+ * Computes `{ values, disabledValues }` for a single variation dimension (`Color`
+ * or `Size`) from supplier variants. A value is marked in `disabledValues` when
+ * every supplier variant with that value has `inStock === false`, and re-enabled
+ * automatically if any matching variant is `inStock === true`.
+ */
+function syncDimensionFromVariants(
+  dimension: VariantDimension,
+  extVariants: SupplierCatalogVariantDTO[],
+  existing?: { name: string; values: string[]; disabledValues?: string[] },
+): SyncedVariation | null {
+  const key = dimension === 'Color' ? 'color' : 'size';
+  // Map normalized lowercase value -> { label, hasInStock }
+  const supplierMap = new Map<string, { label: string; hasInStock: boolean }>();
+
+  for (const v of extVariants) {
+    const raw = v[key]?.trim();
+    if (!raw) continue;
+    const norm = raw.toLowerCase();
+    const prev = supplierMap.get(norm);
+    if (prev) {
+      if (v.inStock) prev.hasInStock = true;
+    } else {
+      supplierMap.set(norm, { label: raw, hasInStock: Boolean(v.inStock) });
+    }
+  }
+
+  if (supplierMap.size === 0 && !existing) return null;
+
+  // Preserve existing value order & casing, then append any new supplier values.
+  const values: string[] = [];
+  const seenNorms = new Set<string>();
+
+  for (const val of existing?.values ?? []) {
+    const trimmed = val.trim();
+    if (!trimmed) continue;
+    const norm = trimmed.toLowerCase();
+    if (seenNorms.has(norm)) continue;
+    seenNorms.add(norm);
+    values.push(trimmed);
+  }
+
+  for (const [norm, info] of supplierMap) {
+    if (!seenNorms.has(norm)) {
+      seenNorms.add(norm);
+      values.push(info.label);
+    }
+  }
+
+  if (values.length === 0) return null;
+
+  const existingDisabled = new Set(
+    (existing?.disabledValues ?? []).map((d) => d.trim().toLowerCase()),
+  );
+  const disabledValues: string[] = [];
+
+  for (const val of values) {
+    const norm = val.toLowerCase();
+    const sup = supplierMap.get(norm);
+    if (sup) {
+      if (!sup.hasInStock) disabledValues.push(val);
+    } else if (existingDisabled.has(norm)) {
+      disabledValues.push(val);
+    }
+  }
+
+  return { name: dimension, values, disabledValues };
+}
+
+function buildSyncedVariations(
+  extVariants: SupplierCatalogVariantDTO[],
+  existingVariations: { name: string; values: string[]; disabledValues?: string[] }[] = [],
+): SyncedVariation[] {
+  if (extVariants.length === 0) {
+    return existingVariations.map((v) => ({
+      name: v.name,
+      values: [...v.values],
+      disabledValues: v.disabledValues ? [...v.disabledValues] : [],
+    }));
+  }
+
+  const findExisting = (dim: VariantDimension) =>
+    existingVariations.find((v) => v.name.trim().toLowerCase() === dim.toLowerCase());
+
+  const colorRow = syncDimensionFromVariants('Color', extVariants, findExisting('Color'));
+  const sizeRow = syncDimensionFromVariants('Size', extVariants, findExisting('Size'));
+
+  const otherRows: SyncedVariation[] = existingVariations
+    .filter((v) => {
+      const lower = v.name.trim().toLowerCase();
+      return lower !== 'color' && lower !== 'size';
+    })
+    .map((v) => ({
+      name: v.name,
+      values: [...v.values],
+      disabledValues: v.disabledValues ? [...v.disabledValues] : [],
+    }));
+
+  const next: SyncedVariation[] = [];
+  if (colorRow) next.push(colorRow);
+  next.push(...otherRows);
+  if (sizeRow) next.push(sizeRow);
+  return next;
+}
 
 export async function fetchSupplierCatalog(
   supplierId: string,
@@ -41,15 +153,7 @@ export async function getSupplierImportDraft(
     throw new AppError('Selected product was not found in the supplier catalog.', 404);
   }
 
-  const colors = [
-    ...new Set(ext.variants.map((v) => v.color).filter((c): c is string => Boolean(c?.trim()))),
-  ];
-  const sizes = [
-    ...new Set(ext.variants.map((v) => v.size).filter((s): s is string => Boolean(s?.trim()))),
-  ];
-  const variations: { name: string; values: string[] }[] = [];
-  if (colors.length) variations.push({ name: 'Color', values: colors });
-  if (sizes.length) variations.push({ name: 'Size', values: sizes });
+  const variations = buildSyncedVariations(ext.variants);
 
   return {
     name: ext.name,
@@ -157,27 +261,9 @@ export async function syncSupplierProducts(
       local.stockStatus = 'in_stock';
     }
 
-    // Update Color / Size variation options to only expose in-stock variants when variants exist.
+    // Keep all Color / Size values and toggle disabledValues based on supplier stock.
     if (ext.variants.length > 0) {
-      const availableVariants = ext.variants.filter((v) => v.inStock);
-      const colors = [
-        ...new Set(
-          availableVariants.map((v) => v.color).filter((c): c is string => Boolean(c?.trim())),
-        ),
-      ];
-      const sizes = [
-        ...new Set(
-          availableVariants.map((v) => v.size).filter((s): s is string => Boolean(s?.trim())),
-        ),
-      ];
-      const nextVariations = local.variations.filter(
-        (v) => v.name !== 'Color' && v.name !== 'Size',
-      );
-      if (colors.length) nextVariations.unshift({ name: 'Color', values: colors });
-      if (sizes.length) nextVariations.push({ name: 'Size', values: sizes });
-      if (colors.length || sizes.length) {
-        local.variations = nextVariations;
-      }
+      local.variations = buildSyncedVariations(ext.variants, local.variations);
     }
 
     await local.save();
