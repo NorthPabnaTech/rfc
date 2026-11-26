@@ -559,7 +559,10 @@ export async function listCustomerOrders(userId: string): Promise<OrderRowDTO[]>
 
 export async function getCustomerOrder(userId: string, id: string): Promise<OrderDTO | null> {
   await connectDB();
-  const doc = await OrderModel.findOne({ _id: id, user: userId }).lean();
+  const filter = /^[a-f\d]{24}$/i.test(id)
+    ? { _id: id, user: userId }
+    : { orderNumber: id.trim().toUpperCase(), user: userId };
+  const doc = await OrderModel.findOne(filter).lean();
   if (!doc) return null;
   const ret = await ReturnRequestModel.findOne({ order: doc._id }).lean();
   return {

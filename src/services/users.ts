@@ -287,7 +287,11 @@ export async function listAddresses(userId: string): Promise<AddressDTO[]> {
   return docs.map(toAddress);
 }
 
-export async function saveAddress(userId: string, input: AddressOutput, id?: string) {
+export async function saveAddress(
+  userId: string,
+  input: AddressOutput,
+  id?: string,
+): Promise<AddressDTO> {
   await connectDB();
   const count = await AddressModel.countDocuments({ user: userId });
   if (!id && count >= 10) throw new AppError('You can save up to 10 addresses.');
@@ -295,14 +299,16 @@ export async function saveAddress(userId: string, input: AddressOutput, id?: str
   if (isDefault) await AddressModel.updateMany({ user: userId }, { $set: { isDefault: false } });
 
   if (id) {
-    const res = await AddressModel.updateOne(
+    const updated = await AddressModel.findOneAndUpdate(
       { _id: id, user: userId },
       { $set: { ...input, isDefault } },
-    );
-    if (!res.matchedCount) throw new AppError('Address not found.', 404);
-  } else {
-    await AddressModel.create({ ...input, isDefault, user: userId });
+      { new: true },
+    ).lean();
+    if (!updated) throw new AppError('Address not found.', 404);
+    return toAddress(updated);
   }
+  const created = await AddressModel.create({ ...input, isDefault, user: userId });
+  return toAddress(created.toObject());
 }
 
 export async function deleteAddress(userId: string, id: string) {
