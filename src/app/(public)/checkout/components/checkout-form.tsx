@@ -422,7 +422,7 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
           {quote?.couponError && (
             <p className="mt-1.5 text-xs text-[var(--status-danger-fg)]">{quote.couponError}</p>
           )}
-          {quote?.appliedCampaign && quote.discount > 0 && (
+          {quote?.appliedCampaign && (
             <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-[var(--status-ok-fg)]">
               <Icon name="coupon" size={13} />
               <span>
@@ -456,15 +456,26 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
           <div className="flex justify-between">
             <dt className="text-muted">Delivery</dt>
             <dd className="text-ink font-medium">
-              {quote ? (
-                quote.shippingFee === 0 ? (
-                  <span className="text-[var(--status-ok-fg)]">Free</span>
-                ) : (
-                  <Taka amount={quote.shippingFee} />
-                )
-              ) : (
-                '—'
-              )}
+              {(() => {
+                if (!quote) return '—';
+                const baseFee = fees[zone ?? 'outside_dhaka'];
+                const discounted = quote.shippingFee < baseFee;
+                return (
+                  <span className="inline-flex items-center gap-1.5">
+                    {discounted && (
+                      <Taka amount={baseFee} className="text-muted text-xs line-through" />
+                    )}
+                    {quote.shippingFee === 0 ? (
+                      <span className="font-semibold text-[var(--status-ok-fg)]">Free</span>
+                    ) : (
+                      <Taka
+                        amount={quote.shippingFee}
+                        className={discounted ? 'font-semibold text-[var(--status-ok-fg)]' : undefined}
+                      />
+                    )}
+                  </span>
+                );
+              })()}
             </dd>
           </div>
           <div className="border-line flex justify-between border-t pt-3">
