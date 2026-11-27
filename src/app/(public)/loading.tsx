@@ -66,7 +66,7 @@ export default function StoreLoading() {
           </div>
           <div className="skeleton h-9 w-24 rounded-full" />
         </div>
-        <ProductGridSkeleton count={5} />
+        <ProductGridSkeleton count={10} />
       </section>
 
       {/* New arrivals */}
