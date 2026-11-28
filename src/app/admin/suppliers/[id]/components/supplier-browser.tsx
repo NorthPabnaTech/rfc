@@ -15,6 +15,14 @@ import { Button } from '@components/ui/button';
 import { toast } from '@lib/toast';
 import { formatStoreDateTime } from '@lib/utils';
 
+type StockFilter = 'all' | 'in_stock' | 'out_of_stock';
+
+const STOCK_FILTER_OPTIONS: Array<{ value: StockFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'in_stock', label: 'In Stock' },
+  { value: 'out_of_stock', label: 'Out of Stock' },
+];
+
 type Props = {
   supplier: SupplierDTO;
   initialCatalog?: {
@@ -42,19 +50,25 @@ export function SupplierBrowser({
   const [totalPages, setTotalPages] = React.useState(initialCatalog?.totalPages ?? 1);
   const [total, setTotal] = React.useState(initialCatalog?.total ?? 0);
   const [search, setSearch] = React.useState('');
+  const [stockFilter, setStockFilter] = React.useState<StockFilter>('all');
   const [loading, setLoading] = React.useState(false);
   const [syncing, setSyncing] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>(initialError);
 
   const linkedSet = React.useMemo(() => new Set(linkedExternalIds), [linkedExternalIds]);
 
-  const loadCatalog = async (nextPage: number, q: string) => {
+  const loadCatalog = async (
+    nextPage: number,
+    q: string,
+    nextStock: StockFilter = stockFilter,
+  ) => {
     setLoading(true);
     setError(undefined);
     const res = await fetchSupplierCatalogAction({
       supplierId: supplier.id,
       search: q.trim() || undefined,
       page: nextPage,
+      stock: nextStock,
     });
     setLoading(false);
     if (!res.ok || !res.data) {
@@ -67,6 +81,12 @@ export function SupplierBrowser({
     setPage(res.data.page);
     setTotalPages(res.data.totalPages);
     setTotal(res.data.total);
+  };
+
+  const handleStockFilterChange = (nextStock: StockFilter) => {
+    if (nextStock === stockFilter && !loading) return;
+    setStockFilter(nextStock);
+    void loadCatalog(1, search, nextStock);
   };
 
   const handleSyncNow = async () => {
@@ -166,23 +186,49 @@ export function SupplierBrowser({
               drafts.
             </p>
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void loadCatalog(1, search);
-            }}
-            className="flex gap-2"
-          >
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search supplier products…"
-              className="input-flat h-9 w-60 px-3 text-sm"
-            />
-            <Button type="submit" variant="secondary" size="sm" disabled={loading}>
-              <Icon name="search" size={14} /> Search
-            </Button>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Filter by stock status"
+              className="bg-well hairline inline-flex items-center rounded-lg p-0.5"
+            >
+              {STOCK_FILTER_OPTIONS.map((opt) => {
+                const active = stockFilter === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleStockFilterChange(opt.value)}
+                    className={
+                      active
+                        ? 'bg-surface text-ink rounded-md px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors'
+                        : 'text-subtle hover:text-ink rounded-md px-2.5 py-1 text-xs font-medium transition-colors'
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void loadCatalog(1, search, stockFilter);
+              }}
+              className="flex gap-2"
+            >
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search supplier products…"
+                className="input-flat h-9 w-60 px-3 text-sm"
+              />
+              <Button type="submit" variant="secondary" size="sm" disabled={loading}>
+                <Icon name="search" size={14} /> Search
+              </Button>
+            </form>
+          </div>
         </div>
 
         {error && (

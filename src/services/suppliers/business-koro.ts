@@ -241,11 +241,51 @@ export const BusinessKoroAdapter: SupplierAdapter = {
   },
 
   async fetchProducts(supplier, opts = {}): Promise<SupplierProductsPage> {
+    const stock = opts.stock ?? 'all';
+
+    // Business Koro only exposes `includeOutOfStock=true` (no out-of-stock-only query param),
+    // so for the `out_of_stock` filter we scan the matching catalog pages and paginate locally.
+    if (stock === 'out_of_stock') {
+      const requestedPage = Math.max(1, opts.page ?? 1);
+      const requestedLimit = Math.max(1, opts.limit ?? 20);
+      const matching: SupplierCatalogProductDTO[] = [];
+      let scanPage = 1;
+      let scanTotalPages = 1;
+      let deliveryCharges = { insideDhaka: 70, outsideDhaka: 130 };
+
+      do {
+        const res = await this.fetchProducts(supplier, {
+          search: opts.search,
+          page: scanPage,
+          limit: 50,
+          stock: 'all',
+        });
+        matching.push(...res.products.filter((p) => !p.inStock));
+        scanTotalPages = res.totalPages;
+        if (res.deliveryCharges) deliveryCharges = res.deliveryCharges;
+        scanPage++;
+      } while (scanPage <= scanTotalPages && scanPage <= 20);
+
+      const total = matching.length;
+      const totalPages = Math.max(1, Math.ceil(total / requestedLimit));
+      const safePage = Math.min(requestedPage, totalPages);
+      const start = (safePage - 1) * requestedLimit;
+
+      return {
+        products: matching.slice(start, start + requestedLimit),
+        total,
+        page: safePage,
+        totalPages,
+        deliveryCharges,
+      };
+    }
+
     assertRateLimit(String(supplier._id), ['products_min']);
     const params = new URLSearchParams();
     if (opts.page) params.set('page', String(opts.page));
     if (opts.limit) params.set('limit', String(opts.limit));
     if (opts.search?.trim()) params.set('search', opts.search.trim());
+    if (stock === 'all') params.set('includeOutOfStock', 'true');
 
     const qs = params.toString();
     const url = `${baseUrl(supplier)}/products${qs ? `?${qs}` : ''}`;
@@ -289,7 +329,7 @@ export const BusinessKoroAdapter: SupplierAdapter = {
     let deliveryCharges: { insideDhaka: number; outsideDhaka: number } | undefined;
 
     do {
-      const res = await this.fetchProducts(supplier, { page, limit: 50 });
+      const res = await this.fetchProducts(supplier, { page, limit: 50, stock: 'all' });
       all.push(...res.products);
       totalPages = res.totalPages;
       if (res.deliveryCharges) deliveryCharges = res.deliveryCharges;

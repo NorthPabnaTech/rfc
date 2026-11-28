@@ -583,17 +583,22 @@ const confirmSupplierOrderSchema = z.object({
   allowDuplicate: z.boolean().optional(),
 });
 
+const supplierStockFilterSchema = z.enum(['all', 'in_stock', 'out_of_stock']);
+
 export async function fetchSupplierCatalogAction(input: {
   supplierId: string;
   search?: string;
   page?: number;
+  stock?: 'all' | 'in_stock' | 'out_of_stock';
 }) {
   return runAction(async () => {
     await requireAdmin();
+    const stock = input.stock ? supplierStockFilterSchema.parse(input.stock) : 'all';
     return fetchSupplierCatalog(objectId.parse(input.supplierId), {
       search: input.search,
       page: input.page ?? 1,
       limit: 20,
+      stock,
     });
   });
 }

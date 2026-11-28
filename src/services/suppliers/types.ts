@@ -37,6 +37,8 @@ export type SupplierOrderStatusResult = {
   rawSummary: Record<string, unknown>;
 };
 
+export type SupplierStockFilter = 'all' | 'in_stock' | 'out_of_stock';
+
 export type SupplierProductsPage = {
   products: SupplierCatalogProductDTO[];
   total: number;
@@ -50,7 +52,7 @@ export interface SupplierAdapter {
   isConfigured(supplier: Pick<Supplier, 'apiKeyEnvVar'>): boolean;
   fetchProducts(
     supplier: Supplier,
-    opts?: { search?: string; page?: number; limit?: number },
+    opts?: { search?: string; page?: number; limit?: number; stock?: SupplierStockFilter },
   ): Promise<SupplierProductsPage>;
   fetchAllProducts(supplier: Supplier): Promise<{
     products: SupplierCatalogProductDTO[];

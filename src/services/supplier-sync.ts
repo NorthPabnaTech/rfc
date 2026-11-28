@@ -9,7 +9,7 @@ import type {
 import { AppError } from '@lib/errors';
 
 import { getSupplierAdapter, isSupplierApiConfigured } from './suppliers/registry';
-import type { SupplierProductsPage } from './suppliers/types';
+import type { SupplierProductsPage, SupplierStockFilter } from './suppliers/types';
 
 type VariantDimension = 'Color' | 'Size';
 type SyncedVariation = { name: string; values: string[]; disabledValues: string[] };
@@ -123,7 +123,7 @@ function buildSyncedVariations(
 
 export async function fetchSupplierCatalog(
   supplierId: string,
-  opts: { search?: string; page?: number; limit?: number } = {},
+  opts: { search?: string; page?: number; limit?: number; stock?: SupplierStockFilter } = {},
 ): Promise<SupplierProductsPage> {
   await connectDB();
   const supplier = await SupplierModel.findById(supplierId).lean();
