@@ -252,20 +252,20 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
               autoComplete="tel"
             />
             <FormInput
+              name="email"
+              label="Email (optional)"
+              type="email"
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+            <LocationFields />
+            <FormInput
               name="addressLine"
               label="Address"
               required
               placeholder="House, road, block / village"
               autoComplete="street-address"
               className="sm:col-span-2"
-            />
-            <LocationFields />
-            <FormInput
-              name="email"
-              label="Email (optional)"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
             />
           </div>
           {user && addressId === 'new' && (
