@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { deleteCategoryAction, saveCategoryAction } from '@/actions/admin';
 import { ProductImage } from '@/features/products/product-image';
 import { ImageUploader } from '@/features/uploads/image-uploader';
-import type { CategoryDTO, ImageDTO } from '@/types';
+import type { BusinessDTO, CategoryDTO, ImageDTO } from '@/types';
 import { Form, FormInput, FormItem, FormSelect, FormSwitch, FormTextarea } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, EmptyState, StatusBadge } from '@components/shared';
@@ -19,20 +19,51 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@components/ui/dialog';
+import { Select } from '@components/ui/select';
 import { useModal } from '@hooks/use-modal';
 import { handleActionResult } from '@lib/action-client';
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 import { cn } from '@lib/utils';
 import { type CategoryInput, categorySchema } from '@lib/validators/catalog';
 
-export function CategoriesManager({ categories }: { categories: CategoryDTO[] }) {
+export function CategoriesManager({
+  categories,
+  businesses,
+}: {
+  categories: CategoryDTO[];
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const modal = useModal<{ category?: CategoryDTO; parentId?: string }>();
   const [deleting, setDeleting] = React.useState<CategoryDTO | null>(null);
-  const roots = categories.filter((c) => !c.parentId);
+  const [businessFilter, setBusinessFilter] = React.useState<string>('all');
+  const bizLabel = React.useMemo(
+    () => new Map(businesses.map((b) => [b.slug, b.name])),
+    [businesses],
+  );
+  const filtered = React.useMemo(
+    () =>
+      businessFilter === 'all'
+        ? categories
+        : categories.filter((c) => c.business === businessFilter),
+    [categories, businessFilter],
+  );
+  const roots = filtered.filter((c) => !c.parentId);
+  const allRoots = categories.filter((c) => !c.parentId);
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="w-56">
+          <Select
+            value={businessFilter}
+            onValueChange={setBusinessFilter}
+            items={[
+              { value: 'all', label: 'All businesses' },
+              ...businesses.map((b) => ({ value: b.slug, label: b.name })),
+            ]}
+          />
+        </div>
         <Button variant="primary" onClick={() => modal.openModal('create', {})}>
           <Icon name="plus" size={15} /> Add category
         </Button>
@@ -46,11 +77,12 @@ export function CategoriesManager({ categories }: { categories: CategoryDTO[] })
       ) : (
         <div className="grid gap-4">
           {roots.map((root) => {
-            const subs = categories.filter((c) => c.parentId === root.id);
+            const subs = filtered.filter((c) => c.parentId === root.id);
             return (
               <div key={root.id} className="bg-panel hairline rounded-xl2 overflow-hidden">
                 <Row
                   category={root}
+                  businessName={bizLabel.get(root.business)}
                   onEdit={() => modal.openModal('update', { category: root })}
                   onDelete={() => setDeleting(root)}
                   extra={
@@ -70,6 +102,7 @@ export function CategoriesManager({ categories }: { categories: CategoryDTO[] })
                         <Row
                           category={s}
                           sub
+                          businessName={bizLabel.get(s.business)}
                           onEdit={() => modal.openModal('update', { category: s })}
                           onDelete={() => setDeleting(s)}
                         />
@@ -84,11 +117,15 @@ export function CategoriesManager({ categories }: { categories: CategoryDTO[] })
       )}
 
       <CategoryDialog
-        key={`${modal.type}-${modal.data?.category?.id ?? modal.data?.parentId ?? 'new'}`}
+        key={`${modal.type}-${modal.data?.category?.id ?? modal.data?.parentId ?? 'new'}-${businessFilter}`}
         open={modal.isOpen()}
         category={modal.data?.category}
         parentId={modal.data?.parentId}
-        roots={roots}
+        defaultBusiness={
+          businessFilter !== 'all' ? businessFilter : DEFAULT_BUSINESS_SLUG
+        }
+        businesses={businesses}
+        roots={allRoots}
         onOpenChange={(o) => !o && modal.closeModal()}
         onSaved={() => {
           modal.closeModal();
@@ -116,12 +153,14 @@ export function CategoriesManager({ categories }: { categories: CategoryDTO[] })
 function Row({
   category: c,
   sub,
+  businessName,
   onEdit,
   onDelete,
   extra,
 }: {
   category: CategoryDTO;
   sub?: boolean;
+  businessName?: string;
   onEdit: () => void;
   onDelete: () => void;
   extra?: React.ReactNode;
@@ -147,6 +186,12 @@ function Row({
         </p>
       </div>
       <div className="flex items-center gap-1.5">
+        {businessName && !sub && (
+          <StatusBadge
+            status={c.business === DEFAULT_BUSINESS_SLUG ? 'info' : 'neutral'}
+            label={businessName}
+          />
+        )}
         {c.isFeatured && <StatusBadge status="info" label="Featured" />}
         {!c.isActive && <StatusBadge status="neutral" label="Hidden" />}
         {extra}
@@ -165,6 +210,8 @@ function CategoryDialog({
   open,
   category,
   parentId,
+  defaultBusiness,
+  businesses,
   roots,
   onOpenChange,
   onSaved,
@@ -172,16 +219,20 @@ function CategoryDialog({
   open: boolean;
   category?: CategoryDTO;
   parentId?: string;
+  defaultBusiness: string;
+  businesses: BusinessDTO[];
   roots: CategoryDTO[];
   onOpenChange: (o: boolean) => void;
   onSaved: () => void;
 }) {
+  const parentCat = parentId ? roots.find((r) => r.id === parentId) : undefined;
   const form = Form.useForm<CategoryInput>({
     schema: categorySchema,
     defaultValues: {
       name: category?.name ?? '',
       slug: category?.slug ?? '',
       description: category?.description ?? '',
+      business: category?.business ?? parentCat?.business ?? defaultBusiness,
       parent: category?.parentId ?? parentId ?? '',
       image: category?.image ?? null,
       isActive: category?.isActive ?? true,
@@ -189,6 +240,7 @@ function CategoryDialog({
       sortOrder: category?.sortOrder ?? 0,
     },
   });
+  const selectedBusiness = form.watch('business') || DEFAULT_BUSINESS_SLUG;
   const { isSubmitting } = form.formState;
 
   return (
@@ -208,6 +260,13 @@ function CategoryDialog({
             </DialogTitle>
           </DialogHeader>
           <DialogBody className="grid gap-x-4 gap-y-5">
+            <FormSelect
+              name="business"
+              label="Business / Store"
+              required
+              disabled={!!parentCat}
+              items={businesses.map((b) => ({ value: b.slug, label: b.name }))}
+            />
             <FormInput name="name" label="Name" required />
             <FormSelect
               name="parent"
@@ -216,7 +275,7 @@ function CategoryDialog({
               clearable
               onClear={() => form.setValue('parent', '')}
               items={roots
-                .filter((r) => r.id !== category?.id)
+                .filter((r) => r.id !== category?.id && r.business === selectedBusiness)
                 .map((r) => ({ value: r.id, label: r.name }))}
             />
             <FormTextarea name="description" label="Description" rows={2} />

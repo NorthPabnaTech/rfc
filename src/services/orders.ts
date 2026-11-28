@@ -36,6 +36,7 @@ import { AppError } from '@lib/errors';
 import { signOrderPaymentToken } from '@lib/payments/paymently';
 import type { CartLineInput } from '@lib/validators/order';
 
+import { businessQueryFilter } from './businesses';
 import {
   calculateCampaignDiscount,
   computeDeliveryDiscountAmount,
@@ -89,6 +90,7 @@ async function priceLines(
 ): Promise<PricedLine[]> {
   await connectDB();
   const ids = [...new Set(lines.map((l) => l.productId))];
+  const effectiveBusiness = business || DEFAULT_BUSINESS_SLUG;
   const products = await ProductModel.find({
     _id: { $in: ids },
     ...(includeDrafts ? {} : { status: 'published' }),
@@ -96,7 +98,7 @@ async function priceLines(
       ? {}
       : {
           visibility: { $ne: 'private' },
-          business: { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] },
+          business: businessQueryFilter(effectiveBusiness) as unknown as string,
         }),
   })
     .populate<{ supplier: Supplier | null }>('supplier', 'name')
@@ -234,8 +236,9 @@ export async function quoteCart(
   lines: CartLineInput[],
   zone?: ShippingZone,
   couponCode?: string | null,
+  business = DEFAULT_BUSINESS_SLUG,
 ): Promise<CartQuote> {
-  const priced = await priceLines(lines);
+  const priced = await priceLines(lines, { business });
   const subtotal = priced.filter((l) => l.available).reduce((sum, l) => sum + l.lineTotal, 0);
   const { freeShippingThreshold } = await getSettings();
   const { discount, deliveryOffer, appliedCampaign, couponError } = await calculateCampaignDiscount(
@@ -376,6 +379,7 @@ async function createOrder(
 }
 
 export async function placeWebsiteOrder(input: {
+  business?: string;
   lines: CartLineInput[];
   userId: string | null;
   name: string;
@@ -387,7 +391,8 @@ export async function placeWebsiteOrder(input: {
   customerNote?: string;
   saveAddress?: boolean;
 }) {
-  const priced = await priceLines(input.lines);
+  const business = input.business || DEFAULT_BUSINESS_SLUG;
+  const priced = await priceLines(input.lines, { business });
   const { discount, deliveryOffer, appliedCampaign, couponError } = await calculateCampaignDiscount(
     priced,
     input.couponCode,
@@ -397,6 +402,7 @@ export async function placeWebsiteOrder(input: {
   }
 
   const result = await createOrder({
+    business,
     lines: input.lines,
     userId: input.userId,
     customer: { name: input.name, phone: input.phone, email: input.email },
@@ -551,17 +557,31 @@ function withinReturnWindow(o: Order): boolean {
   return Date.now() - new Date(o.deliveredAt).getTime() <= RETURN_WINDOW_HOURS * 3600 * 1000;
 }
 
-export async function listCustomerOrders(userId: string): Promise<OrderRowDTO[]> {
+export async function listCustomerOrders(
+  userId: string,
+  business?: string,
+): Promise<OrderRowDTO[]> {
   await connectDB();
-  const docs = await OrderModel.find({ user: userId }).sort({ createdAt: -1 }).limit(200).lean();
+  const query: QueryFilter<Order> = { user: userId };
+  if (business) {
+    query.business = businessQueryFilter(business) as unknown as string;
+  }
+  const docs = await OrderModel.find(query).sort({ createdAt: -1 }).limit(200).lean();
   return docs.map(toRow);
 }
 
-export async function getCustomerOrder(userId: string, id: string): Promise<OrderDTO | null> {
+export async function getCustomerOrder(
+  userId: string,
+  id: string,
+  business?: string,
+): Promise<OrderDTO | null> {
   await connectDB();
-  const filter = /^[a-f\d]{24}$/i.test(id)
+  const filter: QueryFilter<Order> = /^[a-f\d]{24}$/i.test(id)
     ? { _id: id, user: userId }
     : { orderNumber: id.trim().toUpperCase(), user: userId };
+  if (business) {
+    filter.business = businessQueryFilter(business) as unknown as string;
+  }
   const doc = await OrderModel.findOne(filter).lean();
   if (!doc) return null;
   const ret = await ReturnRequestModel.findOne({ order: doc._id }).lean();
@@ -574,9 +594,17 @@ export async function getCustomerOrder(userId: string, id: string): Promise<Orde
 }
 
 /** Public tracking: order number + the phone it was placed with. */
-export async function trackOrder(orderNumber: string, phone: string): Promise<OrderDTO | null> {
+export async function trackOrder(
+  orderNumber: string,
+  phone: string,
+  business?: string,
+): Promise<OrderDTO | null> {
   await connectDB();
-  const doc = await OrderModel.findOne({ orderNumber, 'customer.phone': phone }).lean();
+  const query: QueryFilter<Order> = { orderNumber, 'customer.phone': phone };
+  if (business) {
+    query.business = businessQueryFilter(business) as unknown as string;
+  }
+  const doc = await OrderModel.findOne(query).lean();
   if (!doc) return null;
   const dto = toOrder(doc, { admin: false });
   // Tracking is unauthenticated — show progress, not full personal details.

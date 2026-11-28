@@ -3,6 +3,7 @@ import 'server-only';
 import type { QueryFilter, SortOrder } from 'mongoose';
 
 import {
+  BusinessModel,
   CategoryModel,
   connectDB,
   nextSequence,
@@ -33,6 +34,7 @@ import { AppError } from '@lib/errors';
 import { sanitizeRichText } from '@lib/sanitize';
 import type { ProductOutput } from '@lib/validators/catalog';
 
+import { businessQueryFilter } from './businesses';
 import {
   populated,
   toAdminProduct,
@@ -50,11 +52,17 @@ const CARD_FIELDS =
 const SINGLES = { type: { $ne: 'combo' } } as const;
 
 /** Public storefront must NEVER expose private products or non-public-storefront businesses. */
-export const PUBLIC_PRODUCT_FILTER: QueryFilter<Product> = {
-  status: 'published',
-  visibility: { $ne: 'private' },
-  business: { $in: [DEFAULT_BUSINESS_SLUG, null] as unknown as string[] },
-};
+export function publicProductFilter(business = DEFAULT_BUSINESS_SLUG): QueryFilter<Product> {
+  return {
+    status: 'published',
+    visibility: { $ne: 'private' },
+    business: businessQueryFilter(business) as unknown as string,
+  };
+}
+
+export const PUBLIC_PRODUCT_FILTER: QueryFilter<Product> = publicProductFilter(
+  DEFAULT_BUSINESS_SLUG,
+);
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -75,6 +83,7 @@ export type ProductFilters = {
   availability?: 'in_stock';
   onSale?: boolean;
   featured?: boolean;
+  business?: string;
   sort?: ProductSort;
   page?: number;
   pageSize?: number;
@@ -92,10 +101,15 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
   await connectDB();
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = filters.pageSize ?? PAGE_SIZE;
-  const query: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
+  const business = filters.business || DEFAULT_BUSINESS_SLUG;
+  const query: QueryFilter<Product> = { ...publicProductFilter(business), ...SINGLES };
 
   if (filters.category) {
-    const cat = await CategoryModel.findOne({ slug: filters.category, isActive: true }).lean();
+    const cat = await CategoryModel.findOne({
+      slug: filters.category,
+      isActive: true,
+      business: businessQueryFilter(business) as unknown as string,
+    }).lean();
     if (!cat) return paginate([], 0, page, pageSize);
     query[cat.parent ? 'subCategory' : 'category'] = cat._id;
   }
@@ -120,7 +134,10 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
       tokens.map(async (tok) => {
         const rx = new RegExp(escapeRegex(tok), 'i');
         const [catIds, tagIds] = await Promise.all([
-          CategoryModel.find({ name: rx }, '_id').lean(),
+          CategoryModel.find(
+            { name: rx, business: businessQueryFilter(business) as unknown as string },
+            '_id',
+          ).lean(),
           TagModel.find({ name: rx }, '_id').lean(),
         ]);
         const cIds = catIds.map((c) => c._id);
@@ -170,16 +187,18 @@ export async function searchProducts(filters: ProductFilters): Promise<Paginated
 export async function listProductCards(
   kind: 'featured' | 'new' | 'bestsellers' | 'deals' | 'combos',
   limit = 8,
+  business = DEFAULT_BUSINESS_SLUG,
 ): Promise<ProductCardDTO[]> {
   await connectDB();
-  const base: QueryFilter<Product> = { ...PUBLIC_PRODUCT_FILTER, ...SINGLES };
+  const pub = publicProductFilter(business);
+  const base: QueryFilter<Product> = { ...pub, ...SINGLES };
   const variants: Record<typeof kind, [QueryFilter<Product>, Record<string, SortOrder>]> = {
     featured: [{ ...base, isFeatured: true }, { createdAt: -1 }],
     new: [base, { createdAt: -1 }],
     bestsellers: [base, { soldCount: -1, ratingAverage: -1 }],
     deals: [{ ...base, salePrice: { $ne: null } }, { updatedAt: -1 }],
     combos: [
-      { ...PUBLIC_PRODUCT_FILTER, $or: [{ type: 'combo' }, { isComboOffer: true }] },
+      { ...pub, $or: [{ type: 'combo' }, { isComboOffer: true }] },
       { isFeatured: -1, updatedAt: -1 },
     ],
   };
@@ -192,9 +211,12 @@ export async function listProductCards(
   return docs.map((d) => toProductCard(d as never));
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetailDTO | null> {
+export async function getProductBySlug(
+  slug: string,
+  business = DEFAULT_BUSINESS_SLUG,
+): Promise<ProductDetailDTO | null> {
   await connectDB();
-  const p = await ProductModel.findOne({ slug, ...PUBLIC_PRODUCT_FILTER })
+  const p = await ProductModel.findOne({ slug, ...publicProductFilter(business) })
     .populate('category', 'name slug')
     .populate('subCategory', 'name slug')
     .populate('tags', 'name slug')
@@ -245,11 +267,20 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDTO |
   };
 }
 
-export async function getRelatedProducts(product: ProductDetailDTO, limit = 8) {
+export async function getRelatedProducts(
+  product: ProductDetailDTO,
+  limit = 8,
+  business = DEFAULT_BUSINESS_SLUG,
+) {
   await connectDB();
   if (!product.category) return [];
   const docs = await ProductModel.find(
-    { ...PUBLIC_PRODUCT_FILTER, ...SINGLES, category: product.category.id, _id: { $ne: product.id } },
+    {
+      ...publicProductFilter(business),
+      ...SINGLES,
+      category: product.category.id,
+      _id: { $ne: product.id },
+    },
     CARD_FIELDS,
   )
     .sort({ soldCount: -1, createdAt: -1 })
@@ -337,6 +368,9 @@ async function validateRefs(input: ProductOutput): Promise<void> {
     input.tags.length ? TagModel.countDocuments({ _id: { $in: input.tags } }) : 0,
   ]);
   if (!category || category.parent) throw new AppError('Choose a valid top-level category.');
+  if ((category.business || DEFAULT_BUSINESS_SLUG) !== (input.business || DEFAULT_BUSINESS_SLUG)) {
+    throw new AppError('The category must belong to the selected business.');
+  }
   if (input.subCategory && (!subCategory || String(subCategory.parent) !== input.category)) {
     throw new AppError('The sub-category must belong to the selected category.');
   }
@@ -367,8 +401,11 @@ export async function saveProduct(
 
   const slug = await uniqueSlug(ProductModel, input.slug || input.name, id);
   const business = input.business || DEFAULT_BUSINESS_SLUG;
-  const visibility: ProductVisibility =
-    business !== DEFAULT_BUSINESS_SLUG ? 'private' : input.visibility;
+  const bizDoc =
+    business === DEFAULT_BUSINESS_SLUG
+      ? { isPublicStorefront: true }
+      : await BusinessModel.findOne({ slug: business }, 'isPublicStorefront').lean();
+  const visibility: ProductVisibility = !bizDoc?.isPublicStorefront ? 'private' : input.visibility;
   const baseData = {
     ...input,
     business,

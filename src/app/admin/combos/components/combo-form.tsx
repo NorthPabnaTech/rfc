@@ -11,7 +11,7 @@ import { QuantityStepper } from '@/features/cart/quantity-stepper';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
 import { ImageUploader } from '@/features/uploads/image-uploader';
-import type { AdminComboDTO, ImageDTO } from '@/types';
+import type { AdminComboDTO, BusinessDTO, ImageDTO } from '@/types';
 import {
   Form,
   FormCurrency,
@@ -25,7 +25,7 @@ import { Icon } from '@components/icon/icon';
 import { Callout, FormSection } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { handleActionResult } from '@lib/action-client';
-import { STOCK_STATUS_LABELS, STOCK_STATUSES } from '@lib/constants';
+import { DEFAULT_BUSINESS_SLUG, STOCK_STATUS_LABELS, STOCK_STATUSES } from '@lib/constants';
 import { formatNumber } from '@lib/utils';
 import { type ComboInput, comboSchema } from '@lib/validators/catalog';
 
@@ -42,7 +42,13 @@ type Line = {
   quantity: number;
 };
 
-export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
+export function ComboForm({
+  combo,
+  businesses,
+}: {
+  combo?: AdminComboDTO;
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const [lines, setLines] = React.useState<Line[]>(
     combo?.items.map((i) => ({
@@ -66,6 +72,7 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
       images: combo?.images ?? [],
       items: [],
       comboPrice: combo?.comboPrice ?? 0,
+      business: combo?.business ?? DEFAULT_BUSINESS_SLUG,
       stockStatus: combo?.stockStatus ?? 'in_stock',
       status: combo?.status ?? 'published',
       isFeatured: combo?.isFeatured ?? false,
@@ -73,6 +80,8 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
   });
   const { isSubmitting } = form.formState;
   const comboPrice = Number(useWatch({ control: form.control, name: 'comboPrice' })) || 0;
+  const selectedBusiness =
+    useWatch({ control: form.control, name: 'business' }) || DEFAULT_BUSINESS_SLUG;
 
   React.useEffect(() => {
     form.setValue(
@@ -129,6 +138,7 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
               action={
                 <ProductPicker
                   singlesOnly
+                  business={selectedBusiness}
                   label="Add product"
                   onPick={(l) =>
                     setLines((prev) =>
@@ -243,6 +253,14 @@ export function ComboForm({ combo }: { combo?: AdminComboDTO }) {
           </Panel>
           <Panel>
             <FormSection title="Visibility" icon="eye">
+              <FormSelect
+                name="business"
+                label="Business / Store"
+                items={businesses.map((b) => ({
+                  value: b.slug,
+                  label: b.isPublicStorefront ? `${b.name} (Public)` : `${b.name} (Internal)`,
+                }))}
+              />
               <FormSelect
                 name="status"
                 label="Status"

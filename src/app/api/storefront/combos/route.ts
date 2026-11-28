@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { listCombos } from '@/services/combos';
 import {
+  getStorefrontBusiness,
   storefrontError,
   storefrontJson,
   storefrontOptionsResponse,
@@ -22,10 +23,11 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const { page } = querySchema.parse({
       page: req.nextUrl.searchParams.get('page') ?? undefined,
     });
-    const data = await listCombos(page);
+    const data = await listCombos(page, business);
     return storefrontJson(data);
   } catch (error) {
     return storefrontError(error);

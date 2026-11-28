@@ -10,6 +10,7 @@ import { getSettings } from '@/services/settings';
 import { listAddresses } from '@/services/users';
 import { AppError } from '@lib/errors';
 import {
+  getStorefrontBusiness,
   getStorefrontCustomerId,
   storefrontError,
   storefrontJson,
@@ -40,8 +41,9 @@ export async function GET(
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const { slug } = await context.params;
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlug(slug, business);
     if (!product) throw new AppError('Product not found.', 404);
 
     const userId = await getStorefrontCustomerId(req);
@@ -86,8 +88,9 @@ export async function POST(
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const { slug } = await context.params;
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlug(slug, business);
     if (!product) throw new AppError('Product not found.', 404);
 
     const body: unknown = await req.json();
@@ -96,6 +99,7 @@ export async function POST(
     await enforceRateLimit('placeOrder', `ip:${await requestIp()}`, `phone:${data.phone}`);
 
     const { id, orderNumber, paymentToken } = await placeWebsiteOrder({
+      business,
       lines: [
         {
           productId: product.id,

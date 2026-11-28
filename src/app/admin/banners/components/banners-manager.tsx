@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { deleteBannerAction, saveBannerAction, setBannerActiveAction } from '@/actions/admin';
 import { ProductImage } from '@/features/products/product-image';
 import { ImageUploader } from '@/features/uploads/image-uploader';
-import type { BannerDTO, ImageDTO } from '@/types';
+import type { BannerDTO, BusinessDTO, ImageDTO } from '@/types';
 import { Form, FormInput, FormItem, FormSelect, FormSwitch, FormTextarea } from '@components/form';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, EmptyState, StatusBadge } from '@components/shared';
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@components/ui/dialog';
+import { Select } from '@components/ui/select';
 import { Switch } from '@components/ui/switch';
 import { useModal } from '@hooks/use-modal';
 import { handleActionResult } from '@lib/action-client';
@@ -27,6 +28,7 @@ import {
   BANNER_POSITION_LABELS,
   BANNER_POSITIONS,
   type BannerPosition,
+  DEFAULT_BUSINESS_SLUG,
 } from '@lib/constants';
 import { formatStoreDate } from '@lib/utils';
 import { type BannerInput, bannerSchema } from '@lib/validators/banner';
@@ -38,14 +40,42 @@ function scheduleState(b: BannerDTO): 'scheduled' | 'expired' | null {
   return null;
 }
 
-export function BannersManager({ banners }: { banners: BannerDTO[] }) {
+export function BannersManager({
+  banners,
+  businesses,
+}: {
+  banners: BannerDTO[];
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const modal = useModal<{ banner?: BannerDTO; position?: BannerPosition }>();
   const [deleting, setDeleting] = React.useState<BannerDTO | null>(null);
+  const [businessFilter, setBusinessFilter] = React.useState<string>('all');
+  const bizLabel = React.useMemo(
+    () => new Map(businesses.map((b) => [b.slug, b.name])),
+    [businesses],
+  );
+  const visibleBanners = React.useMemo(
+    () =>
+      businessFilter === 'all'
+        ? banners
+        : banners.filter((b) => b.business === businessFilter),
+    [banners, businessFilter],
+  );
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="w-56">
+          <Select
+            value={businessFilter}
+            onValueChange={setBusinessFilter}
+            items={[
+              { value: 'all', label: 'All businesses' },
+              ...businesses.map((b) => ({ value: b.slug, label: b.name })),
+            ]}
+          />
+        </div>
         <Button variant="primary" onClick={() => modal.openModal('create', {})}>
           <Icon name="plus" size={15} /> New banner
         </Button>
@@ -53,7 +83,7 @@ export function BannersManager({ banners }: { banners: BannerDTO[] }) {
 
       <div className="space-y-6">
         {BANNER_POSITIONS.map((position) => {
-          const list = banners.filter((b) => b.position === position);
+          const list = visibleBanners.filter((b) => b.position === position);
           return (
             <section key={position} className="bg-panel hairline rounded-xl2 p-5">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -113,6 +143,10 @@ export function BannersManager({ banners }: { banners: BannerDTO[] }) {
                           </div>
                           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                             <StatusBadge
+                              status={b.business === DEFAULT_BUSINESS_SLUG ? 'info' : 'neutral'}
+                              label={bizLabel.get(b.business) ?? b.business}
+                            />
+                            <StatusBadge
                               status={!b.isActive ? 'neutral' : sched ? 'warn' : 'ok'}
                               label={
                                 !b.isActive
@@ -161,10 +195,14 @@ export function BannersManager({ banners }: { banners: BannerDTO[] }) {
       </div>
 
       <BannerDialog
-        key={`${modal.type}-${modal.data?.banner?.id ?? modal.data?.position ?? 'new'}`}
+        key={`${modal.type}-${modal.data?.banner?.id ?? modal.data?.position ?? 'new'}-${businessFilter}`}
         open={modal.isOpen()}
         banner={modal.data?.banner}
         position={modal.data?.position}
+        defaultBusiness={
+          businessFilter !== 'all' ? businessFilter : DEFAULT_BUSINESS_SLUG
+        }
+        businesses={businesses}
         onOpenChange={(o) => !o && modal.closeModal()}
         onSaved={() => {
           modal.closeModal();
@@ -195,12 +233,16 @@ function BannerDialog({
   open,
   banner,
   position,
+  defaultBusiness,
+  businesses,
   onOpenChange,
   onSaved,
 }: {
   open: boolean;
   banner?: BannerDTO;
   position?: BannerPosition;
+  defaultBusiness: string;
+  businesses: BusinessDTO[];
   onOpenChange: (o: boolean) => void;
   onSaved: () => void;
 }) {
@@ -214,6 +256,7 @@ function BannerDialog({
       ctaLabel: banner?.ctaLabel ?? '',
       link: banner?.link ?? '',
       position: banner?.position ?? position ?? 'hero',
+      business: banner?.business ?? defaultBusiness,
       isActive: banner?.isActive ?? true,
       sortOrder: banner?.sortOrder ?? 0,
       startsAt: dateValue(banner?.startsAt),
@@ -238,10 +281,15 @@ function BannerDialog({
           </DialogHeader>
           <DialogBody className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <FormSelect
+              name="business"
+              label="Business / Store"
+              required
+              items={businesses.map((b) => ({ value: b.slug, label: b.name }))}
+            />
+            <FormSelect
               name="position"
               label="Display position"
               required
-              className="sm:col-span-2"
               items={BANNER_POSITIONS.map((p) => ({ value: p, label: BANNER_POSITION_LABELS[p] }))}
             />
             <FormItem name="image" label="Banner image" required className="sm:col-span-2">

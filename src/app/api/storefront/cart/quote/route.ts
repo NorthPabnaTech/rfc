@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { quoteCart } from '@/services/orders';
 import { SHIPPING_ZONES } from '@lib/constants';
 import {
+  getStorefrontBusiness,
   storefrontError,
   storefrontJson,
   storefrontOptionsResponse,
@@ -26,9 +27,10 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const body: unknown = await req.json();
     const { items, zone, couponCode } = quoteSchema.parse(body);
-    const quote = await quoteCart(items, zone, couponCode);
+    const quote = await quoteCart(items, zone, couponCode, business);
     return storefrontJson(quote);
   } catch (error) {
     return storefrontError(error);

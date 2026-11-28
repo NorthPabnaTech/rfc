@@ -52,6 +52,7 @@ export type CategoryDTO = {
   name: string;
   slug: string;
   description?: string;
+  business: string;
   parentId: string | null;
   image?: ImageDTO;
   isActive: boolean;
@@ -251,6 +252,7 @@ export type BannerDTO = {
   id: string;
   title: string;
   description?: string;
+  business: string;
   eyebrow?: string;
   image: ImageDTO;
   ctaLabel?: string;
@@ -266,6 +268,7 @@ export type AdminComboDTO = {
   id: string;
   name: string;
   slug: string;
+  business: string;
   shortDescription?: string;
   description?: string;
   images: ImageDTO[];
@@ -413,7 +416,7 @@ export type CartQuoteLine = {
   image?: ImageDTO;
   variant: Record<string, string>;
   /** The product's options, so a line added without them can be completed in the cart. */
-  options: { name: string; values: string[] }[];
+  options: { name: string; values: string[]; disabledValues?: string[] }[];
   quantity: number;
   unitPrice: number;
   lineTotal: number;

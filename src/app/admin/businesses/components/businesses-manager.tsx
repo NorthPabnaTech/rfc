@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@components/ui/dialog';
 import { handleActionResult } from '@lib/action-client';
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 import { type BusinessInput, businessSchema } from '@lib/validators/management';
 
 export function BusinessesManager({ businesses }: { businesses: BusinessDTO[] }) {
@@ -122,6 +123,7 @@ function BusinessDialog({
           phone: business.phone ?? '',
           address: business.address ?? '',
           logo: business.logo ?? null,
+          isPublicStorefront: business.isPublicStorefront,
           isActive: business.isActive,
         }
       : {
@@ -132,6 +134,7 @@ function BusinessDialog({
           phone: '',
           address: '',
           logo: null,
+          isPublicStorefront: false,
           isActive: true,
         },
   });
@@ -193,8 +196,14 @@ function BusinessDialog({
               )}
             </FormItem>
             <FormTextarea name="description" label="Description" rows={2} />
-            {!business?.isPublicStorefront && (
-              <FormSwitch name="isActive" label="Active" />
+            {business?.slug !== DEFAULT_BUSINESS_SLUG && (
+              <div className="flex flex-wrap gap-6">
+                <FormSwitch
+                  name="isPublicStorefront"
+                  label="Public Storefront (API)"
+                />
+                <FormSwitch name="isActive" label="Active" />
+              </div>
             )}
           </DialogBody>
           <DialogFooter>

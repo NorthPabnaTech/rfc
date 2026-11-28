@@ -5,41 +5,51 @@ import { cache } from 'react';
 import { BannerModel, connectDB } from '@/database';
 import type { BannerDTO } from '@/types';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
-import type { BannerPosition } from '@lib/constants';
+import { type BannerPosition, DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import type { BannerOutput } from '@lib/validators/banner';
 
+import { businessQueryFilter } from './businesses';
 import { toBanner } from './mappers';
 
 /**
  * Active banners for the storefront, grouped by position. A banner shows
  * while `isActive` and inside its optional [startsAt, endsAt] window.
  */
-export const getActiveBanners = cache(async (): Promise<Record<BannerPosition, BannerDTO[]>> => {
-  await connectDB();
-  const now = new Date();
-  const docs = await BannerModel.find({
-    isActive: true,
-    $and: [
-      { $or: [{ startsAt: null }, { startsAt: { $lte: now } }] },
-      { $or: [{ endsAt: null }, { endsAt: { $gte: now } }] },
-    ],
-  })
-    .sort({ sortOrder: 1, createdAt: -1 })
-    .lean();
-  const grouped: Record<BannerPosition, BannerDTO[]> = {
-    hero: [],
-    hero_side: [],
-    special: [],
-    combo: [],
-  };
-  for (const d of docs) grouped[d.position]?.push(toBanner(d));
-  return grouped;
-});
+export const getActiveBanners = cache(
+  async (business = DEFAULT_BUSINESS_SLUG): Promise<Record<BannerPosition, BannerDTO[]>> => {
+    await connectDB();
+    const now = new Date();
+    const docs = await BannerModel.find({
+      isActive: true,
+      business: businessQueryFilter(business) as unknown as string,
+      $and: [
+        { $or: [{ startsAt: null }, { startsAt: { $lte: now } }] },
+        { $or: [{ endsAt: null }, { endsAt: { $gte: now } }] },
+      ],
+    })
+      .sort({ sortOrder: 1, createdAt: -1 })
+      .lean();
+    const grouped: Record<BannerPosition, BannerDTO[]> = {
+      hero: [],
+      hero_side: [],
+      special: [],
+      combo: [],
+    };
+    for (const d of docs) grouped[d.position]?.push(toBanner(d));
+    return grouped;
+  },
+);
 
-export async function listAdminBanners(): Promise<BannerDTO[]> {
+export async function listAdminBanners(business?: string): Promise<BannerDTO[]> {
   await connectDB();
-  const docs = await BannerModel.find().sort({ position: 1, sortOrder: 1, createdAt: -1 }).lean();
+  const query =
+    business && business !== 'all'
+      ? { business: businessQueryFilter(business) as unknown as string }
+      : {};
+  const docs = await BannerModel.find(query)
+    .sort({ position: 1, sortOrder: 1, createdAt: -1 })
+    .lean();
   return docs.map(toBanner);
 }
 

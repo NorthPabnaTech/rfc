@@ -18,6 +18,7 @@ export const businessSchema = z.object({
   phone: optionalText(30),
   address: optionalText(300),
   logo: imageAsset.nullable().optional(),
+  isPublicStorefront: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
 export type BusinessInput = z.input<typeof businessSchema>;

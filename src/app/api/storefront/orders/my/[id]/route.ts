@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { getCustomerOrder } from '@/services/orders';
 import { AppError } from '@lib/errors';
 import {
+  getStorefrontBusiness,
   getStorefrontCustomerId,
   storefrontError,
   storefrontJson,
@@ -25,8 +26,9 @@ export async function GET(
     const userId = await getStorefrontCustomerId(req);
     if (!userId) throw new AppError('Unauthorized.', 401);
 
+    const business = await getStorefrontBusiness(req);
     const { id } = await context.params;
-    const order = await getCustomerOrder(userId, id);
+    const order = await getCustomerOrder(userId, id, business);
     if (!order) throw new AppError('Order not found.', 404);
 
     return storefrontJson(order);

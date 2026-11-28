@@ -50,6 +50,7 @@ export const categorySchema = z.object({
   name: requiredText('Category name', 80),
   slug: optionalText(120),
   description: optionalText(500),
+  business: z.string().trim().min(1).max(60).default(DEFAULT_BUSINESS_SLUG),
   parent: objectId
     .nullish()
     .or(z.literal(''))
@@ -181,6 +182,7 @@ export const comboSchema = z.object({
       message: 'Each product can only be added once — increase its quantity instead',
     }),
   comboPrice: money('Combo price').refine((v) => v > 0, 'Combo price must be above 0'),
+  business: z.string().trim().min(1).max(60).default(DEFAULT_BUSINESS_SLUG),
   stockStatus: z.enum(STOCK_STATUSES).default('in_stock'),
   status: z.enum(PRODUCT_STATUSES).default('published'),
   isFeatured: z.boolean().default(false),

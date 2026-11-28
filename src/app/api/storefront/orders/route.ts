@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { placeWebsiteOrder } from '@/services/orders';
 import { enforceRateLimit, requestIp } from '@/services/rate-limit';
 import {
+  getStorefrontBusiness,
   getStorefrontCustomerId,
   storefrontError,
   storefrontJson,
@@ -20,12 +21,14 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const body: unknown = await req.json();
     const data = checkoutSchema.parse(body);
     const userId = await getStorefrontCustomerId(req);
     await enforceRateLimit('placeOrder', `ip:${await requestIp()}`, `phone:${data.phone}`);
 
     const { id, orderNumber, paymentToken } = await placeWebsiteOrder({
+      business,
       lines: data.items,
       userId,
       name: data.fullName,

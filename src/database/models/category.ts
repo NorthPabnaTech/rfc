@@ -1,5 +1,7 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
+
 import { baseSchemaOptions, defineModel, type ImageAsset, imageAssetSchema } from './shared';
 
 /**
@@ -11,6 +13,7 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
+  business: string;
   parent: Types.ObjectId | null;
   image?: ImageAsset;
   isActive: boolean;
@@ -25,6 +28,7 @@ const categorySchema = new Schema<Category>(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     slug: { type: String, required: true, trim: true, lowercase: true },
     description: { type: String, trim: true, maxlength: 500 },
+    business: { type: String, default: DEFAULT_BUSINESS_SLUG, index: true },
     parent: { type: Schema.Types.ObjectId, ref: 'Category', default: null, index: true },
     image: imageAssetSchema,
     isActive: { type: Boolean, default: true },
@@ -34,6 +38,6 @@ const categorySchema = new Schema<Category>(
   baseSchemaOptions,
 );
 
-categorySchema.index({ slug: 1 }, { unique: true });
+categorySchema.index({ business: 1, slug: 1 }, { unique: true });
 
 export const CategoryModel: Model<Category> = defineModel<Category>('Category', categorySchema);

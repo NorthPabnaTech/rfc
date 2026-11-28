@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { searchProducts } from '@/services/products';
 import {
+  getStorefrontBusiness,
   storefrontError,
   storefrontJson,
   storefrontOptionsResponse,
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const raw = Object.fromEntries(req.nextUrl.searchParams.entries());
     const parsed = querySchema.parse(raw);
     const data = await searchProducts({
@@ -43,6 +45,7 @@ export async function GET(req: NextRequest) {
       availability: parsed.availability,
       onSale: parsed.onSale === '1' || parsed.onSale === 'true',
       featured: parsed.featured === '1' || parsed.featured === 'true',
+      business,
       sort: parsed.sort,
       page: parsed.page,
       pageSize: parsed.pageSize,

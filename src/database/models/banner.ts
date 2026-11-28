@@ -1,6 +1,6 @@
 import { type Model, Schema, type Types } from 'mongoose';
 
-import { BANNER_POSITIONS, type BannerPosition } from '@lib/constants';
+import { BANNER_POSITIONS, type BannerPosition, DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 
 import { baseSchemaOptions, defineModel, type ImageAsset, imageAssetSchema } from './shared';
 
@@ -13,6 +13,7 @@ export interface Banner {
   _id: Types.ObjectId;
   title: string;
   description?: string;
+  business: string;
   image: ImageAsset;
   /** Small label above the title, e.g. "Limited time". */
   eyebrow?: string;
@@ -31,6 +32,7 @@ const bannerSchema = new Schema<Banner>(
   {
     title: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 300 },
+    business: { type: String, default: DEFAULT_BUSINESS_SLUG, index: true },
     image: { type: imageAssetSchema, required: true },
     eyebrow: { type: String, trim: true, maxlength: 40 },
     ctaLabel: { type: String, trim: true, maxlength: 40 },
@@ -44,6 +46,6 @@ const bannerSchema = new Schema<Banner>(
   baseSchemaOptions,
 );
 
-bannerSchema.index({ position: 1, isActive: 1, sortOrder: 1 });
+bannerSchema.index({ business: 1, position: 1, isActive: 1, sortOrder: 1 });
 
 export const BannerModel: Model<Banner> = defineModel<Banner>('Banner', bannerSchema);

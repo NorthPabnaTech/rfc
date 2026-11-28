@@ -2,17 +2,24 @@ import 'server-only';
 
 import type { QueryFilter } from 'mongoose';
 
-import { connectDB, type Product, ProductModel, type ProductVariation } from '@/database';
+import {
+  BusinessModel,
+  connectDB,
+  type Product,
+  ProductModel,
+  type ProductVariation,
+} from '@/database';
 import type { AdminComboDTO, Paginated, ProductCardDTO } from '@/types';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
-import { PAGE_SIZE } from '@lib/constants';
+import { DEFAULT_BUSINESS_SLUG, PAGE_SIZE, type ProductVisibility } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import { sanitizeRichText } from '@lib/sanitize';
 import { formatNumber } from '@lib/utils/format';
 import type { ComboOutput } from '@lib/validators/catalog';
 
+import { businessQueryFilter } from './businesses';
 import { toImage, toProductCard } from './mappers';
-import { PUBLIC_PRODUCT_FILTER } from './products';
+import { publicProductFilter } from './products';
 import { uniqueSlug } from './slug';
 
 /**
@@ -33,11 +40,14 @@ type PopulatedItem = {
   quantity: number;
 };
 
-export async function listCombos(page = 1): Promise<Paginated<ProductCardDTO>> {
+export async function listCombos(
+  page = 1,
+  business = DEFAULT_BUSINESS_SLUG,
+): Promise<Paginated<ProductCardDTO>> {
   await connectDB();
   // Bundles, plus regular products flagged "Show in Combo offers".
   const query: QueryFilter<Product> = {
-    ...PUBLIC_PRODUCT_FILTER,
+    ...publicProductFilter(business),
     $or: [{ type: 'combo' }, { isComboOffer: true }],
   };
   const [docs, total] = await Promise.all([
@@ -74,6 +84,7 @@ function toAdminCombo(
     id: String(p._id),
     name: p.name,
     slug: p.slug,
+    business: p.business || DEFAULT_BUSINESS_SLUG,
     shortDescription: p.shortDescription,
     description: p.description,
     images: p.images.map(toImage).filter((i) => !!i),
@@ -91,9 +102,13 @@ function toAdminCombo(
 
 const ITEM_FIELDS = 'name images effectivePrice supplierPrice type status';
 
-export async function listAdminCombos(): Promise<AdminComboDTO[]> {
+export async function listAdminCombos(business?: string): Promise<AdminComboDTO[]> {
   await connectDB();
-  const docs = await ProductModel.find({ type: 'combo' })
+  const query: QueryFilter<Product> = { type: 'combo' };
+  if (business && business !== 'all') {
+    query.business = businessQueryFilter(business) as unknown as string;
+  }
+  const docs = await ProductModel.find(query)
     .sort({ updatedAt: -1 })
     .populate('comboItems.product', ITEM_FIELDS)
     .lean();
@@ -140,15 +155,19 @@ export async function saveCombo(
     throw new AppError('One of the uploaded images is not valid. Please re-upload it.');
   }
   const ids = input.items.map((i) => i.productId);
+  const business = input.business || DEFAULT_BUSINESS_SLUG;
   const products = await ProductModel.find(
     { _id: { $in: ids } },
-    'type price effectivePrice supplierPrice images variations',
+    'type business price effectivePrice supplierPrice images variations',
   ).lean();
   const byId = new Map(products.map((p) => [String(p._id), p]));
   if (products.length !== ids.length)
     throw new AppError('One or more products in this combo no longer exist.');
   if (products.some((p) => p.type === 'combo'))
     throw new AppError('A combo cannot contain another combo.');
+  if (products.some((p) => (p.business || DEFAULT_BUSINESS_SLUG) !== business)) {
+    throw new AppError('All products in a combo must belong to the same business.');
+  }
   if (id && ids.includes(id)) throw new AppError('A combo cannot contain itself.');
 
   const regularPrice = input.items.reduce(
@@ -173,9 +192,17 @@ export async function saveCombo(
     ? input.images
     : input.items.map((i) => byId.get(i.productId)!.images[0]).filter((img) => !!img);
 
+  const bizDoc =
+    business === DEFAULT_BUSINESS_SLUG
+      ? { isPublicStorefront: true }
+      : await BusinessModel.findOne({ slug: business }, 'isPublicStorefront').lean();
+  const visibility: ProductVisibility = !bizDoc?.isPublicStorefront ? 'private' : 'public';
+
   const slug = await uniqueSlug(ProductModel, input.slug || input.name, id);
   const data = {
     type: 'combo' as const,
+    business,
+    visibility,
     name: input.name,
     slug,
     shortDescription: input.shortDescription,

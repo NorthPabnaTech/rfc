@@ -83,6 +83,26 @@ export async function listBusinesses(
   );
 }
 
+export function businessQueryFilter(
+  business = DEFAULT_BUSINESS_SLUG,
+): string | { $in: (string | null)[] } {
+  return business === DEFAULT_BUSINESS_SLUG
+    ? { $in: [DEFAULT_BUSINESS_SLUG, null] }
+    : business;
+}
+
+export async function resolvePublicStorefrontBusiness(slug?: string | null): Promise<string> {
+  const normalized = slug?.trim().toLowerCase();
+  if (!normalized || normalized === DEFAULT_BUSINESS_SLUG) return DEFAULT_BUSINESS_SLUG;
+  await ensureDefaultBusinesses();
+  const doc = await BusinessModel.findOne(
+    { slug: normalized, isActive: true, isPublicStorefront: true },
+    'slug',
+  ).lean();
+  if (!doc) throw new AppError('Storefront not found or not public.', 404);
+  return doc.slug;
+}
+
 export async function getBusinessBySlug(slug: string): Promise<BusinessDTO | null> {
   await ensureDefaultBusinesses();
   const doc = await BusinessModel.findOne({ slug }).lean();
@@ -94,16 +114,24 @@ export async function saveBusiness(input: BusinessOutput, id?: string): Promise<
   if (id) {
     const doc = await BusinessModel.findById(id);
     if (!doc) throw new AppError('Business not found.', 404);
+    const wasPublic = doc.isPublicStorefront;
     doc.name = input.name;
     doc.description = input.description;
     doc.invoicePrefix = input.invoicePrefix;
     doc.phone = input.phone;
     doc.address = input.address;
     doc.logo = input.logo ?? undefined;
-    if (!doc.isPublicStorefront) {
+    if (doc.slug !== DEFAULT_BUSINESS_SLUG) {
       doc.isActive = input.isActive;
+      doc.isPublicStorefront = input.isPublicStorefront;
     }
     await doc.save();
+    if (!wasPublic && doc.isPublicStorefront) {
+      await ProductModel.updateMany(
+        { business: doc.slug, visibility: 'private' },
+        { $set: { visibility: 'public' } },
+      );
+    }
     return toBusiness(doc.toObject());
   }
 
@@ -120,7 +148,7 @@ export async function saveBusiness(input: BusinessOutput, id?: string): Promise<
     phone: input.phone,
     address: input.address,
     logo: input.logo ?? undefined,
-    isPublicStorefront: false,
+    isPublicStorefront: input.isPublicStorefront,
     isActive: input.isActive,
   });
   return toBusiness(doc.toObject());

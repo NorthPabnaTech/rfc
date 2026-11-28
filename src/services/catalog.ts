@@ -12,11 +12,13 @@ import {
 } from '@/database';
 import type { CategoryDTO, CategoryTreeDTO, SupplierDTO, TagDTO } from '@/types';
 import { deleteImages, isOwnCloudinaryAsset } from '@lib/cloudinary';
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import type { CategoryOutput, SupplierOutput, TagOutput } from '@lib/validators/catalog';
 
+import { businessQueryFilter } from './businesses';
 import { toCategory, toSupplier, toTag } from './mappers';
-import { PUBLIC_PRODUCT_FILTER } from './products';
+import { publicProductFilter } from './products';
 import { uniqueSlug } from './slug';
 
 /* ─── Categories ─────────────────────────────────────────────────────────── */
@@ -24,23 +26,38 @@ import { uniqueSlug } from './slug';
 async function productCounts(
   field: 'category' | 'subCategory' | 'tags' | 'supplier',
   publicOnly = false,
+  business?: string,
 ) {
+  const match = publicOnly
+    ? publicProductFilter(business || DEFAULT_BUSINESS_SLUG)
+    : business && business !== 'all'
+      ? { business: businessQueryFilter(business) }
+      : null;
   const rows = await ProductModel.aggregate<{ _id: unknown; count: number }>([
-    ...(publicOnly ? [{ $match: PUBLIC_PRODUCT_FILTER }] : []),
+    ...(match ? [{ $match: match }] : []),
     ...(field === 'tags' ? [{ $unwind: '$tags' }] : []),
     { $group: { _id: `$${field}`, count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((r) => [String(r._id), r.count]));
 }
 
-export async function listCategories(opts: { activeOnly?: boolean } = {}): Promise<CategoryDTO[]> {
+export async function listCategories(
+  opts: { activeOnly?: boolean; business?: string } = {},
+): Promise<CategoryDTO[]> {
   await connectDB();
+  const filter: Record<string, unknown> = opts.activeOnly ? { isActive: true } : {};
+  const effectiveBiz = opts.activeOnly
+    ? opts.business || DEFAULT_BUSINESS_SLUG
+    : opts.business && opts.business !== 'all'
+      ? opts.business
+      : undefined;
+  if (effectiveBiz) {
+    filter.business = businessQueryFilter(effectiveBiz);
+  }
   const [docs, byCat, bySub] = await Promise.all([
-    CategoryModel.find(opts.activeOnly ? { isActive: true } : {})
-      .sort({ sortOrder: 1, name: 1 })
-      .lean(),
-    productCounts('category', opts.activeOnly),
-    productCounts('subCategory', opts.activeOnly),
+    CategoryModel.find(filter).sort({ sortOrder: 1, name: 1 }).lean(),
+    productCounts('category', opts.activeOnly, effectiveBiz),
+    productCounts('subCategory', opts.activeOnly, effectiveBiz),
   ]);
   return docs.map((c) =>
     toCategory({
@@ -56,18 +73,28 @@ export function buildCategoryTree(categories: CategoryDTO[]): CategoryTreeDTO[] 
 }
 
 /** Active categories as a tree — used by the storefront nav and filters. */
-export const getCategoryTree = cache(async (): Promise<CategoryTreeDTO[]> => {
-  return buildCategoryTree(await listCategories({ activeOnly: true }));
-});
+export const getCategoryTree = cache(
+  async (business = DEFAULT_BUSINESS_SLUG): Promise<CategoryTreeDTO[]> => {
+    return buildCategoryTree(await listCategories({ activeOnly: true, business }));
+  },
+);
 
-export async function getCategoryBySlug(slug: string): Promise<CategoryDTO | null> {
+export async function getCategoryBySlug(
+  slug: string,
+  business = DEFAULT_BUSINESS_SLUG,
+): Promise<CategoryDTO | null> {
   await connectDB();
-  const doc = await CategoryModel.findOne({ slug, isActive: true }).lean();
+  const doc = await CategoryModel.findOne({
+    slug,
+    isActive: true,
+    business: businessQueryFilter(business) as unknown as string,
+  }).lean();
   return doc ? toCategory(doc) : null;
 }
 
 export async function saveCategory(input: CategoryOutput, id?: string): Promise<CategoryDTO> {
   await connectDB();
+  const business = input.business || DEFAULT_BUSINESS_SLUG;
   if (input.image && !isOwnCloudinaryAsset(input.image, 'categories')) {
     throw new AppError('Invalid category image.');
   }
@@ -75,6 +102,9 @@ export async function saveCategory(input: CategoryOutput, id?: string): Promise<
     if (input.parent === id) throw new AppError('A category cannot be its own parent.');
     const parent = await CategoryModel.findById(input.parent).lean();
     if (!parent) throw new AppError('Parent category not found.');
+    if ((parent.business || DEFAULT_BUSINESS_SLUG) !== business) {
+      throw new AppError('Parent category must belong to the same business.');
+    }
     if (parent.parent) throw new AppError('Sub-categories can only be one level deep.');
     if (id && (await CategoryModel.exists({ parent: id }))) {
       throw new AppError('This category has sub-categories, so it must stay top-level.');
@@ -82,7 +112,7 @@ export async function saveCategory(input: CategoryOutput, id?: string): Promise<
   }
 
   const slug = await uniqueSlug(CategoryModel, input.slug || input.name, id);
-  const data = { ...input, slug, image: input.image ?? undefined };
+  const data = { ...input, business, slug, image: input.image ?? undefined };
 
   if (id) {
     const doc = await CategoryModel.findById(id);

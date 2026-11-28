@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { BANNER_POSITIONS } from '@lib/constants';
+import { BANNER_POSITIONS, DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 
 import { imageAsset, optionalText, requiredText } from './common';
 
@@ -29,6 +29,7 @@ export const bannerSchema = z.object({
   ctaLabel: optionalText(40),
   link,
   position: z.enum(BANNER_POSITIONS),
+  business: z.string().trim().min(1).max(60).default(DEFAULT_BUSINESS_SLUG),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
   startsAt: optionalDate,

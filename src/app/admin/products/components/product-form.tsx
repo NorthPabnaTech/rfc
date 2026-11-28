@@ -179,8 +179,20 @@ export function ProductForm({
       form.setValue('visibility', 'private');
     }
   }, [isInternalBusiness, form]);
-  const parents = categories.filter((c) => !c.parentId);
+  const parents = categories.filter(
+    (c) => !c.parentId && c.business === (selectedBusiness || DEFAULT_BUSINESS_SLUG),
+  );
   const children = categories.filter((c) => c.parentId && c.parentId === categoryId);
+
+  // Changing the business clears a category that belongs to another business.
+  React.useEffect(() => {
+    const cat = form.getValues('category');
+    const biz = selectedBusiness || DEFAULT_BUSINESS_SLUG;
+    if (cat && !categories.some((c) => c.id === cat && c.business === biz)) {
+      form.setValue('category', '');
+      form.setValue('subCategory', '');
+    }
+  }, [selectedBusiness, categories, form]);
 
   // Changing the category clears a sub-category that belongs to another one.
   React.useEffect(() => {

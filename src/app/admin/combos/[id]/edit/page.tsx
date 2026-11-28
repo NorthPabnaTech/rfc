@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { listBusinesses } from '@/services/businesses';
 import { getAdminCombo } from '@/services/combos';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
@@ -17,7 +18,10 @@ export default async function EditComboPage({ params }: { params: Promise<{ id: 
   await requireAdminPage();
   const { id } = await params;
   if (!objectId.safeParse(id).success) notFound();
-  const combo = await getAdminCombo(id);
+  const [combo, businesses] = await Promise.all([
+    getAdminCombo(id),
+    listBusinesses({ activeOnly: true }),
+  ]);
   if (!combo) notFound();
 
   return (
@@ -37,7 +41,7 @@ export default async function EditComboPage({ params }: { params: Promise<{ id: 
           )
         }
       />
-      <ComboForm combo={combo} />
+      <ComboForm combo={combo} businesses={businesses} />
     </>
   );
 }

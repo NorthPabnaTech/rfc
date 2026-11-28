@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 
 import { getActiveBanners } from '@/services/banners';
+import { getBusinessBySlug } from '@/services/businesses';
 import { getActiveCampaigns } from '@/services/campaigns';
 import { getCategoryTree } from '@/services/catalog';
 import { getSettings } from '@/services/settings';
 import {
+  getStorefrontBusiness,
   storefrontError,
   storefrontJson,
   storefrontOptionsResponse,
@@ -20,13 +22,15 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    const [settings, categories, banners, campaigns] = await Promise.all([
+    const businessSlug = await getStorefrontBusiness(req);
+    const [business, settings, categories, banners, campaigns] = await Promise.all([
+      getBusinessBySlug(businessSlug),
       getSettings(),
-      getCategoryTree(),
-      getActiveBanners(),
+      getCategoryTree(businessSlug),
+      getActiveBanners(businessSlug),
       getActiveCampaigns(),
     ]);
-    return storefrontJson({ settings, categories, banners, campaigns });
+    return storefrontJson({ business, settings, categories, banners, campaigns });
   } catch (error) {
     return storefrontError(error);
   }

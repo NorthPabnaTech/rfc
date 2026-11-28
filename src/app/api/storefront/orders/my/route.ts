@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { listCustomerOrders } from '@/services/orders';
 import { AppError } from '@lib/errors';
 import {
+  getStorefrontBusiness,
   getStorefrontCustomerId,
   storefrontError,
   storefrontJson,
@@ -22,7 +23,8 @@ export async function GET(req: NextRequest) {
     const userId = await getStorefrontCustomerId(req);
     if (!userId) throw new AppError('Unauthorized.', 401);
 
-    const orders = await listCustomerOrders(userId);
+    const business = await getStorefrontBusiness(req);
+    const orders = await listCustomerOrders(userId, business);
     return storefrontJson(orders);
   } catch (error) {
     return storefrontError(error);

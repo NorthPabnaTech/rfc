@@ -7,19 +7,38 @@ import { useRouter } from 'next/navigation';
 import { deleteProductAction } from '@/actions/admin';
 import { Taka } from '@/features/products/price';
 import { ProductImage } from '@/features/products/product-image';
-import type { AdminComboDTO } from '@/types';
+import type { AdminComboDTO, BusinessDTO } from '@/types';
 import { Icon } from '@components/icon/icon';
 import { ConfirmDialog, StatusBadge } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { type Column, DataTable } from '@components/ui/data-table';
+import { Select } from '@components/ui/select';
 import { useClientPagination } from '@hooks/use-client-pagination';
 import { handleActionResult } from '@lib/action-client';
-import { STOCK_STATUS_LABELS } from '@lib/constants';
+import { DEFAULT_BUSINESS_SLUG, STOCK_STATUS_LABELS } from '@lib/constants';
 
-export function CombosTable({ combos }: { combos: AdminComboDTO[] }) {
+export function CombosTable({
+  combos,
+  businesses,
+}: {
+  combos: AdminComboDTO[];
+  businesses: BusinessDTO[];
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = React.useState<AdminComboDTO | null>(null);
-  const paged = useClientPagination(combos);
+  const [businessFilter, setBusinessFilter] = React.useState<string>('all');
+  const bizLabel = React.useMemo(
+    () => new Map(businesses.map((b) => [b.slug, b.name])),
+    [businesses],
+  );
+  const filtered = React.useMemo(
+    () =>
+      businessFilter === 'all'
+        ? combos
+        : combos.filter((c) => c.business === businessFilter),
+    [combos, businessFilter],
+  );
+  const paged = useClientPagination(filtered);
 
   const columns: Column<AdminComboDTO>[] = [
     {
@@ -44,6 +63,16 @@ export function CombosTable({ combos }: { combos: AdminComboDTO[] }) {
             </p>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'business',
+      header: 'Business',
+      cell: (c) => (
+        <StatusBadge
+          status={c.business === DEFAULT_BUSINESS_SLUG ? 'info' : 'neutral'}
+          label={bizLabel.get(c.business) ?? c.business}
+        />
       ),
     },
     {
@@ -112,6 +141,18 @@ export function CombosTable({ combos }: { combos: AdminComboDTO[] }) {
 
   return (
     <>
+      <div className="mb-4 flex justify-start">
+        <div className="w-56">
+          <Select
+            value={businessFilter}
+            onValueChange={setBusinessFilter}
+            items={[
+              { value: 'all', label: 'All businesses' },
+              ...businesses.map((b) => ({ value: b.slug, label: b.name })),
+            ]}
+          />
+        </div>
+      </div>
       <DataTable
         columns={columns}
         {...paged}

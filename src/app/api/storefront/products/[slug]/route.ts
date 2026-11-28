@@ -4,6 +4,7 @@ import { listProductQuestions, listProductReviews } from '@/services/engagement'
 import { getProductBySlug, getRelatedProducts } from '@/services/products';
 import { AppError } from '@lib/errors';
 import {
+  getStorefrontBusiness,
   storefrontError,
   storefrontJson,
   storefrontOptionsResponse,
@@ -22,12 +23,13 @@ export async function GET(
   if (denied) return denied;
 
   try {
+    const business = await getStorefrontBusiness(req);
     const { slug } = await context.params;
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlug(slug, business);
     if (!product) throw new AppError('Product not found.', 404);
 
     const [related, reviews, questions] = await Promise.all([
-      getRelatedProducts(product),
+      getRelatedProducts(product, 8, business),
       listProductReviews(product.id),
       listProductQuestions(product.id),
     ]);

@@ -4,6 +4,7 @@ import { jwtVerify, SignJWT } from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { resolvePublicStorefrontBusiness } from '@/services/businesses';
 import { serverEnv } from '@lib/env';
 import { AppError, zodFieldErrors } from '@lib/errors';
 
@@ -13,8 +14,14 @@ const jwtKey = new TextEncoder().encode(serverEnv.AUTH_SECRET);
 export const STOREFRONT_CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': process.env.STOREFRONT_ALLOWED_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-storefront-key',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-storefront-key, x-business-slug',
 };
+
+export async function getStorefrontBusiness(req: NextRequest): Promise<string> {
+  const slug =
+    req.nextUrl.searchParams.get('business') ?? req.headers.get('x-business-slug');
+  return resolvePublicStorefrontBusiness(slug);
+}
 
 export function storefrontOptionsResponse(): NextResponse {
   return new NextResponse(null, { status: 204, headers: STOREFRONT_CORS_HEADERS });

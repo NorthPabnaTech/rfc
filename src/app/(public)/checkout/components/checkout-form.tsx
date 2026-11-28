@@ -84,12 +84,15 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
       saveAddress: !!user && addresses.length === 0,
     },
   });
+  const division = useWatch({ control: form.control, name: 'division' });
+  const city = useWatch({ control: form.control, name: 'city' });
+  const hasLocation = Boolean(division && city);
   const zone = useWatch({ control: form.control, name: 'zone' }) as ShippingZone | undefined;
   const paymentMethod = useWatch({ control: form.control, name: 'paymentMethod' }) ?? 'cod';
   const clearCouponAction = React.useCallback(() => setCouponAction(null), []);
   const { quote, loading } = useCartQuote(
     items,
-    zone,
+    hasLocation ? zone : undefined,
     hydrated,
     appliedCoupon,
     clearCouponAction,
@@ -345,8 +348,21 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-ink line-clamp-2 text-[13px] font-semibold">{item.name}</p>
+                  <p className="text-muted mt-0.5 text-xs">
+                    <Taka amount={line?.unitPrice ?? item.price} /> × {item.quantity}
+                  </p>
                   {Object.keys(item.variant).length > 0 && (
-                    <p className="text-muted text-xs">{Object.values(item.variant).join(' · ')}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {Object.entries(item.variant).map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="bg-surface text-muted inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px]"
+                        >
+                          <span>{k}:</span>
+                          <span className="text-ink font-medium">{v}</span>
+                        </span>
+                      ))}
+                    </div>
                   )}
                   {line && (
                     <LineOptions
@@ -457,7 +473,7 @@ export function CheckoutForm({ user, addresses, fees, className }: Props) {
             <dt className="text-muted">Delivery</dt>
             <dd className="text-ink font-medium">
               {(() => {
-                if (!quote) return '—';
+                if (!quote || !hasLocation) return '-';
                 const baseFee = fees[zone ?? 'outside_dhaka'];
                 const discounted = quote.shippingFee < baseFee;
                 return (

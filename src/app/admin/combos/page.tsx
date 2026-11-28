@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { listBusinesses } from '@/services/businesses';
 import { listAdminCombos } from '@/services/combos';
 import { Icon } from '@components/icon/icon';
 import { PageHeader } from '@components/shared';
@@ -13,12 +14,15 @@ export const metadata: Metadata = { title: 'Combo offers' };
 
 export default async function CombosPage() {
   await requireAdminPage();
-  const combos = await listAdminCombos();
+  const [combos, businesses] = await Promise.all([
+    listAdminCombos(),
+    listBusinesses({ activeOnly: true }),
+  ]);
   return (
     <>
       <PageHeader
         title="Combo offers"
-        description="Bundle products at a special price. Combos appear on the homepage and at /combo-offers."
+        description="Bundle products at a special price per business. Combos appear on the store and at /combo-offers."
         actions={
           <Button variant="primary" asChild>
             <Link href="/admin/combos/new">
@@ -27,7 +31,7 @@ export default async function CombosPage() {
           </Button>
         }
       />
-      <CombosTable combos={combos} />
+      <CombosTable combos={combos} businesses={businesses} />
     </>
   );
 }

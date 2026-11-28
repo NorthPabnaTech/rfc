@@ -19,7 +19,10 @@ export function LineOptions({
   onChange: (variant: Record<string, string>) => void;
   className?: string;
 }) {
-  const isChosen = (o: CartQuoteLine['options'][number]) => o.values.includes(value[o.name] ?? '');
+  const isChosen = (o: CartQuoteLine['options'][number]) => {
+    const v = value[o.name] ?? '';
+    return o.values.includes(v) && !(o.disabledValues ?? []).includes(v);
+  };
   if (options.every(isChosen)) return null;
 
   return (
@@ -34,18 +37,25 @@ export function LineOptions({
           </legend>
           <div className="flex flex-wrap gap-1.5">
             {o.values.map((val) => {
-              const on = value[o.name] === val;
+              const isDisabled = (o.disabledValues ?? []).includes(val);
+              const on = value[o.name] === val && !isDisabled;
               return (
                 <button
                   key={val}
                   type="button"
+                  disabled={isDisabled}
                   aria-pressed={on}
-                  onClick={() => onChange({ ...value, [o.name]: val })}
+                  title={isDisabled ? 'Out of stock' : undefined}
+                  onClick={() => {
+                    if (!isDisabled) onChange({ ...value, [o.name]: val });
+                  }}
                   className={cn(
                     'focus-ring min-w-9 rounded-full border px-3 py-1 text-xs font-medium transition',
-                    on
-                      ? 'bg-noir border-noir text-white'
-                      : 'border-line-2/70 text-ink hover:border-ink bg-white',
+                    isDisabled
+                      ? 'border-line bg-well text-subtle cursor-not-allowed line-through opacity-50'
+                      : on
+                        ? 'bg-noir border-noir text-white'
+                        : 'border-line-2/70 text-ink hover:border-ink bg-white',
                   )}
                 >
                   {val}

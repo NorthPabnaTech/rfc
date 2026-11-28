@@ -8,13 +8,14 @@ import { Icon } from '@components/icon/icon';
 import { EmptyState } from '@components/shared';
 import { Button } from '@components/ui/button';
 import { requireUserPage } from '@lib/auth/current-user';
+import { DEFAULT_BUSINESS_SLUG } from '@lib/constants';
 import { formatStoreDate } from '@lib/utils';
 
 export const metadata: Metadata = { title: 'My orders' };
 
 export default async function MyOrdersPage() {
   const user = await requireUserPage('/account/orders');
-  const orders = await listCustomerOrders(user.id);
+  const orders = await listCustomerOrders(user.id, DEFAULT_BUSINESS_SLUG);
 
   return (
     <section className="border-line rounded-3xl border bg-white p-6 sm:p-8">
